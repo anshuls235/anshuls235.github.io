@@ -23,15 +23,17 @@ document.addEventListener('DOMContentLoaded', function() {
   menuToggle.addEventListener('click', function() {
     navbarMenu.classList.toggle('active');
     menuOverlay.classList.toggle('active');
-    menuToggle.querySelector('i').classList.toggle('fa-bars');
-    menuToggle.querySelector('i').classList.toggle('fa-times');
+    const icon = menuToggle.querySelector('i');
+    icon.classList.toggle('fa-bars');
+    icon.classList.toggle('fa-times');
   });
   
   menuOverlay.addEventListener('click', function() {
     navbarMenu.classList.remove('active');
     menuOverlay.classList.remove('active');
-    menuToggle.querySelector('i').classList.add('fa-bars');
-    menuToggle.querySelector('i').classList.remove('fa-times');
+    const icon = menuToggle.querySelector('i');
+    icon.classList.add('fa-bars');
+    icon.classList.remove('fa-times');
   });
   
   // Close menu when clicking on menu items
@@ -39,8 +41,9 @@ document.addEventListener('DOMContentLoaded', function() {
     link.addEventListener('click', function() {
       navbarMenu.classList.remove('active');
       menuOverlay.classList.remove('active');
-      menuToggle.querySelector('i').classList.add('fa-bars');
-      menuToggle.querySelector('i').classList.remove('fa-times');
+      const icon = menuToggle.querySelector('i');
+      icon.classList.add('fa-bars');
+      icon.classList.remove('fa-times');
     });
   });
   
@@ -230,11 +233,11 @@ function initializeSite(data) {
     skillTitle.className = 'skill-title';
     skillTitle.textContent = skillCategory.category;
     
-    const skillList = document.createElement('ul');
+    const skillList = document.createElement('div');
     skillList.className = 'skill-list';
     
     skillCategory.items.forEach(skill => {
-      const skillItem = document.createElement('li');
+      const skillItem = document.createElement('span');
       skillItem.className = 'skill-item';
       skillItem.textContent = skill;
       skillList.appendChild(skillItem);
@@ -274,9 +277,23 @@ function initializeSite(data) {
       projectTech.appendChild(techItem);
     });
     
+    const projectFooter = document.createElement('div');
+    projectFooter.className = 'project-footer';
+    
+    if (project.link) {
+      const projectLink = document.createElement('a');
+      projectLink.href = project.link;
+      projectLink.className = 'btn btn-primary btn-small';
+      projectLink.target = '_blank';
+      projectLink.rel = 'noopener noreferrer';
+      projectLink.textContent = 'View Project';
+      projectFooter.appendChild(projectLink);
+    }
+    
     projectBody.appendChild(projectTitle);
     projectBody.appendChild(projectDescription);
     projectBody.appendChild(projectTech);
+    projectBody.appendChild(projectFooter);
     
     projectCard.appendChild(projectBody);
     
