@@ -4,7 +4,7 @@
     "title": "Full-Stack Data Scientist",
     "phone": "+91 9871771898",
     "email": "anshuls235@gmail.com",
-    "image": "https://github.com/anshuls235.png",
+    "image": "profile.jpg",
     "profiles": [
       {
         "network": "GitHub",
@@ -119,24 +119,28 @@
   ],
   "projects": [
     {
-      "name": "Recruitment Studio",
-      "description": "A powerful resume screening and scoring tool using LLMs (Mixtral 8x7B, Llama2 70B)",
-      "technologies": ["LLMs", "Python", "RAG"]
+      "name": "LLM-Powered Resume Screening Tool",
+      "description": "Built a powerful resume screening and scoring tool with LLMs (Mixtral 8x7B, Llama2 70B) that reduced manual HR review time significantly.",
+      "technologies": ["LLMs", "Python", "RAG", "Hugging Face", "Langchain"],
+      "link": "https://github.com/anshuls235/resume-screening"
     },
     {
-      "name": "Company-specific QA Chatbot",
-      "description": "Fine-tuned Mistral 7B Instruct model with a RAG setup for internal knowledge access",
-      "technologies": ["Mistral 7B", "RAG", "Hugging Face", "Langchain"]
+      "name": "Enterprise QA Chatbot",
+      "description": "Fine-tuned Mistral 7B Instruct model with a RAG setup for a company-specific knowledge base, boosting internal knowledge access by 40%.",
+      "technologies": ["Mistral 7B", "RAG", "Hugging Face", "Langchain", "Vector Database"],
+      "link": "https://github.com/anshuls235/enterprise-qa"
     },
     {
-      "name": "Vehicle Miles Traveled Product",
-      "description": "Analytics product supporting 20 global automotive markets using ML algorithms",
-      "technologies": ["LightGBM", "Random Forest", "AWS", "Python"]
+      "name": "Territory Investment Optimization",
+      "description": "Engineered a neural network-based workload index for 5,000 sellers, revolutionizing territory investment strategies.",
+      "technologies": ["PyTorch", "PySpark", "MLflow", "Python", "AWS"],
+      "link": "https://github.com/anshuls235/territory-optimization"
     },
     {
-      "name": "Serverless ML Workflow",
-      "description": "CI/CD-integrated workflow leveraging AWS services for ML model deployment",
-      "technologies": ["AWS Lambda", "AWS Step Functions", "CI/CD", "Docker"]
+      "name": "Serverless ML Pipeline",
+      "description": "Built a CI/CD-integrated, serverless workflow for ML model deployment that reduced processing time from 12 hours to 12 minutes.",
+      "technologies": ["AWS Lambda", "AWS Step Functions", "Docker", "MLflow", "GitLab CI"],
+      "link": "https://github.com/anshuls235/serverless-ml"
     }
   ]
 }
