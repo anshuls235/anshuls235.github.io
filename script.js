@@ -91,7 +91,9 @@ function initializeSite(data) {
   });
   
   // Set name in various places
-  document.getElementById('navbar-logo').textContent = basics.name.split(' ')[0];
+  // Change here: Show full name in navbar-logo instead of first name only
+  document.getElementById('navbar-logo').textContent = "AS"; // Use initials for a clean look
+  document.getElementById('navbar-logo').setAttribute('title', basics.name); // Add tooltip with full name
   document.getElementById('hero-name').textContent = basics.name;
   document.getElementById('footer-name').textContent = basics.name;
   
