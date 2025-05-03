@@ -4,14 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anshul Sharma | Data Scientist</title>
-  <meta name="description" content="Anshul Sharma is a Full-Stack Data Scientist with 9 years of experience in designing, building, and maintaining AI applications.">
-  <meta name="keywords" content="Anshul Sharma, Data Scientist, Machine Learning, AI, Deep Learning, Python, MLOps">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta name="description" content="Anshul Sharma is a Full-Stack Data Scientist with 9 years of experience in designing, building, and maintaining AI applications, including Generative AI, that enhance customer experiences, optimize business processes, and provide insights that drive innovation.">
+  <meta name="keywords" content="Anshul Sharma, Data Scientist, Machine Learning, AI, Deep Learning, Python, MLOps, GenAI, LLM, RAG">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Open Graph / Social Media Meta Tags -->
+  <meta property="og:title" content="Anshul Sharma | Data Scientist">
+  <meta property="og:description" content="Full-Stack Data Scientist with expertise in ML, AI, and Data Engineering">
+  <meta property="og:image" content="profile.jpg">
+  <meta property="og:url" content="https://anshuls235.github.io/">
+  <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
   <!-- Navbar -->
@@ -27,13 +42,14 @@
         <li class="navbar-item"><a href="#skills" class="navbar-link">Skills</a></li>
         <li class="navbar-item"><a href="#projects" class="navbar-link">Projects</a></li>
         <li class="navbar-item"><a href="#education" class="navbar-link">Education</a></li>
+        <li class="navbar-item"><a href="#contact" class="navbar-link">Contact</a></li>
       </ul>
     </div>
   </nav>
   <div class="menu-overlay" id="menu-overlay"></div>
 
   <!-- Hero Section -->
-  <section class="hero" id="home">
+  <section class="hero section" id="home">
     <div class="container hero-content">
       <img id="profile-image" class="avatar fade-in" alt="Anshul Sharma Profile Photo">
       <h1 class="hero-title fade-in delay-1" id="hero-name"></h1>
@@ -46,7 +62,7 @@
   </section>
 
   <!-- About Section -->
-  <section class="about" id="about">
+  <section class="about section" id="about">
     <div class="container">
       <h2 class="section-title">About Me</h2>
       <div class="about-content">
@@ -74,7 +90,7 @@
   </section>
 
   <!-- Experience Section -->
-  <section class="experience" id="experience">
+  <section class="experience section" id="experience">
     <div class="container">
       <h2 class="section-title">Work Experience</h2>
       <div class="timeline" id="experience-timeline">
@@ -84,7 +100,7 @@
   </section>
 
   <!-- Skills Section -->
-  <section class="skills" id="skills">
+  <section class="skills section" id="skills">
     <div class="container">
       <h2 class="section-title">Skills</h2>
       <div class="skills-grid" id="skills-grid">
@@ -94,7 +110,7 @@
   </section>
 
   <!-- Projects Section -->
-  <section class="projects" id="projects">
+  <section class="projects section" id="projects">
     <div class="container">
       <h2 class="section-title">Projects</h2>
       <div class="projects-grid" id="projects-grid">
@@ -104,11 +120,38 @@
   </section>
 
   <!-- Education Section -->
-  <section class="education" id="education">
+  <section class="education section" id="education">
     <div class="container">
       <h2 class="section-title">Education</h2>
       <div class="education-list" id="education-list">
         <!-- Will be populated via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section class="contact section" id="contact">
+    <div class="container">
+      <h2 class="section-title">Get In Touch</h2>
+      <div class="contact-content">
+        <p class="contact-text">I'm always open to discussing new projects, opportunities, or partnerships. Feel free to reach out to me using any of the methods below:</p>
+        <div class="contact-methods">
+          <div class="contact-method">
+            <i class="fas fa-envelope contact-icon"></i>
+            <h3>Email</h3>
+            <a href="mailto:anshuls235@gmail.com">anshuls235@gmail.com</a>
+          </div>
+          <div class="contact-method">
+            <i class="fas fa-phone contact-icon"></i>
+            <h3>Phone</h3>
+            <a href="tel:+919871771898">+91 9871771898</a>
+          </div>
+          <div class="contact-method">
+            <i class="fas fa-map-marker-alt contact-icon"></i>
+            <h3>Location</h3>
+            <p>Gurgaon, Haryana, India</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -126,10 +169,11 @@
   </footer>
 
   <!-- Resume Download Button -->
-  <a href="resume.pdf" class="resume-btn" title="Download Resume" id="resume-btn">
+  <a href="resume.pdf" class="resume-btn" title="Download Resume" id="resume-btn" target="_blank">
     <i class="fas fa-file-download"></i>
   </a>
 
+  <!-- JavaScript -->
   <script src="script.js"></script>
 </body>
 </html>
