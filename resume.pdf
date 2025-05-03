@@ -1,0 +1,485 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/Resources 4 0 R
+/MediaBox [0 0 612 792]
+/Contents 5 0 R
+>>
+endobj
+4 0 obj
+<<
+/Font <<
+/F1 6 0 R
+/F2 7 0 R
+/F3 8 0 R
+>>
+>>
+endobj
+5 0 obj
+<<
+/Length 10242
+>>
+stream
+BT
+/F1 20 Tf
+50 720 Td
+(Anshul Sharma) Tj
+ET
+
+BT
+/F2 10 Tf
+50 700 Td
+(+91 9871771898 | anshuls235@gmail.com | Kaggle | Medium | GitHub | LinkedIn) Tj
+ET
+
+BT
+/F3 11 Tf
+50 670 Td
+(Full-Stack Data Scientist with 9 years of experience in designing, building, and maintaining AI applications, including Generative AI,) Tj
+ET
+
+BT
+/F3 11 Tf
+50 655 Td
+(that enhance customer experiences, optimize business processes, and provide insights that drive innovation business growth.) Tj
+ET
+
+BT
+/F3 11 Tf
+50 640 Td
+(Proficient in building data pipelines, predictive modeling and seamless deployment of ML architecture using Cloud MLOps.) Tj
+ET
+
+BT
+/F1 14 Tf
+50 610 Td
+(WORK EXPERIENCE) Tj
+ET
+
+BT
+/F1 12 Tf
+50 590 Td
+(Senior Data Scientist) Tj
+ET
+
+BT
+/F2 11 Tf
+250 590 Td
+(Gartner) Tj
+ET
+
+BT
+/F2 10 Tf
+350 590 Td
+(JUL 2022 — Present) Tj
+ET
+
+BT
+/F2 10 Tf
+50 575 Td
+(Gurgaon, Haryana) Tj
+ET
+
+BT
+/F3 9 Tf
+60 555 Td
+(• Focused on driving seller productivity by applying Data Science, ML, GenAI, Advanced Analytics, and BI to real-world) Tj
+ET
+
+BT
+/F3 9 Tf
+62 545 Td
+(challenges. This includes ranking enterprises by predicted growth, identifying whitespace, quantifying opportunities, and) Tj
+ET
+
+BT
+/F3 9 Tf
+62 535 Td
+(analyzing seller workload to empower more strategic, data-driven decisions.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 520 Td
+(• Led a series of GenAI projects to tackle real business challenges, from building the Recruitment Studio—a powerful resume) Tj
+ET
+
+BT
+/F3 9 Tf
+62 510 Td
+(screening and scoring tool with LLMs (Mixtral 8x7B, Llama2 70B)—to fine-tuning the Mistral 7B Instruct model with a RAG setup) Tj
+ET
+
+BT
+/F3 9 Tf
+62 500 Td
+(for a company-specific QA chatbot. These initiatives cut down manual HR review time, boosted internal knowledge access by) Tj
+ET
+
+BT
+/F3 9 Tf
+62 490 Td
+(40%, and slashed response time for complex queries by 60%, bringing measurable impact across both HR and internal support.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 475 Td
+(• Automated an ML workflow for quarterly growth forecasts, cutting turnaround time from 14 days to 4 hours and conserving over) Tj
+ET
+
+BT
+/F3 9 Tf
+62 465 Td
+(10,000 person-hours monthly.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 450 Td
+(• Orchestrated a Pyspark-based optimization of data pipelines, shrinking data processing time from 12 hours to 12 minutes, and) Tj
+ET
+
+BT
+/F3 9 Tf
+62 440 Td
+(instituted a robust MLOps framework via MLFlow to mitigate data and concept drift.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 425 Td
+(• Engineered a neural network-based workload index for 5,000 sellers, revolutionizing territory investment strategies and) Tj
+ET
+
+BT
+/F3 9 Tf
+62 415 Td
+(decision-making processes.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 400 Td
+(• Automated and streamlined the NPV model for territory investment, eliminating 20 Excel sheets and 3 weeks of manual labor) Tj
+ET
+
+BT
+/F3 9 Tf
+62 390 Td
+(monthly, reducing the computation time to a mere 5 minutes.) Tj
+ET
+
+BT
+/F1 12 Tf
+50 370 Td
+(Senior Data Scientist) Tj
+ET
+
+BT
+/F2 11 Tf
+250 370 Td
+(S&P Global) Tj
+ET
+
+BT
+/F2 10 Tf
+350 370 Td
+(JAN 2021 — JUL 2022) Tj
+ET
+
+BT
+/F2 10 Tf
+50 355 Td
+(Gurgaon, Haryana) Tj
+ET
+
+BT
+/F3 9 Tf
+60 335 Td
+(• Pioneered the development of a Vehicle Miles Traveled product, generating $300k in revenue during phase-1 and extending) Tj
+ET
+
+BT
+/F3 9 Tf
+62 325 Td
+(support to 20 global automotive markets through LightGBM/Random Forest algorithms.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 310 Td
+(• Architected a CI/CD-integrated, serverless workflow leveraging AWS services, serving as a blueprint for other teams) Tj
+ET
+
+BT
+/F3 9 Tf
+62 300 Td
+(transitioning to serverless architectures.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 285 Td
+(• Led the Data Acquisition Team in scraping 50+ websites and deploying large-scale web crawlers, amassing gigabytes of valuable) Tj
+ET
+
+BT
+/F3 9 Tf
+62 275 Td
+(data.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 260 Td
+(• Orchestrated the acquisition and transformation of data from 10+ disparate sources, including Oracle, Hadoop, and MongoDB,) Tj
+ET
+
+BT
+/F3 9 Tf
+62 250 Td
+(employing advanced analytics to render the data actionable for stakeholders.) Tj
+ET
+
+BT
+/F1 12 Tf
+50 230 Td
+(Developer) Tj
+ET
+
+BT
+/F2 11 Tf
+250 230 Td
+(SAP Labs India) Tj
+ET
+
+BT
+/F2 10 Tf
+350 230 Td
+(AUG 2015 — DEC 2020) Tj
+ET
+
+BT
+/F2 10 Tf
+50 215 Td
+(Gurgaon, Haryana & Bengaluru, Karnataka) Tj
+ET
+
+BT
+/F3 9 Tf
+60 195 Td
+(• Engineered ETL pipelines to automate data transfer from source files to SAP BW, and implemented REST APIs, doubling) Tj
+ET
+
+BT
+/F3 9 Tf
+62 185 Td
+(performance metrics and enhancing reporting capabilities.) Tj
+ET
+
+BT
+/F3 9 Tf
+60 170 Td
+(• Integrated a Random Forest Classifier to replace a manual rule-based mapping system, achieving a 200% speed increase in) Tj
+ET
+
+BT
+/F3 9 Tf
+62 160 Td
+(deriving automotive attributes. Additionally, contributed to customer demos and product design discussions, providing) Tj
+ET
+
+BT
+/F3 9 Tf
+62 150 Td
+(data-driven insights for product development.) Tj
+ET
+
+BT
+/F1 14 Tf
+50 130 Td
+(TECHNICAL SKILLS & EXPERTISE) Tj
+ET
+
+BT
+/F2 10 Tf
+50 115 Td
+(ML Frameworks & Data Science :) Tj
+ET
+
+BT
+/F3 9 Tf
+210 115 Td
+(scikit-learn, XGBoost, LGBM, PyTorch, Keras, Hugging Face, Langchain, LlamaIndex, Pandas, NumPy) Tj
+ET
+
+BT
+/F2 10 Tf
+50 100 Td
+(Generative AI :) Tj
+ET
+
+BT
+/F3 9 Tf
+210 100 Td
+(LLMs, LLM Fine-tuning, RAG, Prompt Engineering) Tj
+ET
+
+BT
+/F2 10 Tf
+50 85 Td
+(Programming Languages & Tools :) Tj
+ET
+
+BT
+/F3 9 Tf
+210 85 Td
+(Python, SQL, R, PySpark, Spark, Git, Shell scripting, VS Code, PyCharm, Jupyter, Anaconda, KNIME) Tj
+ET
+
+BT
+/F2 10 Tf
+50 70 Td
+(Cloud & MLOps :) Tj
+ET
+
+BT
+/F3 9 Tf
+210 70 Td
+(AWS (SageMaker, Lambda, Step Functions, ECS, ECR, Batch, API Gateway, CloudWatch),) Tj
+ET
+
+BT
+/F3 9 Tf
+210 60 Td
+(Azure (App Service, ADF, Cognitive Services), Databricks, Docker, Terraform, Jenkins, MLflow, GitLab CI) Tj
+ET
+
+BT
+/F2 10 Tf
+50 45 Td
+(Data Visualization :) Tj
+ET
+
+BT
+/F3 9 Tf
+210 45 Td
+(Power BI, Tableau, Plotly, Matplotlib, Seaborn) Tj
+ET
+
+BT
+/F2 10 Tf
+50 30 Td
+(Web Development :) Tj
+ET
+
+BT
+/F3 9 Tf
+210 30 Td
+(Flask, Django REST framework, Streamlit, Gradio, HTML, CSS, Bootstrap, Dash) Tj
+ET
+
+BT
+/F1 14 Tf
+50 15 Td
+(EDUCATION) Tj
+ET
+
+BT
+/F2 11 Tf
+50 0 Td
+(BTech in Electronics & Communication, Delhi Technological University) Tj
+ET
+
+BT
+/F2 10 Tf
+450 0 Td
+(2011 — 2015) Tj
+ET
+
+BT
+/F2 11 Tf
+50 -15 Td
+(Machine Learning Nanodegree, Udacity) Tj
+ET
+
+BT
+/F2 10 Tf
+450 -15 Td
+(2019) Tj
+ET
+
+BT
+/F2 11 Tf
+50 -30 Td
+(Data Analyst Nanodegree, Udacity) Tj
+ET
+
+BT
+/F2 10 Tf
+450 -30 Td
+(2018) Tj
+ET
+
+endstream
+endobj
+6 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica-Light
+/Encoding /WinAnsiEncoding
+>>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000123 00000 n 
+0000000222 00000 n 
+0000000289 00000 n 
+0000010585 00000 n 
+0000010687 00000 n 
+0000010784 00000 n 
+trailer
+<<
+/Size 9
+/Root 1 0 R
+>>
+startxref
+10885
+%%EOF
