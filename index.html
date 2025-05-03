@@ -1,111 +1,135 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anshul Sharma | Personal Website</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
-    <meta name="description" content="Anshul Sharma's personal website showcasing skills, projects, and contact information.">
-    <meta name="keywords" content="Anshul Sharma, data scientist, machine learning, developer, portfolio">
-    <meta name="author" content="Anshul Sharma">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anshul Sharma | Data Scientist</title>
+  <meta name="description" content="Anshul Sharma is a Full-Stack Data Scientist with 9 years of experience in designing, building, and maintaining AI applications.">
+  <meta name="keywords" content="Anshul Sharma, Data Scientist, Machine Learning, AI, Deep Learning, Python, MLOps">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Anshul Sharma</h1>
-            <p>Data Scientist | Machine Learning Engineer | Developer</p>
-        </div>
-    </header>
-    
-    <nav>
-        <div class="container">
-            <ul>
-                <li><a href="#about">About</a></li>
-                <li><a href="#projects">Projects</a></li>
-                <li><a href="#skills">Skills</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </div>
-    </nav>
-    
-    <main class="container">
-        <section id="about">
-            <h2>About Me</h2>
-            <p>
-                Hello! I'm Anshul Sharma, a data scientist and machine learning engineer based in Delhi. I have a passion for solving complex problems using data and building applications that make a positive impact.
-            </p>
-            <p>
-                With experience in Python, data analysis, and machine learning, I enjoy working on projects that involve extracting insights from data and developing models to solve real-world problems.
-            </p>
-        </section>
-        
-        <section id="projects">
-            <h2>Projects</h2>
-            <div class="projects">
-                <div class="project-card">
-                    <div class="project-content">
-                        <h3>COVID-19 Dashboard</h3>
-                        <p>A dashboard for tracking COVID-19 statistics in India with interactive visualizations.</p>
-                        <a href="https://github.com/anshuls235/covid19-dashboard" class="btn">View Project</a>
-                    </div>
-                </div>
-                
-                <div class="project-card">
-                    <div class="project-content">
-                        <h3>Freshness Detector</h3>
-                        <p>An application to detect the freshness of fruits using computer vision and machine learning.</p>
-                        <a href="https://github.com/anshuls235/freshness-detector" class="btn">View Project</a>
-                    </div>
-                </div>
-                
-                <div class="project-card">
-                    <div class="project-content">
-                        <h3>SpeechCoach AI</h3>
-                        <p>AI-powered speech training assistant for improving communication skills.</p>
-                        <a href="https://github.com/anshuls235/speechcoach-ai" class="btn">View Project</a>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <section id="skills">
-            <h2>Skills</h2>
-            <ul>
-                <li>Python (NumPy, Pandas, Scikit-learn, TensorFlow)</li>
-                <li>Data Analysis and Visualization</li>
-                <li>Machine Learning and Deep Learning</li>
-                <li>Natural Language Processing</li>
-                <li>Web Development (HTML, CSS, JavaScript)</li>
-                <li>Flask and Django</li>
-                <li>SQL and Database Management</li>
-            </ul>
-        </section>
-        
-        <section id="contact">
-            <h2>Contact</h2>
-            <p>
-                Feel free to reach out if you'd like to collaborate on a project or just want to connect!
-            </p>
-            <p>
-                Email: <a href="mailto:anshuls235@gmail.com">anshuls235@gmail.com</a><br>
-                GitHub: <a href="https://github.com/anshuls235">github.com/anshuls235</a>
-            </p>
-            <div class="social-links">
-                <a href="https://github.com/anshuls235" target="_blank"><i class="fab fa-github"></i></a>
-                <a href="https://linkedin.com/in/anshul-sharma" target="_blank"><i class="fab fa-linkedin"></i></a>
-                <a href="https://twitter.com/anshuls235" target="_blank"><i class="fab fa-twitter"></i></a>
-            </div>
-        </section>
-    </main>
-    
-    <footer>
-        <div class="container">
-            <p>&copy; 2025 Anshul Sharma. All Rights Reserved.</p>
-        </div>
-    </footer>
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="container navbar-container">
+      <a href="#" class="navbar-logo" id="navbar-logo"></a>
+      <div class="menu-toggle" id="menu-toggle">
+        <i class="fas fa-bars"></i>
+      </div>
+      <ul class="navbar-menu" id="navbar-menu">
+        <li class="navbar-item"><a href="#about" class="navbar-link">About</a></li>
+        <li class="navbar-item"><a href="#experience" class="navbar-link">Experience</a></li>
+        <li class="navbar-item"><a href="#skills" class="navbar-link">Skills</a></li>
+        <li class="navbar-item"><a href="#projects" class="navbar-link">Projects</a></li>
+        <li class="navbar-item"><a href="#education" class="navbar-link">Education</a></li>
+      </ul>
+    </div>
+  </nav>
+  <div class="menu-overlay" id="menu-overlay"></div>
 
-    <script src="script.js"></script>
+  <!-- Hero Section -->
+  <section class="hero" id="home">
+    <div class="container hero-content">
+      <img id="profile-image" class="avatar fade-in" alt="Anshul Sharma Profile Photo">
+      <h1 class="hero-title fade-in delay-1" id="hero-name"></h1>
+      <h2 class="hero-subtitle fade-in delay-2" id="hero-title"></h2>
+      <p class="hero-text fade-in delay-3" id="hero-summary"></p>
+      <div class="hero-social fade-in delay-3" id="hero-social">
+        <!-- Will be populated via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section class="about" id="about">
+    <div class="container">
+      <h2 class="section-title">About Me</h2>
+      <div class="about-content">
+        <div class="about-image">
+          <img id="about-profile-image" class="avatar" alt="Anshul Sharma Profile Photo">
+        </div>
+        <div class="about-info">
+          <p class="about-text" id="about-summary"></p>
+          <div class="contact-info">
+            <div class="contact-item">
+              <i class="fas fa-envelope contact-icon"></i>
+              <a id="contact-email" href=""></a>
+            </div>
+            <div class="contact-item">
+              <i class="fas fa-phone contact-icon"></i>
+              <a id="contact-phone" href=""></a>
+            </div>
+          </div>
+          <div id="about-profiles">
+            <!-- Will be populated via JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Experience Section -->
+  <section class="experience" id="experience">
+    <div class="container">
+      <h2 class="section-title">Work Experience</h2>
+      <div class="timeline" id="experience-timeline">
+        <!-- Will be populated via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Skills Section -->
+  <section class="skills" id="skills">
+    <div class="container">
+      <h2 class="section-title">Skills</h2>
+      <div class="skills-grid" id="skills-grid">
+        <!-- Will be populated via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Projects Section -->
+  <section class="projects" id="projects">
+    <div class="container">
+      <h2 class="section-title">Projects</h2>
+      <div class="projects-grid" id="projects-grid">
+        <!-- Will be populated via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Education Section -->
+  <section class="education" id="education">
+    <div class="container">
+      <h2 class="section-title">Education</h2>
+      <div class="education-list" id="education-list">
+        <!-- Will be populated via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <h3 class="footer-logo" id="footer-name"></h3>
+      <p class="footer-text">Thanks for visiting my website. Feel free to connect with me through the social media links below or send me an email.</p>
+      <div class="footer-social" id="footer-social">
+        <!-- Will be populated via JavaScript -->
+      </div>
+      <p class="footer-copyright">&copy; <span id="current-year"></span> All Rights Reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Resume Download Button -->
+  <a href="resume.pdf" class="resume-btn" title="Download Resume" id="resume-btn">
+    <i class="fas fa-file-download"></i>
+  </a>
+
+  <script src="script.js"></script>
 </body>
 </html>
