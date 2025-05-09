@@ -83,15 +83,14 @@ function initializeSite(data) {
   // Set basic information
   const basics = data.basics;
   
-  // Set profile images
-  const profileImages = document.querySelectorAll('#profile-image, #about-profile-image');
-  profileImages.forEach(img => {
-    img.src = basics.image;
-    img.alt = basics.name;
-  });
+  // Set profile image (only hero section now)
+  const profileImage = document.getElementById('profile-image');
+  if (profileImage) {
+    profileImage.src = basics.image;
+    profileImage.alt = basics.name;
+  }
   
   // Set name in various places
-  // Change here: Show full name in navbar-logo instead of first name only
   document.getElementById('navbar-logo').textContent = "AS"; // Use initials for a clean look
   document.getElementById('navbar-logo').setAttribute('title', basics.name); // Add tooltip with full name
   document.getElementById('hero-name').textContent = basics.name;
