@@ -231,6 +231,7 @@ ul {
   background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
   color: white;
   overflow: hidden;
+  padding-top: 100px; /* Added more padding at the top to prevent navbar overlap */
 }
 
 .hero::before {
@@ -253,6 +254,7 @@ ul {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  padding-top: 30px; /* Added additional padding to prevent overlap with navbar */
 }
 
 .avatar {
@@ -315,15 +317,14 @@ ul {
 }
 
 .about-content {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 4rem;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.about-image img {
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
+.about-info {
+  width: 100%;
 }
 
 .about-text {
