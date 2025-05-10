@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   addScrollEffects();
 });
 
+<<<<<<< HEAD
 function loadData() {
   fetch('data.json')
     .then(res => res.json())
@@ -31,6 +32,23 @@ function renderBasicInfo(basics) {
   });
   document.getElementById('navbar-logo').textContent = 'AS';
   document.getElementById('navbar-logo').title = basics.name;
+=======
+// Function to initialize the site with data
+function initializeSite(data) {
+  // Set basic information
+  const basics = data.basics;
+  
+  // Set profile image (only hero section now)
+  const profileImage = document.getElementById('profile-image');
+  if (profileImage) {
+    profileImage.src = basics.image;
+    profileImage.alt = basics.name;
+  }
+  
+  // Set name in various places
+  document.getElementById('navbar-logo').textContent = "AS"; // Use initials for a clean look
+  document.getElementById('navbar-logo').setAttribute('title', basics.name); // Add tooltip with full name
+>>>>>>> 340dc218388b48275fe651e336d3eb37c5729397
   document.getElementById('hero-name').textContent = basics.name;
   document.getElementById('footer-name').textContent = basics.name;
   document.getElementById('hero-title').textContent = basics.title;
