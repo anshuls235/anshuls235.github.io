@@ -1,3 +1,25 @@
+// script.js - Modular and now enhanced with visual upgrades + theme toggle
+
+// Theme Toggle
+const themeToggle = document.createElement('button');
+themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+themeToggle.className = 'theme-toggle';
+document.body.appendChild(themeToggle);
+
+themeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('dark-mode');
+  const icon = themeToggle.querySelector('i');
+  icon.classList.toggle('fa-moon');
+  icon.classList.toggle('fa-sun');
+  localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+});
+
+if (localStorage.getItem('theme') === 'dark') {
+  document.body.classList.add('dark-mode');
+  themeToggle.querySelector('i').classList.remove('fa-moon');
+  themeToggle.querySelector('i').classList.add('fa-sun');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initializeNavbar();
   loadData();

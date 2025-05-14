@@ -42,30 +42,35 @@
   <!-- Hero Section -->
   <section class="hero section" id="home">
     <div class="container hero-content">
-      <img id="profile-image" class="avatar fade-in" alt="Anshul Sharma Profile Photo" />
-      <h1 class="hero-title fade-in delay-1" id="hero-name"></h1>
-      <h2 class="hero-subtitle fade-in delay-2" id="hero-title"></h2>
-      <p class="hero-text fade-in delay-3" id="hero-summary"></p>
-      <div class="hero-social fade-in delay-3" id="hero-social"></div>
+      <div class="hero-text-group fade-in delay-1">
+        <h1 class="hero-title" id="hero-name"></h1>
+        <h2 class="hero-subtitle" id="hero-title"></h2>
+        <p class="hero-text" id="hero-summary"></p>
+        <div class="hero-social fade-in delay-3" id="hero-social"></div>
+      </div>
+      <div class="hero-avatar fade-in delay-2">
+        <img id="profile-image" class="avatar" alt="Anshul Sharma Profile Photo" />
+      </div>
     </div>
   </section>
 
-  <!-- About -->
+  <!-- About Section -->
   <section class="about section" id="about">
     <div class="container">
       <h2 class="section-title">About Me</h2>
-      <div class="about-content">
-        <div class="about-image">
-          <img id="about-profile-image" class="avatar" alt="Anshul Sharma Profile Photo" />
-        </div>
-        <div class="about-info">
-          <p class="about-text" id="about-summary"></p>
-          <div class="contact-info">
-            <div class="contact-item"><i class="fas fa-envelope contact-icon"></i><a id="contact-email" href=""></a></div>
-            <div class="contact-item"><i class="fas fa-phone contact-icon"></i><a id="contact-phone" href=""></a></div>
+      <div class="about-info fade-in delay-1">
+        <p class="about-text" id="about-summary"></p>
+        <div class="contact-info">
+          <div class="contact-item">
+            <i class="fas fa-envelope contact-icon"></i>
+            <a id="contact-email" href=""></a>
           </div>
-          <div id="about-profiles"></div>
+          <div class="contact-item">
+            <i class="fas fa-phone contact-icon"></i>
+            <a id="contact-phone" href=""></a>
+          </div>
         </div>
+        <div id="about-profiles" class="fade-in delay-2"></div>
       </div>
     </div>
   </section>

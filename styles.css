@@ -281,3 +281,38 @@ img {
     padding: 0 1rem;
   }
 }
+
+.hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  text-align: left;
+}
+
+.hero-text-group {
+  flex: 1 1 500px;
+  padding-right: 2rem;
+}
+
+.hero-avatar {
+  flex: 0 0 220px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .hero-content {
+    flex-direction: column-reverse;
+    text-align: center;
+  }
+
+  .hero-text-group {
+    padding-right: 0;
+  }
+
+  .hero-avatar {
+    margin-bottom: 2rem;
+  }
+}
