@@ -1,31 +1,37 @@
-// script.js - Modular and now enhanced with visual upgrades + theme toggle
-
-// Theme Toggle
-const themeToggle = document.createElement('button');
-themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
-themeToggle.className = 'theme-toggle';
-document.body.appendChild(themeToggle);
-
-themeToggle.addEventListener('click', () => {
-  document.body.classList.toggle('dark-mode');
-  const icon = themeToggle.querySelector('i');
-  icon.classList.toggle('fa-moon');
-  icon.classList.toggle('fa-sun');
-  localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
-});
-
-if (localStorage.getItem('theme') === 'dark') {
-  document.body.classList.add('dark-mode');
-  themeToggle.querySelector('i').classList.remove('fa-moon');
-  themeToggle.querySelector('i').classList.add('fa-sun');
+// Theme Toggle Functionality
+function initThemeToggle() {
+  const themeToggle = document.getElementById('theme-toggle');
+  const html = document.documentElement;
+  
+  // Check for saved theme preference or default to light mode
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  html.setAttribute('data-theme', savedTheme);
+  
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = html.getAttribute('data-theme');
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    html.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+  });
 }
 
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+  initThemeToggle();
   initializeNavbar();
   loadData();
   setupSmoothScrolling();
   addScrollEffects();
+  setCurrentYear();
 });
+
+function setCurrentYear() {
+  const yearElement = document.getElementById('current-year');
+  if (yearElement) {
+    yearElement.textContent = new Date().getFullYear();
+  }
+}
 
 function loadData() {
   fetch('data.json')
