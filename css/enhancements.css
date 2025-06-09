@@ -1,0 +1,414 @@
+/* Additional CSS for enhanced modular portfolio */
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--primary-color);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: top 0.3s;
+  z-index: 10001;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Enhanced back to top button */
+.back-to-top {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: 50%;
+  box-shadow: var(--card-shadow);
+  font-size: 1.25rem;
+  z-index: 100;
+  transition: var(--transition);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.back-to-top:hover {
+  background: var(--primary-dark);
+  transform: translateY(-5px) scale(1.1);
+  box-shadow: 0 15px 35px rgba(37, 99, 235, 0.4);
+}
+
+/* Notification system */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  z-index: 10000;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  max-width: 400px;
+  font-weight: 500;
+}
+
+.notification.notification-info {
+  background: var(--primary-color);
+  color: white;
+}
+
+.notification.notification-success {
+  background: var(--success-color);
+  color: white;
+}
+
+.notification.notification-warning {
+  background: var(--warning-color);
+  color: var(--text-color);
+}
+
+.notification.notification-error {
+  background: var(--error-color);
+  color: white;
+}
+
+/* Enhanced loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, var(--background) 0px, var(--border-color) 40px, var(--background) 80px);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* Enhanced focus states for accessibility */
+*:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+button:focus,
+.btn:focus,
+a:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Enhanced dark mode transitions */
+[data-theme="dark"] {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Performance optimization for animations */
+.fade-in,
+.timeline-item,
+.skill-card,
+.project-card,
+.education-item {
+  will-change: transform, opacity;
+}
+
+/* Improved scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Enhanced modal backdrop blur */
+.easter-egg-modal {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Better mobile touch targets */
+@media (max-width: 768px) {
+  .navbar-link,
+  .btn,
+  .social-link,
+  .contact-method a {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .skill-item {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Enhanced error states */
+.error-boundary {
+  padding: 2rem;
+  text-align: center;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--error-color);
+  margin: 2rem 0;
+}
+
+.error-boundary h3 {
+  color: var(--error-color);
+  margin-bottom: 1rem;
+}
+
+.error-boundary p {
+  color: var(--text-color);
+  margin-bottom: 1rem;
+}
+
+/* Improved print styles */
+@media print {
+  .navbar,
+  .easter-egg-modal,
+  .resume-btn,
+  .back-to-top,
+  .particles-container,
+  .cursor-trail,
+  .matrix-rain {
+    display: none !important;
+  }
+  
+  .section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  .hero {
+    background: none !important;
+    color: #000 !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* Enhanced high contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --primary-color: #0000ee;
+    --text-color: #000000;
+    --background: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: #000000;
+  }
+  
+  [data-theme="dark"] {
+    --primary-color: #4d94ff;
+    --text-color: #ffffff;
+    --background: #000000;
+    --card-bg: #000000;
+    --border-color: #ffffff;
+  }
+  
+  .btn,
+  .navbar-link:hover {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Enhanced animation for resume download */
+.resume-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.resume-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.resume-btn:hover::before {
+  left: 100%;
+}
+
+/* Enhanced skill item interaction */
+.skill-item {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.skill-item:active {
+  transform: scale(0.95);
+}
+
+/* Improved timeline responsiveness */
+@media (max-width: 768px) {
+  .timeline::before {
+    left: 1rem;
+  }
+  
+  .timeline-item {
+    padding-left: 2.5rem;
+  }
+  
+  .timeline-item::after {
+    left: 0.75rem;
+  }
+}
+
+/* Enhanced contact method hover effects */
+.contact-method:hover .contact-icon {
+  transform: scale(1.2) rotate(5deg);
+  color: var(--primary-color);
+}
+
+/* Better visual hierarchy for education items */
+.education-degree {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+/* Improved project card layouts */
+.project-card {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-footer {
+  margin-top: auto;
+}
+
+/* Enhanced social link animations */
+.social-link,
+.footer-social-link {
+  position: relative;
+  overflow: hidden;
+}
+
+.social-link::before,
+.footer-social-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.3s;
+}
+
+.social-link:hover::before,
+.footer-social-link:hover::before {
+  left: 100%;
+}
+
+/* Better spacing for mobile devices */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .section {
+    padding: 3rem 0;
+  }
+  
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.2rem;
+  }
+  
+  .section-title {
+    font-size: 2rem;
+  }
+}
+
+/* Enhanced focus management for modals */
+.easter-egg-modal.active {
+  display: flex;
+}
+
+.easter-egg-modal:not(.active) {
+  display: none;
+}
+
+/* Performance optimization */
+.particles-container,
+.cursor-trail,
+.matrix-rain {
+  pointer-events: none;
+  contain: layout style paint;
+}
+
+/* Better error handling display */
+.js-error {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--error-color);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  z-index: 10000;
+  max-width: 90vw;
+  text-align: center;
+}
+
+/* Improved loading spinner */
+.loading-spinner {
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 2rem auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
