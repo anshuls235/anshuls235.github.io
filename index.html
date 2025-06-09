@@ -229,7 +229,16 @@
     <i class="fas fa-chevron-up" aria-hidden="true"></i>
   </button>
 
-  <!-- JS -->
-  <script src="script.js" defer></script>
+  <!-- Modular JavaScript -->
+  <script type="module" src="app.js"></script>
+  
+  <!-- Fallback for browsers that don't support modules -->
+  <script nomodule>
+    console.warn('This browser does not support ES6 modules. Some features may not work.');
+    // Load the old script as fallback
+    var script = document.createElement('script');
+    script.src = 'script.js';
+    document.head.appendChild(script);
+  </script>
 </body>
 </html>
