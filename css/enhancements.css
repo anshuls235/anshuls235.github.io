@@ -1,6 +1,4 @@
-/* Additional CSS for enhanced modular portfolio */
-
-/* Skip link for accessibility */
+/* Fix skip link visibility and other critical issues */
 .skip-link {
   position: absolute;
   top: -40px;
@@ -18,7 +16,17 @@
   top: 6px;
 }
 
-/* Enhanced back to top button */
+/* Hide skip link by default */
+.skip-link:not(:focus) {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+}
+
+/* Rest of the enhancements remain the same */
 .back-to-top {
   position: fixed;
   bottom: 1.5rem;
