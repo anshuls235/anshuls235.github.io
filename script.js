@@ -501,9 +501,23 @@ function setCurrentYear() {
 
 function loadData() {
   fetch('data.json')
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) throw new Error('Network response was not ok');
+      return res.json();
+    })
     .then(data => renderSite(data))
-    .catch(err => console.error('Error loading data:', err));
+    .catch(err => {
+      console.error('Error loading data:', err);
+      const fallbackEl = document.getElementById('default-data');
+      if (fallbackEl) {
+        try {
+          const fallbackData = JSON.parse(fallbackEl.textContent);
+          renderSite(fallbackData);
+        } catch (e) {
+          console.error('Error parsing embedded data:', e);
+        }
+      }
+    });
 }
 
 function renderSite(data) {
