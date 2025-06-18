@@ -38,6 +38,12 @@ To run this website locally:
 
 3. Open the `index.html` file in your browser.
 
+## Offline Usage
+
+The site loads its content from `data.json`. If that file cannot be fetched—for
+example when viewing the page directly from the filesystem—the fallback data
+defined in `script.js` will be used so all sections still display.
+
 ## Customization
 
 Feel free to fork this repository and customize it for your own use. Here are the main files you'll want to modify:
