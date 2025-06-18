@@ -1,7 +1,9 @@
 :root {
-  --primary-color: #2563eb;
-  --primary-dark: #1d4ed8;
+  --primary-color: #6366f1;
+  --primary-dark: #4f46e5;
+  --secondary-color: #ec4899;
   --background: #f8fafc;
+  --background-gradient: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
   --text-color: #1e293b;
   --accent: #94a3b8;
   --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -18,6 +20,7 @@
 
 [data-theme="dark"] {
   --background: #0f172a;
+  --background-gradient: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
   --text-color: #f1f5f9;
   --accent: #64748b;
   --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
@@ -36,7 +39,7 @@
 body {
   font-family: 'Inter', sans-serif;
   margin: 0;
-  background: var(--background);
+  background: var(--background-gradient);
   color: var(--text-color);
   line-height: 1.6;
   scroll-behavior: smooth;
@@ -275,6 +278,7 @@ img {
 }
 
 .navbar-logo {
+  font-family: 'Poppins', sans-serif;
   font-weight: 700;
   font-size: 1.5rem;
   color: var(--primary-color);
@@ -433,6 +437,7 @@ img {
 
 .section-title {
   text-align: center;
+  font-family: 'Poppins', sans-serif;
   font-size: 2.5rem;
   margin-bottom: 2rem;
   color: var(--text-color);
@@ -462,7 +467,7 @@ img {
 
 /* Hero */
 .hero {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   color: white;
   text-align: center;
   padding: 5rem 2rem;
@@ -482,6 +487,7 @@ img {
 }
 
 .hero-title {
+  font-family: 'Poppins', sans-serif;
   font-size: 3rem;
   font-weight: 700;
   animation: typewriter 2s steps(20) forwards;
@@ -499,6 +505,7 @@ img {
 }
 
 .hero-subtitle {
+  font-family: 'Poppins', sans-serif;
   font-size: 1.5rem;
   margin-top: 0.5rem;
   opacity: 0;
@@ -620,7 +627,8 @@ img {
 .project-card,
 .education-item,
 .contact-method {
-  background: var(--card-bg);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
   padding: 2rem;
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
@@ -628,6 +636,14 @@ img {
   border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
+}
+
+[data-theme="dark"] .timeline-item,
+[data-theme="dark"] .skill-card,
+[data-theme="dark"] .project-card,
+[data-theme="dark"] .education-item,
+[data-theme="dark"] .contact-method {
+  background: rgba(30, 41, 59, 0.85);
 }
 
 .timeline-item::before,
