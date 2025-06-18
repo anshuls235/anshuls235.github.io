@@ -695,6 +695,7 @@ function initScrollAnimations() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+  document.body.classList.add('js-enabled');
   initThemeToggle();
   initializeNavbar();
   loadData();

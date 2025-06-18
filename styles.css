@@ -710,13 +710,13 @@ img {
 }
 
 /* Loading animation for sections */
-.fade-in {
+body.js-enabled .fade-in {
   opacity: 0;
   transform: translateY(30px);
   transition: all 0.6s ease;
 }
 
-.fade-in.visible {
+body.js-enabled .fade-in.visible {
   opacity: 1;
   transform: translateY(0);
 }
