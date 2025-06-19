@@ -693,8 +693,7 @@ function initScrollAnimations() {
   });
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
+function initSite() {
   document.body.classList.add('js-enabled');
   initThemeToggle();
   initializeNavbar();
@@ -702,21 +701,27 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSmoothScrolling();
   addScrollEffects();
   setCurrentYear();
-  
+
   // Initialize enhanced features
   createParticles();
   initCursorTrail();
   initKonamiCode();
   initDataScienceEasterEggs();
   initScrollAnimations();
-  
+
   // Add some flair to the loading
   document.body.style.opacity = '0';
   setTimeout(() => {
     document.body.style.transition = 'opacity 0.5s ease';
     document.body.style.opacity = '1';
   }, 100);
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSite);
+} else {
+  initSite();
+}
 
 function setCurrentYear() {
   const yearElement = document.getElementById('current-year');
