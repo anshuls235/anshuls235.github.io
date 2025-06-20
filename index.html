@@ -3,31 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loading...</title>
+    <title>Anshul Sharma - Full-Stack Data Scientist</title>
+    <meta name="description" content="Award-winning Full-Stack Data Scientist with 9+ years of experience in building high-impact AI applications across enterprises.">
+    
+    <!-- Material Icons & Font Awesome -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body>
-    <header class="hero glass text-center p-8 space-y-2">
-        <img id="profile-picture" src="profile.jpg" alt="Profile picture">
-        <h1 id="name"></h1>
-        <h2 id="title"></h2>
-    </header>
-    <nav id="nav" class="glass flex flex-wrap justify-center gap-4 p-4 items-center">
-        <button id="theme-toggle" class="text-xl" aria-label="Toggle theme">
-            <i class="fas fa-moon"></i>
-        </button>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="material-icons">code</span>
+                <span>Anshul Sharma</span>
+            </div>
+            <div class="nav-menu" id="nav-menu">
+                <a href="#home" class="nav-link"><span class="material-icons">home</span>Home</a>
+                <a href="#about" class="nav-link"><span class="material-icons">person</span>About</a>
+                <a href="#experience" class="nav-link"><span class="material-icons">work</span>Experience</a>
+                <a href="#projects" class="nav-link"><span class="material-icons">code</span>Projects</a>
+                <a href="#skills" class="nav-link"><span class="material-icons">psychology</span>Skills</a>
+                <a href="#contact" class="nav-link"><span class="material-icons">contact_mail</span>Contact</a>
+            </div>
+            <div class="nav-actions">
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                    <span class="material-icons">dark_mode</span>
+                </button>
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                    <span class="material-icons">menu</span>
+                </button>
+            </div>
+        </div>
     </nav>
-    <main class="grid gap-6 p-4 md:grid-cols-2">
-        <section id="about" class="glass p-4 space-y-2"></section>
-        <section id="experience-summary" class="glass p-4 space-y-2"></section>
-        <section id="work" class="glass p-4 space-y-2"></section>
-        <section id="education" class="glass p-4 space-y-2"></section>
-        <section id="skills" class="glass p-4 space-y-2"></section>
-        <section id="projects" class="glass p-4 space-y-2"></section>
-        <section id="contact" class="glass p-4 space-y-2"></section>
-    </main>
-    <footer class="glass text-center p-4 mt-6">&copy; <span id="year"></span> <span id="name-footer"></span></footer>
-    <script src="script.js" defer></script>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1 class="hero-title fade-in-up">
+                        Hi, I'm <span class="highlight" id="name">Anshul Sharma</span>
+                    </h1>
+                    <h2 class="hero-subtitle fade-in-up">
+                        <span id="title">Full-Stack Data Scientist</span>
+                    </h2>
+                    <p class="hero-description fade-in-up" id="summary">
+                        Loading...
+                    </p>
+                    <div class="hero-actions fade-in-up">
+                        <a href="#contact" class="btn btn-primary">
+                            <span class="material-icons">contact_mail</span>
+                            Get In Touch
+                        </a>
+                        <a href="resume.pdf" class="btn btn-secondary" target="_blank">
+                            <span class="material-icons">download</span>
+                            Download Resume
+                        </a>
+                    </div>
+                    <div class="social-links fade-in-up" id="social-links">
+                        <!-- Dynamically loaded from JSON -->
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="profile-card fade-in-up">
+                        <div class="profile-image-container">
+                            <img src="profile.jpg" alt="Anshul Sharma" class="profile-image">
+                            <div class="profile-glow"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="scroll-indicator">
+                <span class="material-icons">keyboard_arrow_down</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="material-icons">person</span>
+                About Me
+            </h2>
+            <div class="about-content">
+                <div class="about-text">
+                    <p class="about-description" id="about-description">
+                        Loading...
+                    </p>
+                    <div class="about-stats">
+                        <div class="stat-item">
+                            <div class="stat-number">9+</div>
+                            <div class="stat-label">Years Experience</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">50+</div>
+                            <div class="stat-label">Projects Completed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">20+</div>
+                            <div class="stat-label">Global Markets</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Experience Section -->
+    <section id="experience" class="experience">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="material-icons">work</span>
+                Work Experience
+            </h2>
+            <div class="timeline" id="experience-timeline">
+                <!-- Dynamically loaded from JSON -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Skills Section -->
+    <section id="skills" class="skills">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="material-icons">psychology</span>
+                Technical Skills
+            </h2>
+            <div class="skills-grid" id="skills-grid">
+                <!-- Dynamically loaded from JSON -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="projects">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="material-icons">code</span>
+                Featured Projects
+            </h2>
+            <div class="projects-grid" id="projects-grid">
+                <!-- Dynamically loaded from JSON -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Education Section -->
+    <section id="education" class="education">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="material-icons">school</span>
+                Education
+            </h2>
+            <div class="education-grid" id="education-grid">
+                <!-- Dynamically loaded from JSON -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="material-icons">contact_mail</span>
+                Let's Connect
+            </h2>
+            <div class="contact-content">
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <span class="material-icons">email</span>
+                        <div>
+                            <h3>Email</h3>
+                            <p id="contact-email">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <span class="material-icons">phone</span>
+                        <div>
+                            <h3>Phone</h3>
+                            <p id="contact-phone">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <span class="material-icons">location_on</span>
+                        <div>
+                            <h3>Location</h3>
+                            <p>Gurgaon, Haryana, India</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="contact-form">
+                    <form>
+                        <div class="form-group">
+                            <input type="text" placeholder="Your Name" required>
+                            <span class="material-icons">person</span>
+                        </div>
+                        <div class="form-group">
+                            <input type="email" placeholder="Your Email" required>
+                            <span class="material-icons">email</span>
+                        </div>
+                        <div class="form-group">
+                            <textarea placeholder="Your Message" rows="5" required></textarea>
+                            <span class="material-icons">message</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="material-icons">send</span>
+                            Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-text">
+                    <p>&copy; 2025 Anshul Sharma. All rights reserved.</p>
+                </div>
+                <div class="footer-social" id="footer-social">
+                    <!-- Dynamically loaded from JSON -->
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loading-spinner">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
