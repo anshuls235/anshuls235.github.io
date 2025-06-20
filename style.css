@@ -864,6 +864,20 @@ section {
   height: 40px;
 }
 
+.footer-credits {
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.footer-credits .material-icons {
+  font-size: 1rem;
+  margin: 0 0.25rem;
+}
+
 /* Loading Spinner */
 .loading-spinner {
   position: fixed;
