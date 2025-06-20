@@ -27,7 +27,7 @@
         "url": "https://www.kaggle.com/anshuls235"
       }
     ],
-    "summary": "Award-winning Full-Stack Data Scientist with 9+ years of experience in building high-impact AI applications across enterprises. From engineering scalable ML pipelines to fine-tuning LLMs for enterprise productivity, I bring end-to-end ownership\u2014from ideation to deployment\u2014across cloud-native and serverless architectures. I specialize in Generative AI, MLOps, and decision intelligence, and thrive at the intersection of data, business, and impact."
+    "summary": "Award-winning Full-Stack Data Scientist with 9+ years of experience in building high-impact AI applications across enterprises. From engineering scalable ML pipelines to fine-tuning LLMs for enterprise productivity, I bring end-to-end ownership—from ideation to deployment—across cloud-native and serverless architectures. I specialize in Generative AI, MLOps, and decision intelligence, and thrive at the intersection of data, business, and impact."
   },
   "work": [
     {
@@ -38,7 +38,7 @@
       "endDate": "Present",
       "highlights": [
         "Focused on driving seller productivity by applying Data Science, ML, GenAI, Advanced Analytics, and BI to real-world challenges. This includes ranking enterprises by predicted growth, identifying whitespace, quantifying opportunities, and analyzing seller workload to empower more strategic, data-driven decisions.",
-        "Led a series of GenAI projects to tackle real business challenges, from building the Recruitment Studio\u2014a powerful resume screening and scoring tool with LLMs (Mixtral 8x7B, Llama2 70B)\u2014to fine-tuning the Mistral 7B Instruct model with a RAG setup for a company-specific QA chatbot. These initiatives cut down manual HR review time, boosted internal knowledge access by 40%, and slashed response time for complex queries by 60%, bringing measurable impact across both HR and internal support.",
+        "Led a series of GenAI projects to tackle real business challenges, from building the Recruitment Studio—a powerful resume screening and scoring tool with LLMs (Mixtral 8x7B, Llama2 70B)—to fine-tuning the Mistral 7B Instruct model with a RAG setup for a company-specific QA chatbot. These initiatives cut down manual HR review time, boosted internal knowledge access by 40%, and slashed response time for complex queries by 60%, bringing measurable impact across both HR and internal support.",
         "Automated an ML workflow for quarterly growth forecasts, cutting turnaround time from 14 days to 4 hours and conserving over 10,000 person-hours monthly.",
         "Orchestrated a Pyspark-based optimization of data pipelines, shrinking data processing time from 12 hours to 12 minutes, and instituted a robust MLOps framework via MLFlow to mitigate data and concept drift.",
         "Engineered a neural network-based workload index for 5,000 sellers, revolutionizing territory investment strategies and decision-making processes.",
@@ -197,7 +197,7 @@
     },
     {
       "name": "Territory Investment Optimization",
-      "description": "Developed a neural network\u2013driven workload index for 5,000+ sellers, automating territory prioritization and saving thousands of seller-hours.",
+      "description": "Developed a neural network–driven workload index for 5,000+ sellers, automating territory prioritization and saving thousands of seller-hours.",
       "technologies": [
         "PyTorch",
         "PySpark",
