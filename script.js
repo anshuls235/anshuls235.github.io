@@ -13,11 +13,28 @@ function render(data) {
 
     renderNav();
     renderAbout(data.basics.summary);
+    renderExperienceSummary(data.work);
     renderWork(data.work);
     renderEducation(data.education);
     renderSkills(data.skills);
     renderProjects(data.projects);
     renderContact(data.basics);
+}
+
+function renderExperienceSummary(jobs) {
+    const section = document.getElementById('experience-summary');
+    const summary = computeExperienceSummary(jobs);
+    section.innerHTML = `<h3>Experience Summary</h3><p>${summary}</p>`;
+}
+
+function computeExperienceSummary(jobs) {
+    if (!jobs.length) return '';
+    const parse = str => new Date(str + '-01');
+    const start = parse(jobs[jobs.length - 1].startDate);
+    const latest = jobs[0];
+    const end = !latest.endDate || latest.endDate === 'Present' ? new Date() : parse(latest.endDate);
+    const years = (end - start) / (1000 * 60 * 60 * 24 * 365);
+    return `Over ${years.toFixed(1)} years of professional experience across ${jobs.length} organizations.`;
 }
 
 function renderNav() {
@@ -119,4 +136,25 @@ function renderContact(basics) {
     section.appendChild(list);
 }
 
+function applyTheme(theme) {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const icon = document.querySelector('#theme-toggle i');
+    if (icon) {
+        icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+function setupThemeToggle() {
+    const saved = localStorage.getItem('theme') || 'light';
+    applyTheme(saved);
+    const btn = document.getElementById('theme-toggle');
+    btn.addEventListener('click', () => {
+        const current = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme', next);
+        applyTheme(next);
+    });
+}
+
+setupThemeToggle();
 loadData();
