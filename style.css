@@ -713,6 +713,37 @@ section {
   font-size: 0.9rem;
 }
 
+/* Education with Links */
+.education-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.education-card-link .education-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.education-card-link .education-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-large);
+}
+
+.education-link-indicator {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: var(--primary-color);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.education-card-link:hover .education-link-indicator {
+  opacity: 1;
+  transform: translateX(-5px);
+}
+
 /* Contact Section */
 .contact {
   background: var(--surface-color);
