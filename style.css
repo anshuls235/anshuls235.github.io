@@ -6,11 +6,22 @@
     padding: 0;
 }
 
+:root {
+    --bg: linear-gradient(135deg, #f5f5f5, #e5e5e5);
+    --text: #111;
+}
+
+:root.dark {
+    --bg: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    --text: #fff;
+}
+
 body {
     font-family: 'Inter', sans-serif;
-    color: #fff;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: var(--text);
+    background: var(--bg);
     min-height: 100vh;
+    transition: background 0.3s, color 0.3s;
 }
 
 header.hero {
@@ -24,7 +35,11 @@ header.hero {
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 1rem;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 2px solid rgba(0,0,0,0.2);
+}
+
+.dark #profile-picture {
+    border-color: rgba(255,255,255,0.3);
 }
 
 nav {
@@ -36,7 +51,7 @@ nav {
 }
 
 nav a {
-    color: #fff;
+    color: var(--text);
     text-decoration: none;
     font-weight: 600;
 }
@@ -49,6 +64,12 @@ main {
 
 section {
     padding: 1rem;
+    animation: fadeIn 0.6s ease both;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 footer {
@@ -58,10 +79,14 @@ footer {
 }
 
 .glass {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.65);
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(10px);
+    transition: background 0.3s;
+}
+.dark .glass {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 @media (min-width: 768px) {
