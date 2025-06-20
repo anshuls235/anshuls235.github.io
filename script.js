@@ -283,13 +283,32 @@ class PortfolioApp {
         const educationHTML = this.data.education.map(edu => {
             const duration = this.formatDateRange(edu.startDate, edu.endDate);
 
-            return `
-                <div class="education-card animate-on-scroll">
-                    <div class="education-degree">${edu.degree}</div>
-                    <div class="education-institution">${edu.institution}</div>
-                    <div class="education-duration">${duration}</div>
-                </div>
+            // Check if education item has a link
+            const hasLink = edu.link && edu.link.trim() !== '';
+            const cardContent = `
+                <div class="education-degree">${edu.degree}</div>
+                <div class="education-institution">${edu.institution}</div>
+                <div class="education-duration">${duration}</div>
             `;
+
+            if (hasLink) {
+                return `
+                    <a href="${edu.link}" target="_blank" rel="noopener noreferrer" class="education-card-link">
+                        <div class="education-card animate-on-scroll">
+                            ${cardContent}
+                            <div class="education-link-indicator">
+                                <span class="material-icons">launch</span>
+                            </div>
+                        </div>
+                    </a>
+                `;
+            } else {
+                return `
+                    <div class="education-card animate-on-scroll">
+                        ${cardContent}
+                    </div>
+                `;
+            }
         }).join('');
 
         educationContainer.innerHTML = educationHTML;
@@ -365,27 +384,44 @@ class PortfolioApp {
                 icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
             }
         }
+
+        // Update navbar theme immediately
+        this.updateNavbarTheme(theme);
+    }
+
+    updateNavbarTheme(theme) {
+        const navbar = document.getElementById('navbar');
+        if (!navbar) return;
+
+        // Apply theme-specific background immediately
+        const isScrolled = window.scrollY > 100;
+        
+        if (theme === 'dark') {
+            navbar.style.background = isScrolled ? 'rgba(15, 23, 42, 0.98)' : 'rgba(15, 23, 42, 0.95)';
+        } else {
+            navbar.style.background = isScrolled ? 'rgba(255, 255, 255, 0.98)' : 'rgba(255, 255, 255, 0.95)';
+        }
     }
 
     handleNavbarScroll() {
         const navbar = document.getElementById('navbar');
         if (!navbar) return;
 
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        
         if (window.scrollY > 100) {
-            navbar.style.background = 'rgba(255, 255, 255, 0.98)';
             navbar.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.1)';
-        } else {
-            navbar.style.background = 'rgba(255, 255, 255, 0.95)';
-            navbar.style.boxShadow = 'none';
-        }
-
-        // Update for dark theme
-        const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
-        if (isDarkTheme) {
-            if (window.scrollY > 100) {
+            if (currentTheme === 'dark') {
                 navbar.style.background = 'rgba(15, 23, 42, 0.98)';
             } else {
+                navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+            }
+        } else {
+            navbar.style.boxShadow = 'none';
+            if (currentTheme === 'dark') {
                 navbar.style.background = 'rgba(15, 23, 42, 0.95)';
+            } else {
+                navbar.style.background = 'rgba(255, 255, 255, 0.95)';
             }
         }
     }
