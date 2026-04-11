@@ -27,15 +27,28 @@
         "url": "https://www.kaggle.com/anshuls235"
       }
     ],
-    "summary": "Award-winning Full-Stack Data Scientist with 9+ years of experience in building high-impact AI applications across enterprises. From engineering scalable ML pipelines to fine-tuning LLMs for enterprise productivity, I bring end-to-end ownership—from ideation to deployment—across cloud-native and serverless architectures. I specialize in Generative AI, MLOps, and decision intelligence, and thrive at the intersection of data, business, and impact."
+    "summary": "Award-winning Full-Stack Data Scientist with 10+ years of experience building high-impact AI applications across enterprises. Currently at Al-Futtaim Automotive, where I lead AI initiatives including Automall's AI-powered search, a WhatsApp conversational chatbot, and credit risk modeling. From engineering scalable ML pipelines to fine-tuning LLMs for enterprise productivity, I bring end-to-end ownership—from ideation to deployment—across cloud-native and serverless architectures. I specialize in Generative AI, MLOps, and decision intelligence, thriving at the intersection of data, business, and impact."
   },
   "work": [
+    {
+      "company": "Al-Futtaim Automotive",
+      "position": "Senior Data Scientist",
+      "location": "Dubai, UAE",
+      "startDate": "2025-07",
+      "endDate": "Present",
+      "highlights": [
+        "Architected and deployed Automall AI Search — an AI-powered semantic search experience for UAE's leading used-car marketplace (automall.ae) — leveraging embedding models and vector search across 50,000+ live vehicle listings, significantly improving search relevance and user engagement.",
+        "Built an end-to-end conversational AI chatbot for Automall on WhatsApp, enabling customers to search inventory, get instant pricing, explore financing options, and schedule test drives through natural language — deflecting thousands of monthly inbound calls.",
+        "Developed an IFRS 9–compliant Expected Credit Loss (ECL) model for Al-Futtaim's automotive finance portfolio, enabling granular risk segmentation across the loan book and supporting accurate provisioning decisions for senior risk stakeholders.",
+        "Driving the AI/ML roadmap for Al-Futtaim Automotive, partnering with product, engineering, and business teams to identify high-impact use cases and deliver production-grade data science solutions at scale."
+      ]
+    },
     {
       "company": "Gartner",
       "position": "Senior Data Scientist",
       "location": "Gurgaon, Haryana",
       "startDate": "2022-07",
-      "endDate": "Present",
+      "endDate": "2025-06",
       "highlights": [
         "Focused on driving seller productivity by applying Data Science, ML, GenAI, Advanced Analytics, and BI to real-world challenges. This includes ranking enterprises by predicted growth, identifying whitespace, quantifying opportunities, and analyzing seller workload to empower more strategic, data-driven decisions.",
         "Led a series of GenAI projects to tackle real business challenges, from building the Recruitment Studio—a powerful resume screening and scoring tool with LLMs (Mixtral 8x7B, Llama2 70B)—to fine-tuning the Mistral 7B Instruct model with a RAG setup for a company-specific QA chatbot. These initiatives cut down manual HR review time, boosted internal knowledge access by 40%, and slashed response time for complex queries by 60%, bringing measurable impact across both HR and internal support.",
@@ -116,7 +129,10 @@
         "LLMs",
         "LLM Fine-tuning",
         "RAG",
-        "Prompt Engineering"
+        "Prompt Engineering",
+        "Semantic Search",
+        "Vector Databases",
+        "Conversational AI"
       ]
     },
     {
@@ -174,6 +190,45 @@
     }
   ],
   "projects": [
+    {
+      "name": "Automall AI Search",
+      "description": "Architected an AI-powered semantic search experience for Automall (UAE's leading used-car marketplace), enabling natural-language queries across 50,000+ vehicle listings using embedding models and vector search — dramatically improving search relevance and reducing bounce rates.",
+      "technologies": [
+        "Semantic Search",
+        "Embeddings",
+        "Vector DB",
+        "Python",
+        "LLMs",
+        "AWS"
+      ],
+      "link": "https://www.automall.ae/en/"
+    },
+    {
+      "name": "Automall WhatsApp Chatbot",
+      "description": "Built a conversational AI chatbot for Automall on WhatsApp, allowing customers to search inventory, get instant pricing, explore financing options, and schedule test drives through natural language — deflecting thousands of monthly inbound calls.",
+      "technologies": [
+        "Conversational AI",
+        "LLMs",
+        "WhatsApp API",
+        "Python",
+        "RAG",
+        "Langchain"
+      ],
+      "link": "https://www.automall.ae/en/"
+    },
+    {
+      "name": "Expected Credit Loss Modeling",
+      "description": "Developed an IFRS 9–compliant Expected Credit Loss (ECL) model for Al-Futtaim's automotive finance portfolio, enabling granular risk segmentation across the loan book and supporting accurate provisioning and regulatory reporting.",
+      "technologies": [
+        "Python",
+        "XGBoost",
+        "scikit-learn",
+        "IFRS 9",
+        "SQL",
+        "Risk Modeling"
+      ],
+      "link": ""
+    },
     {
       "name": "LLM-Powered Resume Screening Tool",
       "description": "Built an AI-powered resume scoring engine using LLMs (Mixtral 8x7B, Llama2 70B), fine-tuned on hiring signals and structured inputs, cutting HR screening time by 70%.",
