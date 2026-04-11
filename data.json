@@ -32,12 +32,12 @@
   "work": [
     {
       "company": "Al-Futtaim Automotive",
-      "position": "Senior Data Scientist",
+      "position": "Data Science Manager",
       "location": "Dubai, UAE",
       "startDate": "2025-07",
       "endDate": "Present",
       "highlights": [
-        "Architected and deployed Automall AI Search — an AI-powered semantic search experience for UAE's leading used-car marketplace (automall.ae) — leveraging embedding models and vector search across 50,000+ live vehicle listings, significantly improving search relevance and user engagement.",
+        "Architected and deployed Automall AI Search — an AI-powered semantic search experience for UAE's leading used-car marketplace (automall.ae) — leveraging embedding models and vector search across an immense catalog of unique used-vehicle SKUs, significantly improving search relevance and user engagement.",
         "Built an end-to-end conversational AI chatbot for Automall on WhatsApp, enabling customers to search inventory, get instant pricing, explore financing options, and schedule test drives through natural language — deflecting thousands of monthly inbound calls.",
         "Developed an IFRS 9–compliant Expected Credit Loss (ECL) model for Al-Futtaim's automotive finance portfolio, enabling granular risk segmentation across the loan book and supporting accurate provisioning decisions for senior risk stakeholders.",
         "Driving the AI/ML roadmap for Al-Futtaim Automotive, partnering with product, engineering, and business teams to identify high-impact use cases and deliver production-grade data science solutions at scale."
@@ -192,7 +192,7 @@
   "projects": [
     {
       "name": "Automall AI Search",
-      "description": "Architected an AI-powered semantic search experience for Automall (UAE's leading used-car marketplace), enabling natural-language queries across 50,000+ vehicle listings using embedding models and vector search — dramatically improving search relevance and reducing bounce rates.",
+      "description": "Architected an AI-powered semantic search experience for Automall (UAE's leading used-car marketplace), enabling natural-language queries across an immense catalog of unique used-vehicle SKUs using embedding models and vector search — dramatically improving search relevance and reducing bounce rates.",
       "technologies": [
         "Semantic Search",
         "Embeddings",
