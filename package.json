@@ -1,0 +1,40 @@
+{
+  "name": "anshul-sharma-portfolio",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "node --import tsx scripts/build.ts",
+    "preview": "vite preview --host 127.0.0.1",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:browser": "playwright test",
+    "test:policies": "bash scripts/test-policies.sh",
+    "test:edge": "deno check supabase/functions/analytics/index.ts",
+    "fallback:refresh": "node --import tsx scripts/refresh-fallback.ts",
+    "seed:generate": "node --import tsx scripts/generate-seed.ts",
+    "security:scan": "python3 scripts/security-scan.py",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
+    "@eslint/js": "9.39.1",
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.19.0",
+    "eslint": "9.39.1",
+    "globals": "16.5.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.3",
+    "vite": "6.4.5"
+  },
+  "overrides": {
+    "playwright-core": "1.56.1",
+    "minimatch": "11.0.1"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "audit_date": "2026-11-01",
+  "target": "built site, local mobile simulation, real Supabase configuration",
+  "scores": {
+    "performance": 99,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100
+  },
+  "metrics": {
+    "first-contentful-paint": "1.5\u00a0s",
+    "largest-contentful-paint": "1.7\u00a0s",
+    "cumulative-layout-shift": "0",
+    "total-blocking-time": "100\u00a0ms",
+    "speed-index": "1.7\u00a0s"
+  }
+}

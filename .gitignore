@@ -1,0 +1,31 @@
+# AI tooling (local only)
+.agents/
+.claude/
+.codex/
+.mcp.json
+.playwright-mcp/
+graphify-out/
+
+# OS
+.DS_Store
+
+# Build and verification
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.lighthouseci/
+tmp/
+output/
+
+# Credentials; the example contains names only
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+*.local
+
+# Private editorial SQL; drafts remain in the hosted database
+supabase/drafts/

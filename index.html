@@ -1,143 +1,89 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Anshul Sharma | Data Scientist</title>
-  <meta name="description" content="Anshul Sharma - Full-Stack Data Scientist with expertise in ML, AI, and Generative AI." />
-  <meta name="keywords" content="Data Scientist, Machine Learning, Anshul Sharma, AI, Generative AI" />
-  
-  <!-- Favicon -->
-  <link rel="icon" href="favicon.ico" type="image/x-icon" />
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <!-- Navbar -->
-  <nav class="navbar" id="navbar">
-    <div class="container navbar-container">
-      <a href="#" class="navbar-logo" id="navbar-logo"></a>
-      <div class="menu-toggle" id="menu-toggle"><i class="fas fa-bars"></i></div>
-      <ul class="navbar-menu" id="navbar-menu">
-        <li class="navbar-item"><a href="#about" class="navbar-link">About</a></li>
-        <li class="navbar-item"><a href="#experience" class="navbar-link">Experience</a></li>
-        <li class="navbar-item"><a href="#skills" class="navbar-link">Skills</a></li>
-        <li class="navbar-item"><a href="#projects" class="navbar-link">Projects</a></li>
-        <li class="navbar-item"><a href="#education" class="navbar-link">Education</a></li>
-        <li class="navbar-item"><a href="#contact" class="navbar-link">Contact</a></li>
-      </ul>
-    </div>
-  </nav>
-  <div class="menu-overlay" id="menu-overlay"></div>
-
-  <!-- Hero Section -->
-  <section class="hero section" id="home">
-    <div class="container hero-content">
-      <div class="hero-text-group fade-in delay-1">
-        <h1 class="hero-title" id="hero-name"></h1>
-        <h2 class="hero-subtitle" id="hero-title"></h2>
-        <p class="hero-text" id="hero-summary"></p>
-        <div class="hero-social fade-in delay-3" id="hero-social"></div>
-      </div>
-      <div class="hero-avatar fade-in delay-2">
-        <img id="profile-image" class="avatar" alt="Anshul Sharma Profile Photo" />
-      </div>
-    </div>
-  </section>
-
-  <!-- About Section -->
-  <section class="about section" id="about">
-    <div class="container">
-      <h2 class="section-title">About Me</h2>
-      <div class="about-info fade-in delay-1">
-        <p class="about-text" id="about-summary"></p>
-        <div class="contact-info">
-          <div class="contact-item">
-            <i class="fas fa-envelope contact-icon"></i>
-            <a id="contact-email" href=""></a>
-          </div>
-          <div class="contact-item">
-            <i class="fas fa-phone contact-icon"></i>
-            <a id="contact-phone" href=""></a>
-          </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f6f5f0" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <!--META-->
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link
+      rel="preload"
+      href="/assets/inter-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/src/theme.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header" id="navbar">
+      <nav class="container nav" aria-label="Main navigation">
+        <a class="wordmark" href="#home"
+          ><span class="monogram" aria-hidden="true">as<span>.</span></span
+          ><span id="nav-name">Anshul Sharma</span></a
+        >
+        <button
+          class="menu-toggle"
+          aria-label="Open navigation menu"
+          aria-expanded="false"
+          aria-controls="main-nav"
+          type="button"
+          hidden
+        >
+          Menu <span aria-hidden="true">+</span>
+        </button>
+        <div class="main-nav" id="main-nav">
+          <a href="#projects">Work</a><a href="#experience">Experience</a
+          ><a href="#writing">Writing</a><a href="#about">About</a
+          ><a class="nav-contact" href="#contact"
+            >Let’s talk <span aria-hidden="true">↗</span></a
+          >
         </div>
-        <div id="about-profiles" class="fade-in delay-2"></div>
+        <button
+          class="theme-toggle"
+          type="button"
+          aria-label="Switch to dark theme"
+          aria-pressed="false"
+          hidden
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="19"
+            height="19"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z" />
+          </svg>
+        </button>
+      </nav>
+    </header>
+    <div id="portfolio"><!--CONTENT--></div>
+    <p
+      id="content-status"
+      class="content-status"
+      role="status"
+      aria-live="polite"
+    ></p>
+    <dialog id="project-dialog" aria-labelledby="detail-title">
+      <div class="dialog-toolbar">
+        <span class="mono">PROJECT NOTES</span
+        ><button
+          id="close-dialog"
+          type="button"
+          aria-label="Close project details"
+        >
+          Close <span aria-hidden="true">×</span>
+        </button>
       </div>
-    </div>
-  </section>
-
-  <!-- Experience -->
-  <section class="experience section" id="experience">
-    <div class="container">
-      <h2 class="section-title">Work Experience</h2>
-      <div class="timeline" id="experience-timeline"></div>
-    </div>
-  </section>
-
-  <!-- Skills -->
-  <section class="skills section" id="skills">
-    <div class="container">
-      <h2 class="section-title">Skills</h2>
-      <div class="skills-grid" id="skills-grid"></div>
-    </div>
-  </section>
-
-  <!-- Projects -->
-  <section class="projects section" id="projects">
-    <div class="container">
-      <h2 class="section-title">Projects</h2>
-      <div class="projects-grid" id="projects-grid"></div>
-    </div>
-  </section>
-
-  <!-- Education -->
-  <section class="education section" id="education">
-    <div class="container">
-      <h2 class="section-title">Education</h2>
-      <div class="education-list" id="education-list"></div>
-    </div>
-  </section>
-
-  <!-- Contact -->
-  <section class="contact section" id="contact">
-    <div class="container">
-      <h2 class="section-title">Get In Touch</h2>
-      <div class="contact-content">
-        <p class="contact-text">I'm always open to new projects and collaborations. Let’s connect!</p>
-        <div class="contact-methods">
-          <div class="contact-method"><i class="fas fa-envelope contact-icon"></i><h3>Email</h3><a href="mailto:anshuls235@gmail.com">anshuls235@gmail.com</a></div>
-          <div class="contact-method"><i class="fas fa-phone contact-icon"></i><h3>Phone</h3><a href="tel:+919871771898">+91 9871771898</a></div>
-          <div class="contact-method"><i class="fas fa-map-marker-alt contact-icon"></i><h3>Location</h3><p>Gurgaon, Haryana, India</p></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="container footer-content">
-      <h3 class="footer-logo" id="footer-name"></h3>
-      <p class="footer-text">Thanks for visiting! Feel free to connect via social links or email.</p>
-      <div class="footer-social" id="footer-social"></div>
-      <p class="footer-copyright">
-        &copy; <span id="current-year"></span> Anshul Sharma. All rights reserved.
-      </p>
-    </div>
-  </footer>
-
-  <!-- Resume Button -->
-  <a href="resume.pdf" class="resume-btn" title="Download Resume" id="resume-btn" target="_blank"><i class="fas fa-file-download"></i></a>
-
-  <!-- JS -->
-  <script src="script.js"></script>
-</body>
+      <div id="project-detail"></div>
+    </dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

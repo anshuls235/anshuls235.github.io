@@ -1,0 +1,917 @@
+{
+  "version": 1,
+  "exported_at": "2026-11-01T12:39:45.016Z",
+  "content": {
+    "profile": [
+      {
+        "id": "0119fa94-e8b5-50e1-ac8f-4c47a95659ac",
+        "slug": "anshul-sharma",
+        "name": "Anshul Sharma",
+        "title": "Data Science Manager",
+        "headline": "Making intelligence\nwork in the real world.",
+        "introduction": "I build AI products from business problem to production. My work brings together generative AI, machine learning, and the engineering that makes them useful.",
+        "about": "A developer turned data scientist, I work across the full lifecycle of an AI product: understanding the problem, building the data foundations, and taking models into production. My work spans automotive, enterprise knowledge, seller productivity, and cloud infrastructure.",
+        "location": "Dubai, UAE",
+        "email": "anshuls235@gmail.com",
+        "image_url": "assets/portrait.webp",
+        "resume_url": "resume.pdf",
+        "current_focus": "Generative AI · MLOps · Decision intelligence",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "projects": [
+      {
+        "id": "873cb3bb-e76f-5cfc-bbf8-362569777ef2",
+        "slug": "automall-ai-search",
+        "title": "A more natural way to find a car.",
+        "category": "Generative AI",
+        "summary": "Multilingual AI search for Automall, connecting customer intent with vehicle discovery.",
+        "description": "An end-to-end English and Arabic car search system for Automall using LangGraph, FastAPI, and Azure OpenAI. Databricks analytics pipelines and Power BI dashboards support business monitoring.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": null,
+        "end_date": null,
+        "problem": "Help customers explore car inventory in English and Arabic using natural language.",
+        "approach": "Combine intent classification, multi-parser NLP routing, and progressive search relaxation. Automate analytics with Databricks and Power BI.",
+        "responsibilities": [
+          "Built the end-to-end multilingual search system and its automated analytics pipelines."
+        ],
+        "outcomes": [
+          "Reported in the July 2026 CV: live since April 2026, with 10 orders at under US$70 total operating cost."
+        ],
+        "technologies": [
+          "LangGraph",
+          "FastAPI",
+          "Azure OpenAI",
+          "Databricks",
+          "Power BI"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "search",
+        "featured": true,
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T12:38:09.305399+00:00"
+      },
+      {
+        "id": "fb3c1746-efdb-502a-ad88-f8e08c247388",
+        "slug": "enterprise-knowledge",
+        "title": "Putting enterprise knowledge within reach.",
+        "category": "Generative AI",
+        "summary": "Retrieval-augmented answers built around internal enterprise documents.",
+        "description": "A company-specific question-answering chatbot using Mistral 7B and retrieval-augmented generation, developed during my work at Gartner.",
+        "role": "Senior Data Scientist",
+        "organization": "Gartner",
+        "start_date": null,
+        "end_date": null,
+        "problem": "Make internal knowledge easier to access through a conversational interface.",
+        "approach": "Combine enterprise document retrieval with a fine-tuned Mistral 7B model.",
+        "responsibilities": [],
+        "outcomes": [],
+        "technologies": [
+          "Mistral 7B",
+          "RAG",
+          "LangChain",
+          "Hugging Face"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "retrieval",
+        "featured": true,
+        "status": "published",
+        "sort_order": 1,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "a007224a-453b-5ed4-9664-0bde358d9c0d",
+        "slug": "ml-pipeline-optimization",
+        "title": "Less waiting. More working with data.",
+        "category": "ML engineering",
+        "summary": "Optimizing PySpark data pipelines and introducing MLflow-based model operations.",
+        "description": "Data pipeline optimization and an MLOps framework developed at Gartner. The original résumé records a reduction in processing time from 12 hours to 12 minutes.",
+        "role": "Senior Data Scientist",
+        "organization": "Gartner",
+        "start_date": null,
+        "end_date": null,
+        "problem": "Long-running data processing slowed the ML workflow.",
+        "approach": "Optimize PySpark pipelines and use MLflow to support model lifecycle management and monitor drift.",
+        "responsibilities": [],
+        "outcomes": [
+          "Data processing reduced from 12 hours to 12 minutes, as recorded in the source résumé."
+        ],
+        "technologies": [
+          "PySpark",
+          "MLflow",
+          "Python",
+          "MLOps"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "pipeline",
+        "featured": true,
+        "status": "published",
+        "sort_order": 2,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "35d445d6-392e-511a-9fe7-6f3773bcf625",
+        "slug": "automall-conversational-ai",
+        "title": "Automall, in a conversation.",
+        "category": "Generative AI",
+        "summary": "Conversational vehicle discovery and customer support through WhatsApp.",
+        "description": "A WhatsApp AI chatbot for Automall using LangGraph and Infobip, with intent classification, FAQ retrieval, live agent handoff, sell-car flow, and SAP C4C CRM integration.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": null,
+        "end_date": null,
+        "problem": "Bring vehicle discovery and common customer questions into a conversational channel.",
+        "approach": "Orchestrate conversational flows with LangGraph, connect WhatsApp through Infobip, and integrate with SAP C4C. Use Databricks pipelines and Power BI for monitoring.",
+        "responsibilities": [],
+        "outcomes": [
+          "Reported in the July 2026 CV: live since March 2026, with 25 orders at under US$200 cumulative cost."
+        ],
+        "technologies": [
+          "LangGraph",
+          "Infobip",
+          "Azure OpenAI",
+          "SAP C4C",
+          "Databricks"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "retrieval",
+        "featured": false,
+        "status": "published",
+        "sort_order": 3,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T12:38:09.305399+00:00"
+      },
+      {
+        "id": "2cfd36c0-1665-5ab9-a998-66bbd5554e3d",
+        "slug": "expected-credit-loss",
+        "title": "Models for better risk decisions.",
+        "category": "Machine learning",
+        "summary": "Expected Credit Loss modeling for automotive finance.",
+        "description": "Expected Credit Loss models for automotive operating and financial lease portfolios, combining probability of default modeling with analytical loss-given-default and exposure-at-default estimation.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": null,
+        "end_date": null,
+        "problem": "Support risk stakeholders with a more granular view of the loan portfolio.",
+        "approach": "Engineer features in Databricks, train the probability-of-default model with H2O Driverless AI, and estimate LGD and EAD analytically for credit risk reporting.",
+        "responsibilities": [],
+        "outcomes": [],
+        "technologies": [
+          "Databricks",
+          "H2O Driverless AI",
+          "AutoML",
+          "Credit risk",
+          "Python"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "chart",
+        "featured": false,
+        "status": "published",
+        "sort_order": 4,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "28cd4d61-9a00-5bf5-8d6a-eda1cd8737e3",
+        "slug": "recruitment-studio",
+        "title": "A structured first pass at hiring.",
+        "category": "Generative AI",
+        "summary": "LLM-powered résumé screening and scoring for Recruitment Studio.",
+        "description": "A résumé screening and scoring tool built at Gartner using Mixtral 8x7B and Llama2 70B.",
+        "role": "Senior Data Scientist",
+        "organization": "Gartner",
+        "start_date": null,
+        "end_date": null,
+        "problem": "Reduce the manual effort involved in reviewing candidate information.",
+        "approach": "Use large language models with structured hiring inputs to support résumé screening.",
+        "responsibilities": [],
+        "outcomes": [],
+        "technologies": [
+          "Mixtral 8x7B",
+          "Llama2 70B",
+          "Python",
+          "Hugging Face"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "retrieval",
+        "featured": false,
+        "status": "published",
+        "sort_order": 5,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "ad38a989-0771-5d0a-90cd-0de14f2507f9",
+        "slug": "covid19-dashboard",
+        "title": "A public-health data story.",
+        "category": "Data visualization",
+        "summary": "An open-source dashboard exploring COVID-19 data in India.",
+        "description": "A personal learning project built with Python and Dash, inspired by the Aarogya Setu dashboard. The source repository is public; the historical Heroku deployment is not presented as an active demo.",
+        "role": "Personal project",
+        "organization": null,
+        "start_date": null,
+        "end_date": null,
+        "problem": "Explore public COVID-19 data through interactive visualization.",
+        "approach": "Build an interactive dashboard with Python and Dash.",
+        "responsibilities": [],
+        "outcomes": [],
+        "technologies": [
+          "Python",
+          "Dash",
+          "Plotly"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "chart",
+        "featured": false,
+        "status": "published",
+        "sort_order": 6,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "a6518117-5e49-564d-bff6-ac4b4fdb0c8d",
+        "slug": "freshness-detector",
+        "title": "A small experiment in computer vision.",
+        "category": "Machine learning",
+        "summary": "Classifying fruit freshness, with the limits of the training data made explicit.",
+        "description": "A public fruit-freshness detector for apples, bananas, and oranges. The repository documents its white-background image requirements and training-data limitations.",
+        "role": "Personal project",
+        "organization": null,
+        "start_date": null,
+        "end_date": null,
+        "problem": "Explore image classification on a constrained fruit dataset.",
+        "approach": "Train a classifier and expose a simple web interface. Treat the dataset constraints as part of the result.",
+        "responsibilities": [],
+        "outcomes": [],
+        "technologies": [
+          "Python",
+          "Computer vision"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "vision",
+        "featured": false,
+        "status": "published",
+        "sort_order": 7,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "project_links": [
+      {
+        "id": "70489367-a64f-5ab5-955a-8a362d50761d",
+        "project_id": "a6518117-5e49-564d-bff6-ac4b4fdb0c8d",
+        "kind": "github",
+        "label": "View source",
+        "url": "https://github.com/anshuls235/freshness-detector",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "a26f5ab9-33fc-55a5-bb2e-e4d1ddcac10b",
+        "project_id": "873cb3bb-e76f-5cfc-bbf8-362569777ef2",
+        "kind": "website",
+        "label": "Visit Automall",
+        "url": "https://www.automall.ae/en/",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "b9eb8c81-723d-54ff-b300-5cee431dd412",
+        "project_id": "ad38a989-0771-5d0a-90cd-0de14f2507f9",
+        "kind": "github",
+        "label": "View source",
+        "url": "https://github.com/anshuls235/covid19-dashboard",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "experiences": [
+      {
+        "id": "a97af70b-9289-517c-92f5-8680bde3a6e7",
+        "slug": "al-futtaim-data-science-manager",
+        "company": "Al-Futtaim Automotive",
+        "position": "Data Science Manager",
+        "location": "Dubai, UAE",
+        "start_date": "2025-07-01",
+        "end_date": null,
+        "highlights": [
+          "Built multilingual AI car search for Automall with LangGraph, FastAPI, and Azure OpenAI.",
+          "Architected a WhatsApp chatbot with LangGraph, Infobip, live agent handoff, and SAP C4C integration.",
+          "Built real-time lead scoring using historical data and Google Analytics behaviour signals to prioritize high-quality leads for showroom visits.",
+          "Developed ECL models for automotive lease portfolios using Databricks and H2O Driverless AI."
+        ],
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T12:38:09.305399+00:00"
+      },
+      {
+        "id": "983c2f5d-616e-52b5-a9ae-4d251c260503",
+        "slug": "gartner-senior-data-scientist",
+        "company": "Gartner",
+        "position": "Senior Data Scientist",
+        "location": "Gurugram, India",
+        "start_date": "2024-04-01",
+        "end_date": "2025-06-01",
+        "highlights": [
+          "Developed LLM-driven résumé screening and data-classification solutions.",
+          "Applied predictive modeling to territory planning and seller insights."
+        ],
+        "status": "published",
+        "sort_order": 1,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "48fd0285-23a1-5dae-9f7c-a1cddedc14c9",
+        "slug": "gartner-data-scientist",
+        "company": "Gartner",
+        "position": "Data Scientist",
+        "location": "Gurugram, India",
+        "start_date": "2022-07-01",
+        "end_date": "2024-04-01",
+        "highlights": [
+          "Automated quarterly growth forecasting with ML pipelines.",
+          "Modernized seller productivity tools with advanced analytics and dashboards."
+        ],
+        "status": "published",
+        "sort_order": 2,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "61ee227f-a205-5bef-a507-1a1065de3414",
+        "slug": "sandp-global-senior-data-scientist",
+        "company": "S&P Global",
+        "position": "Senior Data Scientist",
+        "location": "Gurugram, India",
+        "start_date": "2021-01-01",
+        "end_date": "2022-07-01",
+        "highlights": [
+          "Led an automotive Vehicle Miles Traveled product.",
+          "Deployed a serverless AWS architecture for scalable data pipelines."
+        ],
+        "status": "published",
+        "sort_order": 3,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "d309e706-2a28-5bfc-80d8-dbee0f2897be",
+        "slug": "sap-labs-india-developer",
+        "company": "SAP Labs India",
+        "position": "Developer",
+        "location": "Gurugram, India",
+        "start_date": "2019-04-01",
+        "end_date": "2021-01-01",
+        "highlights": [
+          "Applied big-data practices to optimize large-scale systems.",
+          "Resolved complex data issues for global clients."
+        ],
+        "status": "published",
+        "sort_order": 4,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "a2a91f6d-d290-531d-b793-2714e161e049",
+        "slug": "sap-labs-india-associate-developer",
+        "company": "SAP Labs India",
+        "position": "Associate Developer",
+        "location": "Bengaluru, India",
+        "start_date": "2015-08-01",
+        "end_date": "2019-03-01",
+        "highlights": [
+          "Enhanced SAP Demand Signal Management for supply-chain analytics with SAP BW/HANA and ABAP.",
+          "Built predictive models and automated ETL pipelines."
+        ],
+        "status": "published",
+        "sort_order": 5,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "education": [
+      {
+        "id": "fadd962d-fd02-5f27-b99c-bd931906242a",
+        "institution": "Delhi Technological University",
+        "degree": "BTech · Electronics & Communication",
+        "start_year": 2011,
+        "end_year": 2015,
+        "url": "https://dtu.ac.in/",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "skills": [
+      {
+        "id": "acc8be4c-5084-5b47-9f60-d638e596e8df",
+        "name": "LLMs",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "d824a3c1-ac28-5c1a-a6a4-0bb295fbf1cc",
+        "name": "RAG",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 1,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "79852d3f-68b0-5e95-b415-039e7062065d",
+        "name": "LLM fine-tuning",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 2,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "6a976861-0ab7-5ff9-a7c7-0a6358d64515",
+        "name": "LangChain",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 3,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "31f2b540-76f4-509d-998e-c77f4419e8c4",
+        "name": "LlamaIndex",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 4,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "4fcc3f0a-84fc-56bd-8e33-e5c04f3fbac3",
+        "name": "Hugging Face",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 5,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "566aa01d-a2fa-5383-baae-3f2f344721d2",
+        "name": "Semantic search",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 6,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "200d9d6a-466e-5ccc-a6ca-2c497390fd2a",
+        "name": "Python",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 7,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "c9b8b92b-3feb-5c08-8d9a-2e3342ffc6c7",
+        "name": "SQL",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 8,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "adab31fc-c852-526a-9522-0cd2bb06ded9",
+        "name": "scikit-learn",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 9,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "8b4e2042-f2b8-54cc-87a8-8a32b41ca733",
+        "name": "XGBoost",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 10,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "f64dfed6-5b21-519d-b377-4795e1005a12",
+        "name": "LightGBM",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 11,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "93c6ccbc-3e56-58e6-ac19-9ccb083cd776",
+        "name": "PyTorch",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 12,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "8cf9763b-09b1-5cd5-80f5-d07006ac95b5",
+        "name": "Pandas",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 13,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "af83a7e2-ea59-5f80-922d-7346c11594a9",
+        "name": "NumPy",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 14,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "f2a33bb9-ae97-5400-8e17-6d5a9553821c",
+        "name": "PySpark",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 15,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "3ab46206-89d5-58a4-a295-118df45a548c",
+        "name": "MLflow",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 16,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "0f4cca84-9463-5f35-bd5b-384202dde9d5",
+        "name": "Databricks",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 17,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "551a2655-f85b-50a2-b5e6-a915b9cad077",
+        "name": "Docker",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 18,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "2aaaceb9-342b-5c7e-b658-1ca296765d22",
+        "name": "Terraform",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 19,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "b06b3ea5-a5e7-5641-b10c-89f68dc7cf32",
+        "name": "GitLab CI",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 20,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "c98871da-857e-59f3-ab76-625591fa9eae",
+        "name": "Jenkins",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 21,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "23cb3bdd-ac67-5af9-9a8e-488997f9dc1a",
+        "name": "AWS",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 22,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "73825d9d-0211-5e56-bed9-109ae87114c3",
+        "name": "Azure",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 23,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "840518b9-cf35-5e93-bdc7-845a49c9726d",
+        "name": "Flask",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 24,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "58a0e1f5-bc67-5db3-87de-64e3402dea00",
+        "name": "Streamlit",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 25,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "95f75d9d-0044-50ed-91e1-f44256ac9545",
+        "name": "Gradio",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 26,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "dfba31cd-10f4-50f4-a8e0-a20aaadd2be9",
+        "name": "Dash",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 27,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "10fe9693-8134-5166-9183-dc3a6e6fc765",
+        "name": "Plotly",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 28,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "ade7ff9c-28c9-5fda-b133-c76393fc3099",
+        "name": "Power BI",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 29,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "333138da-e03d-5675-86f2-d714dd0f0f4e",
+        "name": "LangGraph",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 30,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "3f907c3a-7a31-5873-bea9-869ed869b6bd",
+        "name": "Agentic AI",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 31,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "3563aacf-aee3-5cde-9531-2699fea4d673",
+        "name": "Azure OpenAI",
+        "category": "Generative AI",
+        "status": "published",
+        "sort_order": 32,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "361e0726-de34-5b2f-bfe0-2d4d512dd926",
+        "name": "H2O Driverless AI",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 33,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "53d16013-5de7-52d8-85b7-7a4d4e2fe7ca",
+        "name": "FastAPI",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 34,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "4797b4b6-5805-5f53-9265-e7ac45d45664",
+        "name": "Infobip",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 35,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "82ad526d-ad86-58eb-947a-23754b9459c1",
+        "name": "Google Analytics (GA4)",
+        "category": "Machine learning",
+        "status": "published",
+        "sort_order": 36,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "aa7edffc-2599-5528-8c51-1c7646c293da",
+        "name": "Azure DevOps",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 37,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "18d405b7-97d7-5c85-a974-78ad7e7b62fe",
+        "name": "Cosmos DB",
+        "category": "Data & MLOps",
+        "status": "published",
+        "sort_order": 38,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "660265cc-ca77-532b-8af5-0253c51782c3",
+        "name": "Azure AKS",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 39,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "8485eac8-749e-5956-ab6e-ba76f5a7227d",
+        "name": "React",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 40,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "d48f0a9b-c682-5669-8415-39eda9a90523",
+        "name": "Django REST",
+        "category": "Cloud & applications",
+        "status": "published",
+        "sort_order": 41,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "certifications": [
+      {
+        "id": "3cf733a0-bdcb-5db4-9917-5dcc417f7df3",
+        "title": "Machine Learning Nanodegree",
+        "issuer": "Udacity",
+        "issued_on": "2019-01-01",
+        "url": "https://www.udacity.com/certificate/e/2a11e416-07f0-11e9-8559-cf82ed3def6b",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "f0c54ee8-e180-5fa7-b165-b871397478a2",
+        "title": "Data Analyst Nanodegree",
+        "issuer": "Udacity",
+        "issued_on": "2018-01-01",
+        "url": "https://www.udacity.com/certificate/e/655e69e2-b56f-11e7-b649-5f47628f4203",
+        "status": "published",
+        "sort_order": 1,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "publications": [
+      {
+        "id": "a1fdc721-8de6-59e5-bf00-e99985805cb9",
+        "slug": "tool-calling",
+        "title": "Tool-Calling with LangChain & Open-Source Models",
+        "summary": "Running tool-calling workflows with open-source models locally.",
+        "platform": "Medium",
+        "published_on": null,
+        "url": "https://anshuls235.medium.com/️-tool-calling-with-langchain-open-source-models-run-it-locally-seamlessly-8d31ff4c7a76",
+        "featured": true,
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "b11e770d-b905-5389-8933-539baf629f7f",
+        "slug": "plotly-dash",
+        "title": "Plotly Dash: From Development to Deployment",
+        "summary": "Taking a Python dashboard from local development to the web.",
+        "platform": "Medium",
+        "published_on": "2021-05-23",
+        "url": "https://anshuls235.medium.com/plotly-dash-from-development-to-deployment-c9500d16581a",
+        "featured": true,
+        "status": "published",
+        "sort_order": 1,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "5a234add-2c7e-513e-b57a-b3c869a899d5",
+        "slug": "vaccine-notifier",
+        "title": "Vaccine Slot Notifier using AWS & Python",
+        "summary": "A practical notification system built with AWS and Python.",
+        "platform": "Medium",
+        "published_on": "2021-05-14",
+        "url": "https://anshuls235.medium.com/vaccine-slot-notifier-using-aws-python-bbfe7dd60e84",
+        "featured": true,
+        "status": "published",
+        "sort_order": 2,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ],
+    "social_links": [
+      {
+        "id": "437ff1a5-03b0-5a39-80dd-8392052608e7",
+        "network": "GitHub",
+        "url": "https://github.com/anshuls235",
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "942a6a81-d7a9-5aed-9fe1-0bb400100ec9",
+        "network": "LinkedIn",
+        "url": "https://www.linkedin.com/in/anshuls235/",
+        "status": "published",
+        "sort_order": 1,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "89037342-3af6-5d3a-8657-351409f64807",
+        "network": "Medium",
+        "url": "https://medium.com/@anshuls235",
+        "status": "published",
+        "sort_order": 2,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "b1350616-563d-51c6-8d4c-0aae50e67789",
+        "network": "Kaggle",
+        "url": "https://www.kaggle.com/anshuls235",
+        "status": "published",
+        "sort_order": 3,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-01T00:00:00+00:00"
+      }
+    ]
+  }
+}
