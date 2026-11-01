@@ -92,6 +92,21 @@ document.addEventListener("click", (event) => {
       ? event.target.closest<HTMLElement>("a,button")
       : null;
   if (!target) return;
+  if (target.hasAttribute("data-motion-toggle")) {
+    const video = document.querySelector<HTMLVideoElement>(".character-video");
+    if (video) {
+      if (video.paused) {
+        void video.play().then(() => {
+          target.setAttribute("aria-label", "Pause animation");
+          target.innerHTML = 'Pause <span aria-hidden="true">Ⅱ</span>';
+        }).catch(() => {});
+      } else {
+        video.pause();
+        target.setAttribute("aria-label", "Play animation");
+        target.innerHTML = 'Play <span aria-hidden="true">▷</span>';
+      }
+    }
+  }
   if (target.hasAttribute("data-project")) {
     event.preventDefault();
     opener = target;
