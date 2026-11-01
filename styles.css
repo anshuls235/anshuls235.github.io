@@ -2088,3 +2088,55 @@ dialog::backdrop {
 .arrow-icon { display: inline-block; vertical-align: -0.125em; flex: none; }
 .portrait-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 @media (prefers-reduced-motion: reduce) { .portrait-video { display: none; } }
+
+/* A quiet visual rhythm across the portrait and project illustrations. */
+.portrait-frame {
+  isolation: isolate;
+  background: #ebe9df;
+}
+.portrait-frame > .avatar-art {
+  object-position: center;
+  filter: none;
+  mix-blend-mode: normal;
+  animation: avatar-breathe 12s ease-in-out infinite alternate;
+}
+.avatar-orbit {
+  position: absolute;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 5px rgba(38, 75, 225, .12);
+  pointer-events: none;
+  animation: orbit-drift 6s ease-in-out infinite alternate;
+}
+.avatar-orbit-one { top: 15%; right: 12%; }
+.avatar-orbit-two { top: 43%; left: 9%; width: 6px; height: 6px; animation-delay: -3s; }
+.portrait-cross { z-index: 2; }
+.project-art { transition: transform .35s ease, box-shadow .35s ease; }
+@media (hover: hover) {
+  .project-card:hover .project-art { transform: translateY(-4px); box-shadow: 0 16px 36px #17252c14; }
+}
+.query-cursor { animation: cursor-blink 1.3s steps(2, start) infinite; }
+.search-results > span { animation: signal-glow 5s ease-in-out infinite; }
+.search-results > span:nth-child(2) { animation-delay: .5s; }
+.search-results > span:nth-child(3) { animation-delay: 1s; }
+.retrieval-diagram .model-node { animation: node-float 6s ease-in-out infinite; }
+.pipeline-line span { transform-origin: left; animation: pipeline-flow 5s ease-in-out infinite; }
+.status-dot { animation: status-pulse 3s ease-in-out infinite; }
+@keyframes avatar-breathe { from { transform: scale(1); } to { transform: scale(1.025); } }
+@keyframes orbit-drift { from { transform: translate(0, 0); opacity: .5; } to { transform: translate(-5px, 7px); opacity: 1; } }
+@keyframes cursor-blink { to { opacity: 0; } }
+@keyframes signal-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.12); } }
+@keyframes node-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes pipeline-flow { 0%, 100% { transform: scaleX(.25); } 50% { transform: scaleX(1); } }
+@keyframes status-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(38,75,225,.25); } 50% { box-shadow: 0 0 0 5px rgba(38,75,225,0); } }
+@media (prefers-reduced-motion: reduce) {
+  .avatar-art, .avatar-orbit, .query-cursor, .search-results > span,
+  .retrieval-diagram .model-node, .pipeline-line span, .status-dot { animation: none !important; }
+}
+@media (max-width: 600px) {
+  .portrait-block { grid-template-columns: minmax(155px, 48%) 1fr; }
+  .portrait-frame { aspect-ratio: 4 / 5; }
+}
