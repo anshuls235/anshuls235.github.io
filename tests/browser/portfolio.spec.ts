@@ -256,13 +256,15 @@ test("configured analytics respects DNT and never delays a link", async ({
 
 test('illustrated world: visible motion, touch ideas, pause and reduced motion', async ({page}) => {
   await page.goto('./');
-  await expect(page.locator('.workshop-art')).toBeVisible();
+  await expect(page.locator('.character-scene')).toBeVisible();
   await expect(page.locator('.workshop-art')).toHaveJSProperty('naturalWidth',1536);
-  expect(await page.locator('.scene-star').first().evaluate(el => getComputedStyle(el).animationName)).toBe('slow-turn');
+  await expect.poll(() => page.locator('[data-world-video]').evaluate(el => (el as HTMLVideoElement).currentTime)).toBeGreaterThan(.2);
+  expect(await page.locator('.journey-signal').first().evaluate(el => getComputedStyle(el).animationName)).toBe('journey-flow');
   await page.getByRole('button',{name:'Spark a new idea'}).click();
   await expect(page.locator('.idea-response')).toContainText('finding a car');
   await page.getByRole('button',{name:'Pause motion'}).click();
   await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
+  await expect(page.locator('[data-world-video]')).toHaveJSProperty('paused',true);
   await page.getByRole('button',{name:'Play motion'}).click();
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1440,height:1000});
@@ -273,5 +275,46 @@ test('illustrated world: visible motion, touch ideas, pause and reduced motion',
   await page.screenshot({path:'test-results/workshop-mobile.png',fullPage:true});
   await page.emulateMedia({reducedMotion:'reduce'});
   await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
-  expect(await page.locator('.scene-star').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  expect(await page.locator('.journey-signal').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+});
+
+
+test('cinematic gallery, touch navigation and idea machine', async ({page}) => {
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('./');
+  await page.getByRole('link',{name:/Explore my work/}).click();
+  await expect(page.locator('#projects')).toHaveClass(/is-cinematic/);
+  await page.getByRole('button',{name:'Next featured project'}).click();
+  await expect(page.locator('[data-project-position]')).toContainText('02 / 03');
+  await expect(page.locator('.project-card.is-current h3')).toContainText('enterprise knowledge');
+  await expect.poll(() => page.evaluate(() => Math.abs(scrollY - ((document.querySelector('#projects') as HTMLElement).offsetTop - 88 + innerHeight * .85)))).toBeLessThan(4);
+  await page.screenshot({path:'test-results/gallery-desktop.png'});
+  await page.getByRole('button',{name:'Run the idea machine'}).click();
+  await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done',{timeout:6000});
+  await expect(page.locator('.machine-status')).toContainText('became something useful');
+  await page.getByRole('button',{name:'Reset',exact:true}).click();
+  await expect(page.locator('.machine-status')).toHaveText('Ready when you are.');
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  await expect(page.locator('#projects')).not.toHaveClass(/is-cinematic/);
+  await page.getByRole('button',{name:'Next featured project'}).click();
+  await expect(page.locator('[data-project-position]')).toContainText('02 / 03');
+  await expect.poll(() => page.locator('.selected-grid').evaluate(el => el.scrollLeft)).toBeGreaterThan(250);
+  await page.screenshot({path:'test-results/gallery-mobile.png'});
+  await page.getByRole('button',{name:'Run the idea machine'}).click();
+  await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done',{timeout:6000});
+  await page.screenshot({path:'test-results/machine-mobile.png'});
+});
+
+
+test('reduced motion keeps the character poster and avoids downloading the film', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const films:string[]=[];
+  page.on('request',r=>{if(r.url().includes('workshop-loop.'))films.push(r.url());});
+  await page.goto('./');
+  await expect(page.locator('[data-world-video]')).toHaveJSProperty('paused',true);
+  await expect(page.locator('.workshop-art')).toBeVisible();
+  await page.getByRole('button',{name:'Run the idea machine'}).click();
+  await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done');
+  expect(films).toEqual([]);
 });
