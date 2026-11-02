@@ -253,3 +253,25 @@ test("configured analytics respects DNT and never delays a link", async ({
   expect(requests).toBe(0);
   await context.close();
 });
+
+test('illustrated world: visible motion, touch ideas, pause and reduced motion', async ({page}) => {
+  await page.goto('./');
+  await expect(page.locator('.workshop-art')).toBeVisible();
+  await expect(page.locator('.workshop-art')).toHaveJSProperty('naturalWidth',1536);
+  expect(await page.locator('.scene-star').first().evaluate(el => getComputedStyle(el).animationName)).toBe('slow-turn');
+  await page.getByRole('button',{name:'Spark a new idea'}).click();
+  await expect(page.locator('.idea-response')).toContainText('finding a car');
+  await page.getByRole('button',{name:'Pause motion'}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
+  await page.getByRole('button',{name:'Play motion'}).click();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('./');
+  await page.screenshot({path:'test-results/workshop-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('./');
+  await page.screenshot({path:'test-results/workshop-mobile.png',fullPage:true});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
+  expect(await page.locator('.scene-star').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+});

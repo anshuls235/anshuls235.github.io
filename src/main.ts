@@ -1,3 +1,4 @@
+import { initWorld } from "./world-motion";
 import fallback from "./content/fallback.json";
 import { validateSnapshot, fetchContent, filterProjects } from "./lib/content";
 import { configuredProject, configuredAnalytics } from "./lib/settings";
@@ -209,6 +210,7 @@ async function refresh() {
         ?.setAttribute("content", profile.introduction);
     }
     enableInteractions();
+    initWorld();
     if (!content.projects.some((p) => p.category === category))
       category = "All work";
     const input = document.querySelector<HTMLInputElement>("#project-search");
