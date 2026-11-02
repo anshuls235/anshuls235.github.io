@@ -13,10 +13,9 @@
 .orbit-two { animation-direction:reverse;animation-duration:37s; }
 .floating-note { z-index:3; }
 .idea-switch { z-index:4; }
-.hero { position:relative;isolation:isolate; }
+.hero-world { background:#fff4dc; }
+.hero { position:relative;isolation:isolate;color:var(--ink); }
 [data-theme="dark"] .hero { --ink:#202941;--paper:#fff4dc;--muted:#535665;--line:#d2c6ae;--accent:#304cdd; }
-[data-theme="dark"] .hero::before { content:"";position:absolute;top:0;bottom:0;left:calc(50% - 50vw);width:100vw;background:#fff4dc;z-index:-2; }
-[data-theme="dark"] .hero .workshop-art { mix-blend-mode:multiply;border-radius:0; }
 .idea-journey { padding:90px 0 25px; background:#304cdd; color:#fff4dc; overflow:hidden;border-block:1.5px solid #202941;--travel:.5; }
 .journey-heading { display:grid;grid-template-columns:1.3fr 1fr;gap:25px 70px;align-items:end; }
 .journey-heading .eyebrow { grid-column:1/-1;color:#fff4dc; }
@@ -154,6 +153,6 @@
 }
 @media print { .idea-journey,.playground,.closing-scene,.project-gallery-controls,.gallery-hint{display:none}.selected-section.is-cinematic{height:auto}.is-cinematic .project-theatre{position:static;height:auto}.is-cinematic .selected-grid{transform:none!important;display:block}.is-cinematic .selected-grid>.project-card{margin-bottom:30px} }
 .character-scene { mix-blend-mode:multiply; }
-.character-scene .workshop-art,.character-scene .workshop-film { mix-blend-mode:normal; }
+.character-scene .workshop-art,.character-scene .workshop-film { mix-blend-mode:normal;border-radius:0; }
 .has-film .workshop-art { opacity:0; }
 @media(prefers-reduced-motion:reduce) { .has-film .workshop-art { opacity:1; } }

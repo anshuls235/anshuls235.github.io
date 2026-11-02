@@ -318,3 +318,25 @@ test('reduced motion keeps the character poster and avoids downloading the film'
   await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done');
   expect(films).toEqual([]);
 });
+
+
+test('theme switching preserves the animated scene and readable hero content', async ({page}) => {
+  for (const width of [390,1440]) {
+    await page.setViewportSize({width,height:1000});
+    await page.goto('./');
+    for (const theme of ['dark','light','dark'] as const) {
+      const current=await page.locator('html').getAttribute('data-theme');
+      if(current!==theme) await page.locator('.theme-toggle').click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+      await expect(page.locator('.hero-world')).toHaveCSS('background-color','rgb(255, 244, 220)');
+      await expect(page.locator('.hero')).toHaveCSS('color','rgb(32, 41, 65)');
+      await expect(page.locator('#hero-heading')).toHaveCSS('color','rgb(32, 41, 65)');
+      await expect(page.locator('.floating-note').first()).toHaveCSS('color','rgb(32, 41, 65)');
+      const video=page.locator('[data-world-video]');
+      await expect.poll(()=>video.evaluate(el=>(el as HTMLVideoElement).currentTime)).toBeGreaterThan(.2);
+      await expect(video).toHaveJSProperty('paused',false);
+      await expect(video).toHaveCSS('opacity','1');
+      if(theme==='dark') await page.screenshot({path:`test-results/dark-hero-${width}.png`,fullPage:width===390});
+    }
+  }
+});
