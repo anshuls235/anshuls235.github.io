@@ -7,6 +7,7 @@ try {
 }
 const apply = (dark: boolean) => {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
+  window.dispatchEvent(new Event("portfolio-theme-change"));
   const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
   if (button) {
     button.hidden = false;

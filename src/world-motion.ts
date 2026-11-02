@@ -1,3 +1,4 @@
+import { initFlight, pauseFlight } from "./flight";
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const desktop = matchMedia('(min-width: 901px)');
 let paused = reduced.matches;
@@ -12,22 +13,44 @@ const clamp = (value: number) => Math.max(0, Math.min(1, value));
 let videoVisible = false;
 function syncVideo() {
  const video = document.querySelector<HTMLVideoElement>('[data-world-video]');
- if (!video) return;
+ const poster = document.querySelector<HTMLImageElement>('.workshop-art');
+ if (!video || !poster) return;
+ const night = document.documentElement.dataset.theme === 'dark';
+ const variant = night ? 'night' : 'day';
+ const posterSource = night ? poster.dataset.nightPoster : poster.dataset.dayPoster;
+ if (posterSource && poster.getAttribute('src') !== posterSource) {poster.src=posterSource;video.poster=posterSource;}
  const saveData = (navigator as Navigator & {connection?: {saveData?:boolean}}).connection?.saveData;
- if (paused || reduced.matches || document.hidden || !videoVisible || saveData) { video.pause(); return; }
- if (!video.getAttribute('src') && video.dataset.src) {
-  const webm = video.dataset.webm;
-  const alternative = video.canPlayType('video/webm; codecs="vp9"') && webm ? video.dataset.src : webm;
-  video.src = video.canPlayType('video/webm; codecs="vp9"') && webm ? webm : video.dataset.src;
-  video.addEventListener('loadeddata', () => video.parentElement?.classList.add('has-film'), {once:true});
-  video.addEventListener('error', () => {
-   if (alternative && !video.dataset.triedFallback) {
+ const shouldPlay = !paused && !reduced.matches && !document.hidden && videoVisible && !saveData;
+ if (video.dataset.variant !== variant) {
+  video.pause();video.parentElement?.classList.remove('has-film');
+  video.dataset.variant = variant;
+  video.dataset.triedFallback = '';
+  // Defer the themed video until it is actually needed.
+  video.removeAttribute('src');
+  video.load();
+ }
+ if (!shouldPlay) {video.pause();return;}
+ if (!video.dataset.listenersReady) {
+  video.dataset.listenersReady='true';
+  video.addEventListener('loadeddata',()=>video.parentElement?.classList.add('has-film'));
+  video.addEventListener('error',()=>{
+   const dark=video.dataset.variant==='night';
+   const mp4=dark?video.dataset.nightSrc:video.dataset.src;
+   const webm=dark?video.dataset.nightWebm:video.dataset.webm;
+   const alternative=video.canPlayType('video/webm; codecs="vp9"')?mp4:webm;
+   if(alternative && !video.dataset.triedFallback){
     video.dataset.triedFallback='true';video.src=alternative;
-    if (!paused && !reduced.matches && videoVisible) void video.play().catch(()=>{});
-   } else video.parentElement?.classList.remove('has-film');
+    if(!paused && !reduced.matches && videoVisible)void video.play().catch(()=>{});
+   }else video.parentElement?.classList.remove('has-film');
   });
  }
- void video.play().catch(() => { /* The illustrated poster remains available if autoplay is refused. */ });
+ if (!video.getAttribute('src')) {
+  const mp4=night?video.dataset.nightSrc:video.dataset.src;
+  const webm=night?video.dataset.nightWebm:video.dataset.webm;
+  const selected=video.canPlayType('video/webm; codecs="vp9"') && webm?webm:mp4;
+  if(selected)video.src=selected;
+ }
+ void video.play().catch(()=>{/* The themed poster remains when autoplay is refused. */});
 }
 function syncMotion() {
  document.documentElement.dataset.motion = paused || reduced.matches ? 'paused' : 'running';
@@ -36,6 +59,7 @@ function syncMotion() {
   button.innerHTML = `${paused || reduced.matches ? 'Play motion' : 'Pause motion'} <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="${paused || reduced.matches ? 'm7 4 8 6-8 6Z' : 'M6 4v12M14 4v12'}" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
  });
  syncVideo();
+ pauseFlight(paused || reduced.matches);
  requestUpdate();
 }
 const observer = new IntersectionObserver(entries => entries.forEach(entry => {
@@ -113,6 +137,7 @@ export function initWorld() {
    }
   }, {passive:true});
  }
+ initFlight();
  setGalleryIndex(0); syncMotion(); requestUpdate();
 }
 function resetMachine() {
@@ -168,6 +193,7 @@ document.addEventListener('focusin', event => {
 window.addEventListener('scroll',requestUpdate,{passive:true});
 window.addEventListener('resize',requestUpdate,{passive:true});
 document.addEventListener('visibilitychange',syncVideo);
+window.addEventListener('portfolio-theme-change',syncVideo);
 if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
  document.addEventListener('pointermove', event => {
   pointerX=(event.clientX/innerWidth-.5)*14;pointerY=(event.clientY/innerHeight-.5)*10;requestUpdate();

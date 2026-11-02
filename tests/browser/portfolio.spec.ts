@@ -328,15 +328,37 @@ test('theme switching preserves the animated scene and readable hero content', a
       const current=await page.locator('html').getAttribute('data-theme');
       if(current!==theme) await page.locator('.theme-toggle').click();
       await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
-      await expect(page.locator('.hero-world')).toHaveCSS('background-color','rgb(255, 244, 220)');
-      await expect(page.locator('.hero')).toHaveCSS('color','rgb(32, 41, 65)');
-      await expect(page.locator('#hero-heading')).toHaveCSS('color','rgb(32, 41, 65)');
-      await expect(page.locator('.floating-note').first()).toHaveCSS('color','rgb(32, 41, 65)');
+      await expect(page.locator('.hero-world')).toHaveCSS('background-color',theme==='dark'?'rgb(23, 34, 58)':'rgb(255, 244, 220)');
+      await expect(page.locator('.hero')).toHaveCSS('color',theme==='dark'?'rgb(255, 244, 220)':'rgb(32, 41, 65)');
+      await expect(page.locator('#hero-heading')).toHaveCSS('color',theme==='dark'?'rgb(255, 244, 220)':'rgb(32, 41, 65)');
+      await expect(page.locator('.floating-note').first()).toHaveCSS('color',theme==='dark'?'rgb(255, 244, 220)':'rgb(32, 41, 65)');
       const video=page.locator('[data-world-video]');
       await expect.poll(()=>video.evaluate(el=>(el as HTMLVideoElement).currentTime)).toBeGreaterThan(.2);
       await expect(video).toHaveJSProperty('paused',false);
+      await expect(video).toHaveAttribute('data-variant',theme==='dark'?'night':'day');
+      await expect(page.locator('.workshop-art')).toHaveAttribute('src',theme==='dark'?/idea-workshop-night/:/idea-workshop.webp/);
       await expect(video).toHaveCSS('opacity','1');
       if(theme==='dark') await page.screenshot({path:`test-results/dark-hero-${width}.png`,fullPage:width===390});
     }
   }
+});
+
+
+test('paper airplane follows the route, arrives, replays and respects reduced motion', async ({page}) => {
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000});
+  await page.goto('./');
+  await page.locator('#contact').scrollIntoViewIfNeeded();
+  await page.getByRole('button',{name:'Send it flying'}).click();
+  const plane=page.locator(width===390?'.flight-mobile [data-flight-plane]':'.flight-desktop [data-flight-plane]');
+  const first=await plane.getAttribute('transform');
+  await expect.poll(()=>plane.getAttribute('transform')).not.toBe(first);
+  await expect(page.locator('[data-flight]')).toHaveAttribute('data-flight-state','arrived',{timeout:9000});
+  await expect(page.locator('[data-flight-status]')).toContainText('has arrived');
+  await page.screenshot({path:`test-results/contact-flight-${width}.png`});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.getByRole('button',{name:'Send it flying'}).click();
+  await expect(page.locator('[data-flight]')).toHaveAttribute('data-flight-state','arrived');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+ }
 });
