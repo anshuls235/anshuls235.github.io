@@ -18,7 +18,7 @@ const config = {
 };
 test("reviewed snapshot is published, linked, and complete", () => {
   assert.equal(snapshot.content.profile.length, 1);
-  assert.equal(snapshot.content.projects.length, 8);
+  assert.equal(snapshot.content.projects.length, 13);
   assert.equal(snapshot.content.experiences.length, 6);
   assert.ok(
     snapshot.content.project_links.every((l) =>
@@ -114,7 +114,7 @@ test("filters combine text and category without changing source content", () => 
   assert.equal(
     filterProjects(snapshot.content.projects, "Generative AI", "LangGraph")
       .length,
-    2,
+    snapshot.content.projects.filter(p => p.category === "Generative AI" && p.technologies.join(" ").toLowerCase().includes("langgraph")).length,
   );
   assert.equal(
     filterProjects(snapshot.content.projects, "All work", "nothing matches")
@@ -123,7 +123,7 @@ test("filters combine text and category without changing source content", () => 
   );
   assert.equal(
     filterProjects(snapshot.content.projects, "All work", "  ").length,
-    8,
+    snapshot.content.projects.length,
   );
 });
 test("renderer preserves deep links and never renders content as executable HTML", () => {
@@ -145,4 +145,33 @@ test("renderer preserves deep links and never renders content as executable HTML
   assert.match(html, /\/repo\/resume.pdf/);
   const detail = renderProjectDetail(c.projects[0], c, "/repo/");
   assert.match(detail, /rel="noopener noreferrer"/);
+});
+
+test("career chapters preserve every role, date and company return", async () => {
+  const { careerChapters } = await import("../src/lib/experience");
+  const roles = snapshot.content.experiences;
+  const chapters = careerChapters(roles);
+  assert.equal(chapters.length, 4);
+  assert.deepEqual(chapters.map(c => c.roles.length), [1, 2, 1, 2]);
+  const gartner = chapters.find(c => c.company === "Gartner")!;
+  assert.equal(gartner.start, "2022-07-01");
+  assert.equal(gartner.end, "2025-06-01");
+  assert.deepEqual(chapters.flatMap(c => c.roles), roles);
+  const returned = careerChapters([roles[1], roles[3], roles[2]]);
+  assert.equal(returned.length, 3);
+  assert.equal(careerChapters([]).length, 0);
+});
+
+test("reported impact uses published summaries and keeps evidence accessible", () => {
+  const html = renderSite(snapshot.content);
+  for (const slug of ["automall-ai-search", "automall-conversational-ai", "real-time-lead-scoring"]) {
+    const project = snapshot.content.projects.find(p => p.slug === slug)!;
+    assert.ok(html.includes(escapeHtml(project.summary)));
+    const detail = renderProjectDetail(project, snapshot.content, "/");
+    for (const outcome of project.outcomes) assert.ok(detail.includes(escapeHtml(outcome)));
+  }
+  assert.match(html, /not causal uplift/);
+  const content = structuredClone(snapshot.content);
+  content.projects = [];
+  assert.ok(!renderSite(content).includes('id="impact"'));
 });

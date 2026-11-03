@@ -53,7 +53,7 @@ test("desktop project, filter, search, deep link, CV and theme flows", async ({
   await page
     .getByRole("button", { name: "Machine learning", exact: true })
     .click();
-  await expect(page.locator("#archive-list article")).toHaveCount(2);
+  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.filter(p => p.category === "Machine learning").length);
   await page
     .getByRole("searchbox", { name: "Search projects" })
     .fill("no matching project");
@@ -61,7 +61,7 @@ test("desktop project, filter, search, deep link, CV and theme flows", async ({
     page.getByRole("heading", { name: "No matching projects." }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Clear filters/ }).click();
-  await expect(page.locator("#archive-list article")).toHaveCount(8);
+  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.length);
   await page.getByRole("button", { name: "Switch to dark theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
@@ -153,7 +153,7 @@ test("static content works without JavaScript", async ({ browser }) => {
   await expect(
     page.getByRole("link", { name: "Visit Automall", exact: false }),
   ).toBeVisible();
-  expect(await page.locator("#archive-list article").count()).toBe(8);
+  expect(await page.locator("#archive-list article").count()).toBe(fallback.content.projects.length);
   await context.close();
 });
 test("all local assets load and no third-party resources are requested", async ({
@@ -220,7 +220,7 @@ test("configured content: live edits, empty collections, errors and paused datab
   ).toBeVisible();
   mode = "paused";
   await page.reload();
-  await expect(page.locator("#archive-list article")).toHaveCount(8);
+  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.length);
   await expect(
     page.getByRole("status").filter({ hasText: "Showing a saved portfolio" }),
   ).toBeVisible();
@@ -228,7 +228,7 @@ test("configured content: live edits, empty collections, errors and paused datab
   await page
     .getByRole("button", { name: "Generative AI", exact: true })
     .click();
-  await expect(page.locator("#archive-list article")).toHaveCount(4);
+  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.filter(p => p.category === "Generative AI").length);
   await page.context().setOffline(false);
 });
 test("configured analytics respects DNT and never delays a link", async ({
@@ -285,7 +285,7 @@ test('cinematic gallery, touch navigation and idea machine', async ({page}) => {
   await page.getByRole('link',{name:/Explore my work/}).click();
   await expect(page.locator('#projects')).toHaveClass(/is-cinematic/);
   await page.getByRole('button',{name:'Next featured project'}).click();
-  await expect(page.locator('[data-project-position]')).toContainText('02 / 03');
+  await expect(page.locator('[data-project-position]')).toContainText(`02 / ${String(fallback.content.projects.filter(p => p.featured).length).padStart(2, '0')}`);
   await expect(page.locator('.project-card.is-current h3')).toContainText('enterprise knowledge');
   await expect.poll(() => page.evaluate(() => Math.abs(scrollY - ((document.querySelector('#projects') as HTMLElement).offsetTop - 88 + innerHeight * .85)))).toBeLessThan(4);
   await page.screenshot({path:'test-results/gallery-desktop.png'});
@@ -298,7 +298,7 @@ test('cinematic gallery, touch navigation and idea machine', async ({page}) => {
   await page.goto('./');
   await expect(page.locator('#projects')).not.toHaveClass(/is-cinematic/);
   await page.getByRole('button',{name:'Next featured project'}).click();
-  await expect(page.locator('[data-project-position]')).toContainText('02 / 03');
+  await expect(page.locator('[data-project-position]')).toContainText(`02 / ${String(fallback.content.projects.filter(p => p.featured).length).padStart(2, '0')}`);
   await expect.poll(() => page.locator('.selected-grid').evaluate(el => el.scrollLeft)).toBeGreaterThan(250);
   await page.screenshot({path:'test-results/gallery-mobile.png'});
   await page.getByRole('button',{name:'Run the idea machine'}).click();
@@ -361,4 +361,47 @@ test('paper airplane follows the route, arrives, replays and respects reduced mo
   await expect(page.locator('[data-flight]')).toHaveAttribute('data-flight-state','arrived');
   await page.emulateMedia({reducedMotion:'no-preference'});
  }
+});
+
+test('published impact, expanded work and grouped career chapters on desktop and mobile', async ({page}) => {
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:1000});
+    await page.goto('./');
+    await expect(page.locator('#archive-list article')).toHaveCount(fallback.content.projects.length);
+    await expect(page.locator('.selected-grid>.project-card')).toHaveCount(fallback.content.projects.filter(p=>p.featured).length);
+    await expect(page.locator('.impact-card')).toHaveCount(3);
+    await expect(page.locator('#impact')).toContainText('AED 1.99M');
+    await expect(page.locator('#impact')).toContainText('AED 1.33M');
+    await expect(page.locator('#impact')).toContainText('45%');
+    await expect(page.locator('#impact')).toContainText('not causal uplift');
+    await page.locator('.impact-card').nth(1).getByRole('link').click();
+    await expect(page.getByRole('dialog')).toContainText('Attribution is by lead match, not proof of causation.');
+    await page.keyboard.press('Escape');
+    await page.locator('#experience').scrollIntoViewIfNeeded();
+    await expect(page.locator('.experience-item')).toHaveCount(4);
+    await expect(page.locator('#experience').getByRole('heading',{level:3,name:'Gartner',exact:true})).toHaveCount(1);
+    await expect(page.locator('#experience').getByRole('heading',{level:3,name:'SAP Labs India',exact:true})).toHaveCount(1);
+    await expect(page.locator('.career-role')).toHaveCount(6);
+    const gartner=page.locator('.experience-item').filter({has:page.getByRole('heading',{name:'Gartner',exact:true})});
+    await expect(gartner.locator('.experience-date')).toHaveText('Jul 2022 — Jun 2025');
+    await expect(gartner).toContainText('Senior Data Scientist');
+    await expect(gartner).toContainText('Data Scientist');
+    await gartner.locator('summary').first().click();
+    await expect(gartner.locator('details[open]')).toContainText('territory planning');
+    await page.screenshot({path:`test-results/career-${width}.png`});
+    await page.getByRole('button',{name:'Switch to dark theme'}).click();
+    await page.screenshot({path:`test-results/career-dark-${width}.png`});
+    const audit=await new AxeBuilder({page}).include('#experience').include('#impact').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    expect(audit.violations).toEqual([]);
+    await page.getByRole('button',{name:'Switch to light theme'}).click();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await page.locator('#impact').scrollIntoViewIfNeeded();
+    await page.screenshot({path:`test-results/impact-${width}.png`});
+    for (const slug of ['command-center-ask-ai','qualification-bot','test-drive-mcp','genie-builder']) {
+      await page.locator(`#archive-list a[data-project="${slug}"]`).first().click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByRole('dialog')).toContainText(fallback.content.projects.find(p=>p.slug===slug)!.outcomes.at(-1)!);
+      await page.keyboard.press('Escape');
+    }
+  }
 });

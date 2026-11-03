@@ -1,6 +1,7 @@
 import { workshop, vignette, spark, ideaMachine, playground, closingScene } from "../world";
 import type { Content, Project, Profile } from "./types";
 import { escapeHtml as e, safeUrl } from "./content";
+import { careerChapters } from "./experience";
 const arrow = '<span aria-hidden="true"><svg class="arrow-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5 M7 5h12v12"/></svg></span>';
 const right = '<span aria-hidden="true"><svg class="arrow-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5 M7 5h12v12"/></svg></span>';
 function link(
@@ -60,6 +61,22 @@ export function renderProjectDetail(
       "",
     )}${project.responsibilities.length ? `<section><h3>My contribution</h3><ul>${project.responsibilities.map((x) => `<li>${e(x)}</li>`).join("")}</ul></section>` : ""}${project.outcomes.length ? `<section><h3>Documented outcomes</h3><ul>${project.outcomes.map((x) => `<li>${e(x)}</li>`).join("")}</ul></section>` : ""}${links.length ? `<div class="detail-links">${links.map((l) => link(l.url, `${e(l.label)} ${arrow}`, base, "button button-primary", `data-event="project_link" data-project-id="${project.id}" data-link-id="${l.id}" data-platform="${e(l.kind)}"`)).join("")}</div>` : ""}`;
 }
+export function renderImpact(projects: Project[]) {
+  const stories = [
+    ["automall-ai-search", "Search → sales"],
+    ["automall-conversational-ai", "Conversations → leads"],
+    ["real-time-lead-scoring", "Intent → opportunity"],
+  ].flatMap(([slug, label]) => {
+    const project = projects.find(p => p.slug === slug && p.outcomes.length);
+    return project ? [{ project, label }] : [];
+  });
+  if (!stories.length) return "";
+  return `<section class="impact-section section container" id="impact" aria-labelledby="impact-heading"><div class="impact-heading"><p class="eyebrow">FROM THE WORKSHOP TO THE REAL WORLD</p><h2 id="impact-heading">Built to make a difference.</h2><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div><div class="impact-grid">${stories.map(({ project, label }, index) => `<article class="impact-card"><p class="mono"><span>${String(index + 1).padStart(2, "0")}</span> ${e(label)}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="text-link" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">Explore the evidence ${right}<span class="sr-only"> for ${e(project.title)}</span></a></article>`).join("")}</div><p class="impact-scope">Sales figures show attributed revenue, not causal uplift. Lead scoring reports early pilot opportunities, not sales. Open the project notes for measurement periods, methods and limitations.</p></section>`;
+}
+
+export function renderExperience(experiences: Content["experiences"]) {
+  return careerChapters(experiences).map((chapter, index) => `<article class="experience-item"><span class="experience-number mono">${String(index + 1).padStart(2, "0")}</span><div class="career-chapter"><p class="mono experience-date">${date(chapter.start)} — ${chapter.end ? date(chapter.end) : "Latest chapter"}</p><h3>${e(chapter.company)}</h3>${chapter.roles.length > 1 ? '<p class="career-progression mono">Role progression</p>' : ""}<ol class="career-roles">${chapter.roles.map(role => `<li class="career-role"><div class="career-role-heading"><h4>${e(role.position)}</h4><p class="mono">${date(role.start_date)} — ${role.end_date ? date(role.end_date) : "Latest chapter"}</p></div><p class="career-location">${e(role.location)}</p>${role.highlights.length ? `<details><summary>Explore contributions<span class="sr-only"> as ${e(role.position)} at ${e(chapter.company)}</span><span aria-hidden="true">+</span></summary><ul>${role.highlights.map(h => `<li>${e(h)}</li>`).join("")}</ul></details>` : ""}</li>`).join("")}</ol></div></article>`).join("") || '<p class="empty-state">Experience details will be added soon.</p>';
+}
 export function renderSite(content: Content, base = "/") {
   const p = content.profile[0];
   if (!p)
@@ -88,6 +105,7 @@ export function renderSite(content: Content, base = "/") {
     <div class="hero-bottom"><p class="mono">BIG QUESTIONS. SMALL EXPERIMENTS. USEFUL THINGS.</p><button class="world-motion" data-world-motion type="button" aria-pressed="false">Pause motion <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M6 4v12M14 4v12" stroke="currentColor" stroke-width="3"/></svg></button></div>
   </section></div>
   ${ideaMachine()}<div class="world-ribbon" aria-label="Approach"><div>HUMAN IDEAS ${spark} MACHINE INTELLIGENCE ${spark} REAL-WORLD IMPACT ${spark} ENDLESS CURIOSITY ${spark}</div></div>
+  ${renderImpact(content.projects)}
   <section class="selected-section section" id="projects"><div class="project-theatre container">${sectionHead("01", "SELECTED WORK", "Out of the workshop.", '<a href="#archive" class="text-link">View all projects <span aria-hidden="true"><svg class="arrow-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5 19 19 M7 19h12V7"/></svg></span></a>')}<p class="section-intro">From a first question to a working system. A selection of things I’ve helped build.</p><div class="project-gallery-controls" data-interactive hidden><p class="mono" data-project-position aria-live="polite">01 / SELECTED WORK</p><div><button type="button" data-gallery-prev aria-label="Previous featured project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button><button type="button" data-gallery-next aria-label="Next featured project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button></div></div><div class="project-window"><div class="selected-grid">${
     content.projects
       .filter((x) => x.featured)
@@ -97,7 +115,7 @@ export function renderSite(content: Content, base = "/") {
   }</div></div><p class="gallery-hint" data-interactive hidden>SCROLL, SWIPE OR USE THE ARROWS TO EXPLORE</p></div></section>
   ${playground()}
   <section class="archive-section section container" id="archive">${sectionHead("02", "THE PROJECT ARCHIVE", "The curiosity cabinet.")}<div class="archive-tools" data-interactive hidden><div class="filters" role="group" aria-label="Filter projects">${categories.map((c, i) => `<button class="filter ${i === 0 ? "is-active" : ""}" type="button" data-category="${e(c)}" aria-pressed="${i === 0}">${e(c)}</button>`).join("")}</div><div class="search-field"><label class="sr-only" for="project-search">Search projects</label><span aria-hidden="true">⌕</span><input id="project-search" type="search" placeholder="Search projects…" maxlength="120" autocomplete="off"></div></div><p id="archive-count" class="mono archive-count" role="status" aria-live="polite">${content.projects.length} projects</p><div id="archive-list">${renderArchive(content.projects)}</div><noscript><p class="notice">All work is shown. Project filtering and expanded case studies need JavaScript; external source links remain available below.</p><div>${content.project_links.map((l) => link(l.url, `${e(l.label)} ${arrow}`, base, "text-link")).join(" · ")}</div></noscript></section>
-  <section class="experience-section section" id="experience"><div class="container experience-layout"><div>${sectionHead("03", "EXPERIENCE", "A few chapters<br>in the making.")}<p class="section-intro">Working where data, engineering, and business decisions meet.</p>${link(p.resume_url, `Download full CV ${arrow}`, base, "text-link", 'data-event="cv_download" download')}</div><div class="experience-list">${content.experiences.map((x, i) => `<article class="experience-item"><span class="experience-number mono">${String(i + 1).padStart(2, "0")}</span><div><p class="mono experience-date">${date(x.start_date)} — ${(x.end_date ? date(x.end_date) : "Latest chapter")}</p><h3>${e(x.company)}</h3><p class="experience-role">${e(x.position)} <span>· ${e(x.location)}</span></p><details><summary>Explore this role <span aria-hidden="true">+</span></summary><ul>${x.highlights.map((h) => `<li>${e(h)}</li>`).join("")}</ul></details></div></article>`).join("") || '<p class="empty-state">Experience details will be added soon.</p>'}</div></div></section>
+  <section class="experience-section section" id="experience"><div class="container experience-layout"><div>${sectionHead("03", "EXPERIENCE", "A few chapters<br>in the making.")}<p class="section-intro">Working where data, engineering, and business decisions meet.</p>${link(p.resume_url, `Download full CV ${arrow}`, base, "text-link", 'data-event="cv_download" download')}</div><div class="experience-list">${renderExperience(content.experiences)}</div></div></section>
   <section class="section container" id="skills">${sectionHead("04", "EXPERTISE", "A well-stocked toolbox.")}<div class="expertise-grid">${
     skills
       .map(

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-11-01T12:39:45.016Z",
+  "exported_at": "2026-11-03T11:40:38.385Z",
   "content": {
     "profile": [
       {
@@ -28,26 +28,35 @@
         "slug": "automall-ai-search",
         "title": "A more natural way to find a car.",
         "category": "Generative AI",
-        "summary": "Multilingual AI search for Automall, connecting customer intent with vehicle discovery.",
-        "description": "An end-to-end English and Arabic car search system for Automall using LangGraph, FastAPI, and Azure OpenAI. Databricks analytics pipelines and Power BI dashboards support business monitoring.",
+        "summary": "Multilingual AI car search that turned about 322,000 searches into AED 1.99M of attributed invoiced sales for roughly US$195 of LLM spend.",
+        "description": "An end-to-end English and Arabic natural-language car search for Automall, built on LangGraph, FastAPI and Azure OpenAI. I designed it as a tiered system: about half of all searches are answered straight from the database with no AI call, a fifth from cache, and only the remaining 28% reach an LLM. That tiering keeps the cost per search to a fraction of a cent. I also built the measurement layer end to end: daily Databricks pipelines from Cosmos DB to Delta tables, a search-journey model, Google Analytics session capture, and an attribution model that links each web lead to a prior AI search and follows it through SAP C4C to orders and invoices. Power BI dashboards on top let the business see usage, quality and revenue impact together.",
         "role": "Data Science Manager",
         "organization": "Al-Futtaim Automotive",
         "start_date": null,
         "end_date": null,
-        "problem": "Help customers explore car inventory in English and Arabic using natural language.",
-        "approach": "Combine intent classification, multi-parser NLP routing, and progressive search relaxation. Automate analytics with Databricks and Power BI.",
+        "problem": "Customers browse a large used-car inventory by filters, which fails for natural, bilingual requests like a budget, a body type and a feature. The business also had no way to show whether a new search experience produced leads and sales.",
+        "approach": "Route each query through the cheapest path that can answer it: database match, cache, then LLM with intent classification, multi-parser NLP and progressive filter relaxation when nothing matches. Instrument every search with tokens, latency and outcome, and join GA sessions to CRM leads, orders and billing documents so impact is measured, not assumed.",
         "responsibilities": [
-          "Built the end-to-end multilingual search system and its automated analytics pipelines."
+          "Built the end-to-end multilingual search system and its automated analytics pipelines.",
+          "Built the daily Databricks pipeline from Cosmos DB to Delta tables, including search-journey and GA tables.",
+          "Designed the GA-to-C4C lead attribution that links AI searches to leads, orders and invoices."
         ],
         "outcomes": [
-          "Reported in the July 2026 CV: live since April 2026, with 10 orders at under US$70 total operating cost."
+          "Served 321,938 searches from 27 Feb to 3 Nov 2026 (about 47,000 a month), reaching 86,540 distinct web visitors since GA tracking began on 22 Apr.",
+          "Kept AI cost low: 52% of searches resolved from the database and 20% from cache, so only 28% needed an LLM. Total token spend is about US$195, roughly US$0.0006 per search (list-price estimate).",
+          "Attributed 778 web leads (461 test drive, 238 offer, 79 enquiry) to sessions that used AI Search, via GA-to-SAP C4C lead matching.",
+          "Attributed 39 orders and 24 invoices worth AED 1.99M net of VAT, checked against SAP billing documents, as of 3 Nov 2026. Attribution is last-touch, not proof of causation."
         ],
         "technologies": [
           "LangGraph",
           "FastAPI",
           "Azure OpenAI",
           "Databricks",
-          "Power BI"
+          "Delta Lake",
+          "Cosmos DB",
+          "Power BI",
+          "Google Analytics",
+          "SAP C4C"
         ],
         "image_url": null,
         "image_alt": null,
@@ -56,7 +65,7 @@
         "status": "published",
         "sort_order": 0,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T12:38:09.305399+00:00"
+        "updated_at": "2026-11-03T11:23:59.767095+00:00"
       },
       {
         "id": "fb3c1746-efdb-502a-ad88-f8e08c247388",
@@ -125,24 +134,34 @@
         "slug": "automall-conversational-ai",
         "title": "Automall, in a conversation.",
         "category": "Generative AI",
-        "summary": "Conversational vehicle discovery and customer support through WhatsApp.",
-        "description": "A WhatsApp AI chatbot for Automall using LangGraph and Infobip, with intent classification, FAQ retrieval, live agent handoff, sell-car flow, and SAP C4C CRM integration.",
+        "summary": "WhatsApp assistant that generated 1,054 leads, 92% matched to real CRM leads, and AED 1.33M of attributed invoiced sales.",
+        "description": "A bilingual WhatsApp assistant for Automall, built on LangGraph and Infobip, covering vehicle discovery, test-drive booking, sell-your-car and FAQ, with live-agent handoff and SAP C4C integration. Beyond the bot itself, I built the analytics that prove its value: a daily Databricks pipeline that reconstructs sessions from raw conversation history, classifies each lead by intent (buy hot or cold, test drive, sell), matches it to the C4C lead created within a minute, and follows it through opportunities, test drives, orders and SAP invoices. That lead-to-invoice journey feeds a Sankey view in Power BI, so the business can see where WhatsApp conversations turn into revenue.",
         "role": "Data Science Manager",
         "organization": "Al-Futtaim Automotive",
         "start_date": null,
         "end_date": null,
-        "problem": "Bring vehicle discovery and common customer questions into a conversational channel.",
-        "approach": "Orchestrate conversational flows with LangGraph, connect WhatsApp through Infobip, and integrate with SAP C4C. Use Databricks pipelines and Power BI for monitoring.",
-        "responsibilities": [],
+        "problem": "Customers wanted vehicle discovery and quick answers inside WhatsApp, and the business needed to know which conversations became qualified leads, orders and sales.",
+        "approach": "Orchestrate conversational flows in LangGraph, connect WhatsApp through Infobip, hand off to the CRM, and build an attribution pipeline from conversation to lead to order to invoice, checked against SAP billing documents.",
+        "responsibilities": [
+          "Built the WhatsApp conversational flows and their SAP C4C integration.",
+          "Built the daily Databricks pipeline that sessionises conversations, tags lead intent and maps sessions to C4C leads.",
+          "Built the lead-to-order-to-invoice journey tables used for Power BI reporting."
+        ],
         "outcomes": [
-          "Reported in the July 2026 CV: live since March 2026, with 25 orders at under US$200 cumulative cost."
+          "Handled 9,247 sessions from 5,732 WhatsApp users between 11 Mar and 2 Nov 2026, with monthly users growing from about 700 to 956 in October.",
+          "Generated 1,054 leads (416 sell, 370 buy-hot, 203 test drive, 65 buy-cold); 974 (92%) matched to real SAP C4C leads.",
+          "Attributed 35 orders and 17 invoices worth AED 1.33M net of VAT, checked against SAP billing documents, as of 3 Nov 2026. Attribution is by lead match, not proof of causation.",
+          "Estimated LLM cost of roughly US$45 (plausible range US$20 to US$120), derived from message volumes at list prices because token counts are not stored for this channel."
         ],
         "technologies": [
           "LangGraph",
           "Infobip",
           "Azure OpenAI",
           "SAP C4C",
-          "Databricks"
+          "Databricks",
+          "Delta Lake",
+          "Cosmos DB",
+          "Power BI"
         ],
         "image_url": null,
         "image_alt": null,
@@ -151,7 +170,7 @@
         "status": "published",
         "sort_order": 3,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T12:38:09.305399+00:00"
+        "updated_at": "2026-11-03T11:23:59.767095+00:00"
       },
       {
         "id": "2cfd36c0-1665-5ab9-a998-66bbd5554e3d",
@@ -270,6 +289,215 @@
         "sort_order": 7,
         "created_at": "2026-11-01T00:00:00+00:00",
         "updated_at": "2026-11-01T00:00:00+00:00"
+      },
+      {
+        "id": "4175d329-c397-5e9d-b9a7-9ae8f40015c4",
+        "slug": "real-time-lead-scoring",
+        "title": "Knowing which lead is ready before anyone calls.",
+        "category": "Machine learning",
+        "summary": "In the Lexus pilot, 16% of digital leads, scored by AI and sent straight to a sales executive, produced 45% of all sales opportunities.",
+        "description": "Most digital leads used to follow the same path: a call-centre call, then a hand-off, by which time the buyer's momentum was often gone. I reframed the problem as one of timing and routing. A pre-call model predicts each lead's intent the moment it arrives, from customer history, lead attributes and website behaviour, and sends the high-intent ones directly to a showroom sales executive. Everyone else goes to the call centre as before. A second, post-call model then uses what happened on the call to rank those leads, so sales executives spend their time on the best opportunities first. The result is fewer wasted calls, faster response to ready buyers and more productive teams.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": "2026-09-14",
+        "end_date": null,
+        "problem": "Every lead was treated the same and qualified on limited information. Some good leads never answered the phone, and a lead labelled hot by agent judgement often reached the showroom after the moment had passed.",
+        "approach": "Predict intent at lead creation, route by score, then re-rank after the call. This puts the right customer with the right team at the right time, and the models keep learning from outcomes.",
+        "responsibilities": [
+          "Framed the two-stage approach: score and route before the call, prioritise after it.",
+          "Built the pre-call model that predicts intent from historical customer invoices, recent lead and showroom activity across brands, and website interactions.",
+          "Built the post-call model that ranks leads using the call outcome, and defined the routing rule between showroom and call centre."
+        ],
+        "outcomes": [
+          "Lexus pilot, 14 Sep to 21 Oct 2026: 2,006 digital leads scored, including test-drive requests.",
+          "The 16% of leads with the highest scores (321) went straight to a sales executive and produced 45% of all sales opportunities (74 of 165), with no extra qualifying call.",
+          "23% of those high-score leads became opportunities, against 13% of leads qualified by phone (91 of 719).",
+          "First results from the lead scoring team, as of 21 Oct 2026. It is too early to see the effect on sales."
+        ],
+        "technologies": [
+          "Predictive modeling",
+          "Google Analytics (GA4)",
+          "Lead routing",
+          "Customer data"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "chart",
+        "featured": true,
+        "status": "published",
+        "sort_order": 9,
+        "created_at": "2026-11-01T00:00:00+00:00",
+        "updated_at": "2026-11-03T11:37:25.288622+00:00"
+      },
+      {
+        "id": "bf3e113b-8553-4f9c-8bcb-1df17e709445",
+        "slug": "command-center-ask-ai",
+        "title": "An executive workspace with an AI analyst.",
+        "category": "Generative AI",
+        "summary": "Backend and multi-agent Ask AI for an executive analytics workspace across finance, stock, logistics, leads, market and sales.",
+        "description": "The FastAPI backend behind Al-Futtaim Automotive's executive analytics workspace, serving a corporate iPad app and a web UI across finance, stock, logistics, lead management, market intelligence and sales insights. I wrote the backend end to end, authored the API and data contracts the frontend and data teams build against, and designed the multi-agent Ask AI system. Ask AI interprets a question in context, grounds its entities against a Neo4j knowledge graph, plans a dependency graph of lookups, has an independent model verify the plan, runs Databricks Genie specialists in parallel, and then writes an executive-style answer in which every figure is validated in code and fact-checked by a separate reviewer before charts are produced.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": "2026-06-28",
+        "end_date": "2026-10-13",
+        "problem": "Executives had dashboards but no fast way to ask cross-domain questions. A free-form LLM over business data risks wrong numbers, leaked internals and unreliable multi-step answers.",
+        "approach": "Contract-first APIs over Databricks stored procedures for the dashboards. For Ask AI, a planner-and-specialists graph with a relevance gate, plan verification, evidence-bound query building, code-computed totals and rankings, factual review with a verified-facts fallback, and checkpoint-and-resume so an interrupted run does not repeat uncertain work.",
+        "responsibilities": [
+          "Built the FastAPI backend: about 65 endpoints across 11 route modules.",
+          "Authored 6 API and data contracts (about 4,100 lines) plus shared conventions, enforced with Pydantic schemas and a roughly 390-test offline suite.",
+          "Designed the Ask AI graph: 14 nodes and about 16 task-specific LLM roles covering conversation context, entity grounding, a relevance gate, a planner with an independent plan verifier, parallel specialists, synthesis, factual review and visualisation.",
+          "Added reliability controls: Mongo-backed checkpoint and resume, idempotent Genie submission tracking, bounded concurrency, retries and SSE progress streaming.",
+          "Made new data domains a config change: each Genie space is registered in a config file."
+        ],
+        "outcomes": [
+          "About 15,000 lines of backend code and 38,000 lines in total, with 37 of 38 commits over about three and a half months (28 Jun to 13 Oct 2026).",
+          "Answers are guarded against invented figures: totals and rankings are computed in code, and a separate reviewer model checks facts with a verified-facts fallback.",
+          "Configured for dev, QA and production deployment. Production usage is not yet measured, and no usage or accuracy figures are claimed."
+        ],
+        "technologies": [
+          "FastAPI",
+          "LangGraph",
+          "Azure OpenAI",
+          "Databricks Genie",
+          "Neo4j",
+          "MongoDB",
+          "React",
+          "TypeScript",
+          "Plotly"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "retrieval",
+        "featured": true,
+        "status": "published",
+        "sort_order": 10,
+        "created_at": "2026-11-03T11:16:38.341056+00:00",
+        "updated_at": "2026-11-03T11:23:59.767095+00:00"
+      },
+      {
+        "id": "80f666e1-9b8e-48c7-9d43-a5e3c8f23218",
+        "slug": "qualification-bot",
+        "title": "A deterministic journey for qualifying leads on WhatsApp.",
+        "category": "Generative AI",
+        "summary": "WhatsApp lead-qualification bot whose finite state machine guides a customer from vehicle choice to a booking and a hot or cold hand-off.",
+        "description": "A bilingual English and Arabic WhatsApp bot that qualifies social-media leads for Al-Futtaim Automotive. It opens from a CRM lead, then walks the customer through vehicle choice against live stock, offers, trade-in, test-drive and showroom booking against live availability, and contact preferences, finishing with a hot or cold verdict and structured notes for sales. The core of my work is the finite state machine: an LLM only classifies each message, and a pure-function router with a fixed priority order and code validators decide every transition, so the conversation never skips steps, moves backwards or loses state. It includes opt-out and drop-out handling, session resumption, idempotent finalisation, and a timeout sweeper that is safe when several replicas run. I ran multi-round agent-driven QA against the live webhook, which found and fixed 5 critical and 11 high-severity defects.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": "2026-07-24",
+        "end_date": "2026-09-09",
+        "problem": "Sales teams spend time on the first conversation with every social-media lead. Free-form chatbots drift, skip qualification questions, ignore opt-outs and lose context between sessions.",
+        "approach": "Separate perception from control. An LLM classifier only labels each message; a pure-function router with a fixed priority order and code validators decide every state transition, so ambiguous input cannot move the journey.",
+        "responsibilities": [
+          "Designed the finite state machine: 11 nodes, a 5-level routing priority, same-turn chaining and per-lead state persisted in MongoDB.",
+          "Implemented opt-out and drop-out handling in English and Arabic, session resumption, idempotent finalisation and a timeout sweeper that is safe across replicas.",
+          "Integrated stock, showroom and test-drive availability services, with showroom filtering by available demo vehicles.",
+          "Made the hot or cold verdict deterministic code and built a React test console that traces every turn.",
+          "Ran multi-round QA with agent-driven live-webhook tests; found and fixed 5 critical and 11 high-severity defects."
+        ],
+        "outcomes": [
+          "About 15,700 lines of Python, 40 routing tests and 27 commits over about seven weeks.",
+          "Not yet in production: the CRM write-back and WhatsApp outbound integrations are still simulated, so no business impact figures are claimed."
+        ],
+        "technologies": [
+          "LangGraph",
+          "FastAPI",
+          "Azure OpenAI",
+          "MongoDB",
+          "Infobip",
+          "React",
+          "Docker",
+          "Kubernetes"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "pipeline",
+        "featured": false,
+        "status": "published",
+        "sort_order": 11,
+        "created_at": "2026-11-03T11:16:38.341056+00:00",
+        "updated_at": "2026-11-03T11:23:59.767095+00:00"
+      },
+      {
+        "id": "1d6b977a-c357-4c3c-a0ea-f70032923ec1",
+        "slug": "test-drive-mcp",
+        "title": "Booking a test drive through tools an agent can safely call.",
+        "category": "Generative AI",
+        "summary": "MCP server that lets conversational agents check availability and book test drives across four automotive brands.",
+        "description": "A Model Context Protocol server, with a parallel REST API, that lets conversational agents on Kore.ai check availability and book test drives across BYD, Denza, Lexus and Toyota. Agents work in plain language; the server resolves brands, models and showrooms, and keeps VINs, model codes and lead identifiers entirely behind the tool boundary. The write path is built for safety: availability is re-checked immediately before booking, a stored attempt lifecycle prevents duplicate and concurrent bookings, gateway request IDs make retries idempotent, and lead writes are never retried automatically. Access is controlled with hashed per-client keys and client-bound context tokens, and audit logs carry timings but no personal data.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": "2026-09-22",
+        "end_date": "2026-10-02",
+        "problem": "Chatbot platforms needed a safe way to book test drives without ever handling vehicle IDs, model codes or lead identifiers.",
+        "approach": "Expose a small set of tools that take natural-language names and resolve them to internal IDs on the server, with booking safety built into the write path.",
+        "responsibilities": [
+          "Built the MCP server and REST API for four brands, with fuzzy brand and model resolution that returns choices when input is ambiguous.",
+          "Added booking safety: availability re-checked immediately before writing, a stored booking-attempt lifecycle against duplicate or concurrent bookings, request-ID idempotency and no automatic retry of lead writes.",
+          "Added resilience and security: backoff retries, circuit breakers, hashed per-client API keys, client-bound context tokens and PII-free audit logging.",
+          "Wrote the dev and production Kubernetes configuration and 14 unit tests."
+        ],
+        "outcomes": [
+          "About 2,300 lines of Python built in about 11 days (22 Sep to 2 Oct 2026).",
+          "Pre-production: no production usage is evidenced yet, so no usage figures are claimed."
+        ],
+        "technologies": [
+          "FastAPI",
+          "MCP",
+          "MongoDB",
+          "Docker",
+          "Kubernetes"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "pipeline",
+        "featured": false,
+        "status": "published",
+        "sort_order": 12,
+        "created_at": "2026-11-03T11:16:38.341056+00:00",
+        "updated_at": "2026-11-03T11:23:59.767095+00:00"
+      },
+      {
+        "id": "ee6ab01b-7c1d-4bfd-a77e-835285ff90be",
+        "slug": "genie-builder",
+        "title": "A studio for building analytics agents people can trust.",
+        "category": "Generative AI",
+        "summary": "Platform for authoring, testing, evaluating and publishing natural-language-to-SQL analytics agents on Databricks, with code-enforced row-level security.",
+        "description": "A full-stack platform for building, testing, evaluating and publishing analytics agents that answer business questions in SQL over Databricks, modelled on Databricks Genie spaces. Its differentiator is that trust is enforced in code: SQL is parsed and restricted to read-only queries on allowlisted tables, blocked columns are refused, and a per-user row-level-security predicate is wrapped around every base table, failing closed if the user is unknown, so the model never sees or chooses the identity. Two engines run behind an automatic router: a bounded LangGraph pipeline with validated SQL repair, and a ReAct tool loop with parallel calls and time budgets. Builders get eval sets with regression flags, version diff and rollback, a run-graph view, and one-click publishing of each agent as an MCP server.",
+        "role": "Data Science Manager",
+        "organization": "Al-Futtaim Automotive",
+        "start_date": "2026-10-19",
+        "end_date": "2026-10-23",
+        "problem": "Analytics agents need per-user data access rules, repeatable evaluation and version control, which standard tools leave to prompts.",
+        "approach": "Two engines behind an automatic router: a bounded LangGraph pipeline with SQL repair, and a ReAct tool loop. Safety is enforced in code, not in prompts.",
+        "responsibilities": [
+          "Designed the dual-engine agent: a 9-node pipeline with up to two validated SQL repairs, and a tool loop with parallel calls and time budgets.",
+          "Implemented guardrails in code: read-only SQL validation, table and column allowlists, a row cap and a fail-closed per-user row-level-security layer that wraps every base table.",
+          "Built the evaluation harness (expected SQL, expected rows or LLM judge, regression flags), version diff and rollback, and import of existing Genie spaces.",
+          "Built the React interface with a pipeline run-graph view and exposed every published agent as an MCP server."
+        ],
+        "outcomes": [
+          "About 7,400 lines of Python and 6,200 of TypeScript, 112 tests and 32 commits in 5 days (19 to 23 Oct 2026).",
+          "Local prototype, not deployed: no usage or accuracy figures are claimed."
+        ],
+        "technologies": [
+          "FastAPI",
+          "LangGraph",
+          "Azure OpenAI",
+          "Databricks",
+          "MCP",
+          "MongoDB",
+          "React",
+          "TypeScript",
+          "Tailwind CSS"
+        ],
+        "image_url": null,
+        "image_alt": null,
+        "visual_kind": "search",
+        "featured": false,
+        "status": "published",
+        "sort_order": 13,
+        "created_at": "2026-11-03T11:16:38.341056+00:00",
+        "updated_at": "2026-11-03T11:23:59.767095+00:00"
       }
     ],
     "project_links": [

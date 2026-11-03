@@ -2220,3 +2220,33 @@ html,body{overflow-x:clip}
 [data-theme="dark"] .button-primary{color:#fff4dc;background:#304cdd}
 [data-theme="dark"] .notebook-panel p{color:#202941}
 #project-detail>.project-art{max-width:620px;margin:28px 0 35px;box-shadow:3px 4px 0 var(--ink)}
+
+/* Reported impact and company-level career chapters. */
+.impact-heading{max-width:810px;margin-bottom:38px}
+.impact-heading .eyebrow{margin-bottom:18px}
+.impact-heading .section-intro{margin-top:20px;max-width:570px}
+.impact-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.impact-card{position:relative;display:flex;flex-direction:column;min-width:0;padding:30px;border:1.5px solid var(--ink);border-radius:18px;background:var(--blue-paper);box-shadow:4px 5px 0 var(--ink)}
+.impact-card:nth-child(2){background:var(--surface)}
+.impact-card:nth-child(3){background:var(--paper)}
+.impact-card>.mono{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:9px}
+.impact-card>.mono>span{display:grid;place-items:center;width:29px;height:29px;border:1px solid var(--ink);border-radius:50%;color:var(--ink);flex:none}
+.impact-card h3{font-size:27px;line-height:1.12;margin:24px 0 18px;letter-spacing:-.04em}
+.impact-result{font-size:16px;line-height:1.7;margin-bottom:26px}
+.impact-card .text-link{font-size:11px;margin-top:auto;align-self:flex-start;min-height:44px;display:inline-flex;align-items:center;gap:10px}
+.impact-scope{font-size:11px;color:var(--muted);max-width:900px;margin-top:28px;line-height:1.8}
+.career-chapter{min-width:0}
+.career-progression{color:var(--muted);margin-top:18px;font-size:9px;text-transform:uppercase}
+.career-roles{list-style:none;margin:22px 0 0;padding:0 0 0 22px;border-left:1px solid var(--line)}
+.career-role{position:relative;padding:0 0 22px}
+.career-role:last-child{padding-bottom:0}
+.career-role::before{content:"";position:absolute;top:7px;left:-27px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--surface)}
+.career-role-heading h4{font-size:16px;line-height:1.4;letter-spacing:-.025em;margin:0 0 6px;font-weight:700}
+.career-role-heading .mono{font-size:9px;color:var(--muted);line-height:1.8}
+.career-location{font-size:11px;color:var(--muted);margin-top:4px}
+.career-role details{margin-top:4px}
+.career-role summary{font-size:11px;gap:12px;justify-content:flex-start}
+.career-role summary>span[aria-hidden]{margin-left:auto}
+.career-role details ul{font-size:12px;margin:0 0 10px;padding-left:16px}
+@media(max-width:1000px){.impact-grid{gap:16px}.impact-card{padding:24px}.impact-card h3{font-size:24px}.impact-result{font-size:14px}}
+@media(max-width:700px){.impact-grid{grid-template-columns:1fr;gap:22px}.impact-card{padding:26px}.impact-card h3{font-size:27px;max-width:350px;margin-top:20px}.impact-result{font-size:15px}.impact-heading{margin-bottom:30px}.impact-heading h2{font-size:39px}.impact-scope{font-size:10px}.career-roles{padding-left:18px}.career-role::before{left:-23px}.career-role-heading h4{font-size:15px}.career-role summary{font-size:11px}}
