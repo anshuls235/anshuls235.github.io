@@ -341,7 +341,7 @@ test('skills network runs a forward pass and stays accessible', async ({page}) =
 test('reduced motion keeps the illustrated poster and never downloads the film', async ({page}) => {
   await page.emulateMedia({reducedMotion:'reduce'});
   const films:string[]=[];
-  page.on('request',r=>{if(r.url().endsWith('.mp4'))films.push(r.url());});
+  page.on('request',r=>{if(/\.(mp4|webm)$/.test(r.url()))films.push(r.url());});
   await page.goto('./');
   await expect(page.locator('.hero .scene-day')).toBeVisible();
   await expect(page.locator('[data-hero-video]')).toHaveJSProperty('paused',true);

@@ -75,7 +75,10 @@ function syncHeroVideo() {
   if (!video || !scene) return;
   const night = document.documentElement.dataset.theme === "dark";
   const hd = innerWidth * Math.min(devicePixelRatio || 1, 2) > 2100;
-  const wanted = night ? (hd ? video.dataset.nightHd : video.dataset.night) : hd ? video.dataset.dayHd : video.dataset.day;
+  const mp4 = night ? (hd ? video.dataset.nightHd : video.dataset.night) : hd ? video.dataset.dayHd : video.dataset.day;
+  // VP9 WebM is lighter and plays in Chromium builds without H.264; Safari keeps MP4.
+  const webm = video.canPlayType('video/webm; codecs="vp9"') && video.dataset.failed !== "webm";
+  const wanted = webm ? mp4?.replace(/\.mp4$/, ".webm") : mp4;
   const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
   const play = !still() && heroVisible && !document.hidden && !saveData;
   if (wanted && video.dataset.current !== wanted) {
@@ -93,7 +96,13 @@ function syncHeroVideo() {
   if (!video.dataset.ready) {
     video.dataset.ready = "true";
     video.addEventListener("playing", () => scene.classList.add("has-film"));
-    video.addEventListener("error", () => scene.classList.remove("has-film"));
+    video.addEventListener("error", () => {
+      scene.classList.remove("has-film");
+      if (video.currentSrc.endsWith(".webm") && !video.dataset.failed) {
+        video.dataset.failed = "webm";
+        syncHeroVideo();
+      }
+    });
   }
   void video.play().catch(() => {
     /* The illustrated poster stays when autoplay is refused. */
@@ -303,7 +312,7 @@ function setupScroll() {
       start: "top 90%",
       once: true,
       onEnter: (batch) =>
-        gsap.to(batch, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out", stagger: 0.1, overwrite: true }),
+        gsap.to(batch, { y: 0, duration: 1,  ease: "power3.out", stagger: 0.1, overwrite: true }),
     });
     // Parallax for the illustrated scenes.
     const heroArt = document.querySelector<HTMLElement>("[data-hero-scene]");
