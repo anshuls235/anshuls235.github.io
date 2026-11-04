@@ -1,10 +1,1 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="6" fill="url(#gradient)"/>
-  <text x="16" y="22" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" text-anchor="middle" fill="white">AS</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#2b45ff"/><g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 50 18 14l10 36M12.8 37h10.4"/><path d="M54 14H41a9 9 0 0 0 0 18h4a9 9 0 0 1 0 18H28"/></g><g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="#7cf0b8" stroke="#0d0f1a" stroke-width="2.4"><circle cx="18" cy="14" r="5.6"/><circle cx="28" cy="50" r="5.6"/><circle cx="54" cy="14" r="5.6"/></g></svg>

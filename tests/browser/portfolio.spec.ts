@@ -254,73 +254,102 @@ test("configured analytics respects DNT and never delays a link", async ({
   await context.close();
 });
 
-test('illustrated world: visible motion, touch ideas, pause and reduced motion', async ({page}) => {
+test('illustrated hero: film plays, pauses and respects reduced motion', async ({page}) => {
+  await page.setViewportSize({width:1440,height:900});
   await page.goto('./');
-  await expect(page.locator('.character-scene')).toBeVisible();
-  await expect(page.locator('.workshop-art')).toHaveJSProperty('naturalWidth',1536);
-  await expect.poll(() => page.locator('[data-world-video]').evaluate(el => (el as HTMLVideoElement).currentTime)).toBeGreaterThan(.2);
-  expect(await page.locator('.journey-signal').first().evaluate(el => getComputedStyle(el).animationName)).toBe('journey-flow');
-  await page.getByRole('button',{name:'Spark a new idea'}).click();
-  await expect(page.locator('.idea-response')).toContainText('finding a car');
+  await expect(page.locator('.hero-scene')).toBeVisible();
+  await expect(page.locator('.hero-scene img.scene-art').first()).toHaveJSProperty('complete', true);
+  const film = page.locator('[data-hero-video]');
+  await expect.poll(() => film.evaluate(el => (el as HTMLVideoElement).currentTime)).toBeGreaterThan(.2);
+  await expect(page.locator('.hero-scene')).toHaveClass(/has-film/);
+  expect(await page.locator('.ticker-track').evaluate(el => getComputedStyle(el).animationName)).toBe('ticker');
   await page.getByRole('button',{name:'Pause motion'}).click();
   await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
-  await expect(page.locator('[data-world-video]')).toHaveJSProperty('paused',true);
+  await expect(film).toHaveJSProperty('paused',true);
+  expect(await page.locator('.ticker-track').evaluate(el => getComputedStyle(el).animationPlayState)).toBe('paused');
   await page.getByRole('button',{name:'Play motion'}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-motion','running');
+  await page.screenshot({path:'test-results/hero-desktop.png'});
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.setViewportSize({width:1440,height:1000});
   await page.goto('./');
-  await page.screenshot({path:'test-results/workshop-desktop.png',fullPage:true});
-  await page.setViewportSize({width:390,height:844});
-  await page.goto('./');
-  await page.screenshot({path:'test-results/workshop-mobile.png',fullPage:true});
-  await page.emulateMedia({reducedMotion:'reduce'});
   await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
-  expect(await page.locator('.journey-signal').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
-});
-
-
-test('cinematic gallery, touch navigation and idea machine', async ({page}) => {
-  await page.setViewportSize({width:1440,height:1000});
-  await page.goto('./');
-  await page.getByRole('link',{name:/Explore my work/}).click();
-  await expect(page.locator('#projects')).toHaveClass(/is-cinematic/);
-  await page.getByRole('button',{name:'Next featured project'}).click();
-  await expect(page.locator('[data-project-position]')).toContainText(`02 / ${String(fallback.content.projects.filter(p => p.featured).length).padStart(2, '0')}`);
-  await expect(page.locator('.project-card.is-current h3')).toContainText('enterprise knowledge');
-  await expect.poll(() => page.evaluate(() => Math.abs(scrollY - ((document.querySelector('#projects') as HTMLElement).offsetTop - 88 + innerHeight * .85)))).toBeLessThan(4);
-  await page.screenshot({path:'test-results/gallery-desktop.png'});
-  await page.getByRole('button',{name:'Run the idea machine'}).click();
-  await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done',{timeout:6000});
-  await expect(page.locator('.machine-status')).toContainText('became something useful');
-  await page.getByRole('button',{name:'Reset',exact:true}).click();
-  await expect(page.locator('.machine-status')).toHaveText('Ready when you are.');
+  await expect(page.locator('#hero-heading')).toBeVisible();
   await page.setViewportSize({width:390,height:844});
   await page.goto('./');
-  await expect(page.locator('#projects')).not.toHaveClass(/is-cinematic/);
-  await page.getByRole('button',{name:'Next featured project'}).click();
-  await expect(page.locator('[data-project-position]')).toContainText(`02 / ${String(fallback.content.projects.filter(p => p.featured).length).padStart(2, '0')}`);
-  await expect.poll(() => page.locator('.selected-grid').evaluate(el => el.scrollLeft)).toBeGreaterThan(250);
-  await page.screenshot({path:'test-results/gallery-mobile.png'});
-  await page.getByRole('button',{name:'Run the idea machine'}).click();
-  await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done',{timeout:6000});
-  await page.screenshot({path:'test-results/machine-mobile.png'});
+  await page.screenshot({path:'test-results/hero-mobile.png',fullPage:true});
 });
 
+test('featured work carousel works with buttons, keyboard and swipe', async ({page}) => {
+  const featured = fallback.content.projects.filter(p => p.featured);
+  const total = String(featured.length).padStart(2, '0');
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({width,height:1000});
+    await page.goto('./');
+    await page.getByRole('link',{name:/Explore my work/}).click();
+    await expect(page.locator('#projects')).toHaveClass(/is-carousel/);
+    await expect(page.locator('.project-card.is-current h3')).toContainText(featured[0].title);
+    await expect(page.locator('[data-gallery-prev]')).toBeDisabled();
+    await page.getByRole('button',{name:'Next featured project'}).click();
+    await expect(page.locator('[data-project-position]')).toContainText(`02 / ${total}`);
+    await expect(page.locator('.project-card.is-current h3')).toContainText(featured[1].title);
+    await expect(page.locator('.project-card:not(.is-current)').first()).toHaveJSProperty('inert', true);
+    await page.getByRole('button',{name:'Next featured project'}).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('[data-project-position]')).toContainText(`03 / ${total}`);
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('[data-project-position]')).toContainText(`02 / ${total}`);
+    const box = (await page.locator('.project-card.is-current .project-art').boundingBox())!;
+    await page.mouse.move(box.x + box.width * .8, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * .1, box.y + box.height / 2, {steps:6});
+    await page.mouse.up();
+    await expect(page.locator('[data-project-position]')).toContainText(`03 / ${total}`);
+    await page.locator('.project-card.is-current').getByRole('link',{name:/View project/}).click();
+    await expect(page.getByRole('dialog')).toContainText(featured[2].title);
+    await page.keyboard.press('Escape');
+    await page.screenshot({path:`test-results/work-${width}.png`});
+  }
+});
 
-test('reduced motion keeps the character poster and avoids downloading the film', async ({page}) => {
+test('skills network runs a forward pass and stays accessible', async ({page}) => {
+  const categories = [...new Set(fallback.content.skills.map(s => s.category))];
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({width,height:1000});
+    await page.goto('./');
+    await page.locator('#skills').scrollIntoViewIfNeeded();
+    for (const skill of fallback.content.skills) await expect(page.locator('#skills .skill-list li', {hasText: skill.name}).first()).toBeAttached();
+    const button = page.locator(`#skills .node-input[data-cat="1"]`);
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed','true');
+    await expect(page.locator('[data-network-status]')).toContainText(categories[1]);
+    const expected = fallback.content.skills.filter(s => s.category === categories[1]).length;
+    await expect.poll(() => page.locator('.node-skill.is-lit').count(), {timeout: 8000}).toBe(expected);
+    await expect.poll(() => page.locator('.node-output.is-lit').count(), {timeout: 8000}).toBe(3);
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed','false');
+    await page.screenshot({path:`test-results/network-${width}.png`});
+    const audit = await new AxeBuilder({page}).include('#skills').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    expect(audit.violations).toEqual([]);
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto('./');
+  await page.locator('#skills').scrollIntoViewIfNeeded();
+  await page.locator('#skills .node-input[data-cat="0"]').click();
+  await expect(page.locator('.node-output.is-lit')).toHaveCount(3);
+});
+
+test('reduced motion keeps the illustrated poster and never downloads the film', async ({page}) => {
   await page.emulateMedia({reducedMotion:'reduce'});
   const films:string[]=[];
-  page.on('request',r=>{if(r.url().includes('workshop-loop.'))films.push(r.url());});
+  page.on('request',r=>{if(r.url().endsWith('.mp4'))films.push(r.url());});
   await page.goto('./');
-  await expect(page.locator('[data-world-video]')).toHaveJSProperty('paused',true);
-  await expect(page.locator('.workshop-art')).toBeVisible();
-  await page.getByRole('button',{name:'Run the idea machine'}).click();
-  await expect(page.locator('[data-machine]')).toHaveAttribute('data-state','done');
+  await expect(page.locator('.hero .scene-day')).toBeVisible();
+  await expect(page.locator('[data-hero-video]')).toHaveJSProperty('paused',true);
+  await page.locator('#contact').scrollIntoViewIfNeeded();
   expect(films).toEqual([]);
 });
 
-
-test('theme switching preserves the animated scene and readable hero content', async ({page}) => {
+test('theme switching swaps the illustrated scenes and keeps the hero readable', async ({page}) => {
   for (const width of [390,1440]) {
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
@@ -328,16 +357,14 @@ test('theme switching preserves the animated scene and readable hero content', a
       const current=await page.locator('html').getAttribute('data-theme');
       if(current!==theme) await page.locator('.theme-toggle').click();
       await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
-      await expect(page.locator('.hero-world')).toHaveCSS('background-color',theme==='dark'?'rgb(23, 34, 58)':'rgb(255, 244, 220)');
-      await expect(page.locator('.hero')).toHaveCSS('color',theme==='dark'?'rgb(255, 244, 220)':'rgb(32, 41, 65)');
-      await expect(page.locator('#hero-heading')).toHaveCSS('color',theme==='dark'?'rgb(255, 244, 220)':'rgb(32, 41, 65)');
-      await expect(page.locator('.floating-note').first()).toHaveCSS('color',theme==='dark'?'rgb(255, 244, 220)':'rgb(32, 41, 65)');
-      const video=page.locator('[data-world-video]');
+      await expect(page.locator('.hero-panel')).toHaveCSS('background-color',theme==='dark'?'rgb(21, 26, 61)':'rgb(255, 250, 240)');
+      await expect(page.locator('.hero-hello')).toHaveCSS('color',theme==='dark'?'rgb(244, 241, 232)':'rgb(13, 15, 26)');
+      await expect(page.locator(theme==='dark'?'.hero .scene-night':'.hero .scene-day')).toBeVisible();
+      await expect(page.locator(theme==='dark'?'.hero .scene-day':'.hero .scene-night')).toBeHidden();
+      const video=page.locator('[data-hero-video]');
       await expect.poll(()=>video.evaluate(el=>(el as HTMLVideoElement).currentTime)).toBeGreaterThan(.2);
       await expect(video).toHaveJSProperty('paused',false);
-      await expect(video).toHaveAttribute('data-variant',theme==='dark'?'night':'day');
-      await expect(page.locator('.workshop-art')).toHaveAttribute('src',theme==='dark'?/idea-workshop-night/:/idea-workshop.webp/);
-      await expect(video).toHaveCSS('opacity','1');
+      await expect(video).toHaveAttribute('src',theme==='dark'?/hero-night/:/hero-day/);
       if(theme==='dark') await page.screenshot({path:`test-results/dark-hero-${width}.png`,fullPage:width===390});
     }
   }

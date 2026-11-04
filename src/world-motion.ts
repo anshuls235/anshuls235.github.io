@@ -1,204 +1,408 @@
+// Presentation and motion only. Content, Supabase and analytics live elsewhere.
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
 import { initFlight, pauseFlight } from "./flight";
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-const desktop = matchMedia('(min-width: 901px)');
+import { initNetwork, type NetworkControls } from "./network";
+
+gsap.registerPlugin(ScrollTrigger);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 let paused = reduced.matches;
-let ideaIndex = 0;
-let galleryIndex = 0;
-let machineTimer: ReturnType<typeof setTimeout> | undefined;
-let frame = 0;
-let pointerX = 0;
-let pointerY = 0;
-const ideas = ['What if finding a car felt like a conversation?', 'What if a model gave back hours of someone’s day?', 'What if complex data made the next decision clearer?', 'What if the next useful thing starts with your question?'];
-const clamp = (value: number) => Math.max(0, Math.min(1, value));
-let videoVisible = false;
-function syncVideo() {
- const video = document.querySelector<HTMLVideoElement>('[data-world-video]');
- const poster = document.querySelector<HTMLImageElement>('.workshop-art');
- if (!video || !poster) return;
- const night = document.documentElement.dataset.theme === 'dark';
- const variant = night ? 'night' : 'day';
- const posterSource = night ? poster.dataset.nightPoster : poster.dataset.dayPoster;
- if (posterSource && poster.getAttribute('src') !== posterSource) {poster.src=posterSource;video.poster=posterSource;}
- const saveData = (navigator as Navigator & {connection?: {saveData?:boolean}}).connection?.saveData;
- const shouldPlay = !paused && !reduced.matches && !document.hidden && videoVisible && !saveData;
- if (video.dataset.variant !== variant) {
-  video.pause();video.parentElement?.classList.remove('has-film');
-  video.dataset.variant = variant;
-  video.dataset.triedFallback = '';
-  // Defer the themed video until it is actually needed.
-  video.removeAttribute('src');
-  video.load();
- }
- if (!shouldPlay) {video.pause();return;}
- if (!video.dataset.listenersReady) {
-  video.dataset.listenersReady='true';
-  video.addEventListener('loadeddata',()=>video.parentElement?.classList.add('has-film'));
-  video.addEventListener('error',()=>{
-   const dark=video.dataset.variant==='night';
-   const mp4=dark?video.dataset.nightSrc:video.dataset.src;
-   const webm=dark?video.dataset.nightWebm:video.dataset.webm;
-   const alternative=video.canPlayType('video/webm; codecs="vp9"')?mp4:webm;
-   if(alternative && !video.dataset.triedFallback){
-    video.dataset.triedFallback='true';video.src=alternative;
-    if(!paused && !reduced.matches && videoVisible)void video.play().catch(()=>{});
-   }else video.parentElement?.classList.remove('has-film');
+const still = () => paused || reduced.matches;
+let lenis: Lenis | null = null;
+let network: NetworkControls | null = null;
+let carouselIndex = 0;
+let heroVisible = true;
+let swingFrame = 0;
+let context: gsap.Context | null = null;
+
+/* ---------------- Smooth scrolling ---------------- */
+function headerOffset() {
+  return -(document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 0) - 8;
+}
+function setupLenis() {
+  if (lenis || reduced.matches) return;
+  lenis = new Lenis({ lerp: 0.11, wheelMultiplier: 1, smoothWheel: true });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((time) => lenis?.raf(time * 1000));
+  gsap.ticker.lagSmoothing(0);
+}
+function teardownLenis() {
+  lenis?.destroy();
+  lenis = null;
+}
+// In-page anchors glide with Lenis; project deep links are handled by main.ts.
+document.addEventListener("click", (event) => {
+  if (!lenis || event.defaultPrevented) return;
+  const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href^="#"]') : null;
+  if (!anchor || anchor.hasAttribute("data-project")) return;
+  const hash = anchor.getAttribute("href")!;
+  if (hash.length < 2 || hash.startsWith("#work/")) return;
+  const target = document.getElementById(hash.slice(1));
+  if (!target) return;
+  event.preventDefault();
+  history.pushState(null, "", hash);
+  lenis.scrollTo(hash === "#home" ? 0 : target, { offset: headerOffset(), duration: 1.2 });
+  target.setAttribute("tabindex", target.getAttribute("tabindex") ?? "-1");
+  target.focus({ preventScroll: true });
+});
+// The dialog scrolls itself; pause page smoothing while it is open.
+const dialog = document.querySelector<HTMLDialogElement>("#project-dialog");
+if (dialog)
+  new MutationObserver(() => (dialog.open ? lenis?.stop() : lenis?.start())).observe(dialog, {
+    attributes: true,
+    attributeFilter: ["open"],
   });
- }
- if (!video.getAttribute('src')) {
-  const mp4=night?video.dataset.nightSrc:video.dataset.src;
-  const webm=night?video.dataset.nightWebm:video.dataset.webm;
-  const selected=video.canPlayType('video/webm; codecs="vp9"') && webm?webm:mp4;
-  if(selected)video.src=selected;
- }
- void video.play().catch(()=>{/* The themed poster remains when autoplay is refused. */});
-}
-function syncMotion() {
- document.documentElement.dataset.motion = paused || reduced.matches ? 'paused' : 'running';
- document.querySelectorAll<HTMLButtonElement>('[data-world-motion]').forEach(button => {
-  button.setAttribute('aria-pressed', String(paused || reduced.matches));
-  button.innerHTML = `${paused || reduced.matches ? 'Play motion' : 'Pause motion'} <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="${paused || reduced.matches ? 'm7 4 8 6-8 6Z' : 'M6 4v12M14 4v12'}" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
- });
- syncVideo();
- pauseFlight(paused || reduced.matches);
- requestUpdate();
-}
-const observer = new IntersectionObserver(entries => entries.forEach(entry => {
- if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target); }
-}), {threshold:.08});
-const videoObserver = new IntersectionObserver(entries => {videoVisible = entries.some(entry => entry.isIntersecting);syncVideo();}, {threshold:.05});
-function setGalleryIndex(index: number) {
- const cards = [...document.querySelectorAll<HTMLElement>('.selected-grid>.project-card')];
- galleryIndex = Math.max(0, Math.min(cards.length - 1, index));
- const position = document.querySelector('[data-project-position]');
- if (position) position.textContent = `${String(galleryIndex+1).padStart(2,'0')} / ${String(cards.length).padStart(2,'0')} — SELECTED WORK`;
- document.querySelector<HTMLButtonElement>('[data-gallery-prev]')?.toggleAttribute('disabled', galleryIndex === 0);
- document.querySelector<HTMLButtonElement>('[data-gallery-next]')?.toggleAttribute('disabled', galleryIndex >= cards.length-1);
- cards.forEach((card,i) => card.classList.toggle('is-current', i === galleryIndex));
-}
-function update() {
- frame = 0;
- const stage = document.querySelector<HTMLElement>('#projects');
- const theatre = document.querySelector<HTMLElement>('.project-theatre');
- const track = document.querySelector<HTMLElement>('.selected-grid');
- const cards = document.querySelectorAll('.selected-grid>.project-card');
- const cinematic = desktop.matches && !reduced.matches && cards.length > 1;
- if (stage && theatre && track) {
-  stage.classList.toggle('is-cinematic', cinematic);
-  if (cinematic) {
-   const distance = (cards.length-1) * innerHeight * .85;
-   stage.style.setProperty('--stage-height', `${theatre.offsetHeight + distance}px`);
-   const progress = clamp((88-stage.getBoundingClientRect().top) / distance);
-   track.style.transform = `translate3d(${-progress * (cards.length-1) * track.clientWidth}px,0,0)`;
-   setGalleryIndex(Math.round(progress * (cards.length-1)));
-  } else {
-   stage.style.removeProperty('--stage-height'); track.style.removeProperty('transform');
+
+/* ---------------- Header hides on the way down ---------------- */
+let lastY = scrollY;
+window.addEventListener(
+  "scroll",
+  () => {
+    const header = document.querySelector(".site-header");
+    const menuOpen = document.querySelector(".main-nav.is-open");
+    const y = scrollY;
+    header?.classList.toggle("is-hidden", y > lastY && y > 400 && !menuOpen && !document.activeElement?.closest(".site-header"));
+    lastY = y;
+  },
+  { passive: true },
+);
+
+/* ---------------- Hero film ---------------- */
+function syncHeroVideo() {
+  const video = document.querySelector<HTMLVideoElement>("[data-hero-video]");
+  const scene = document.querySelector<HTMLElement>("[data-hero-scene]");
+  if (!video || !scene) return;
+  const night = document.documentElement.dataset.theme === "dark";
+  const hd = innerWidth * Math.min(devicePixelRatio || 1, 2) > 2100;
+  const wanted = night ? (hd ? video.dataset.nightHd : video.dataset.night) : hd ? video.dataset.dayHd : video.dataset.day;
+  const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+  const play = !still() && heroVisible && !document.hidden && !saveData;
+  if (wanted && video.dataset.current !== wanted) {
+    scene.classList.remove("has-film");
+    video.pause();
+    video.dataset.current = wanted;
+    video.removeAttribute("src");
+    video.load();
   }
- }
- const journey = document.querySelector<HTMLElement>('.idea-journey');
- if (journey) {
-  const rect = journey.getBoundingClientRect();
-  journey.style.setProperty('--travel', paused || reduced.matches ? '.5' : String(clamp((innerHeight-rect.top)/(innerHeight+rect.height))));
- }
- const world = document.querySelector<HTMLElement>('[data-workshop]');
- if (world) {
-  const rect = world.getBoundingClientRect();
-  world.style.setProperty('--scene-depth', paused || reduced.matches ? '0' : String(clamp(-rect.top/innerHeight)));
-  world.style.setProperty('--px', paused || reduced.matches ? '0px' : `${pointerX}px`);
-  world.style.setProperty('--py', paused || reduced.matches ? '0px' : `${pointerY}px`);
- }
+  if (!play) {
+    video.pause();
+    return;
+  }
+  if (!video.getAttribute("src") && wanted) video.src = wanted;
+  if (!video.dataset.ready) {
+    video.dataset.ready = "true";
+    video.addEventListener("playing", () => scene.classList.add("has-film"));
+    video.addEventListener("error", () => scene.classList.remove("has-film"));
+  }
+  void video.play().catch(() => {
+    /* The illustrated poster stays when autoplay is refused. */
+  });
 }
-function requestUpdate() { if (!frame) frame = requestAnimationFrame(update); }
-function goToProject(index:number) {
- const stage = document.querySelector<HTMLElement>('#projects');
- const cards = [...document.querySelectorAll<HTMLElement>('.selected-grid>.project-card')];
- if (!stage || !cards.length) return;
- const next = Math.max(0, Math.min(cards.length-1,index));
- if (desktop.matches && !reduced.matches && cards.length>1) {
-  window.scrollTo({top:scrollY + stage.getBoundingClientRect().top - 88 + next * innerHeight * .85, behavior:paused?'instant':'smooth'});
- } else {
-  const track = document.querySelector<HTMLElement>('.selected-grid');
-  if (track && !reduced.matches) track.scrollTo({left:cards[next].offsetLeft - cards[0].offsetLeft,behavior:paused?'instant':'smooth'});
-  else cards[next].scrollIntoView({behavior:'instant',block:'center'});
-  setGalleryIndex(next);
- }
+const heroObserver = new IntersectionObserver(
+  (entries) => {
+    heroVisible = entries.some((e) => e.isIntersecting);
+    syncHeroVideo();
+  },
+  { threshold: 0.05 },
+);
+
+/* ---------------- Featured work carousel ---------------- */
+function cards() {
+  return [...document.querySelectorAll<HTMLElement>(".selected-grid > .project-card")];
 }
+function paintCarousel(next: number, direction = 1, animate = true) {
+  const list = cards();
+  if (!list.length) return;
+  const previous = carouselIndex;
+  carouselIndex = Math.max(0, Math.min(list.length - 1, next));
+  const position = document.querySelector("[data-project-position]");
+  if (position)
+    position.textContent = `${String(carouselIndex + 1).padStart(2, "0")} / ${String(list.length).padStart(2, "0")} — Selected work`;
+  document.querySelector<HTMLButtonElement>("[data-gallery-prev]")?.toggleAttribute("disabled", carouselIndex === 0);
+  document.querySelector<HTMLButtonElement>("[data-gallery-next]")?.toggleAttribute("disabled", carouselIndex >= list.length - 1);
+  document.querySelectorAll("[data-dot]").forEach((dot, i) => dot.classList.toggle("is-current", i === carouselIndex));
+  const incoming = list[carouselIndex];
+  const outgoing = list[previous];
+  list.forEach((card, i) => {
+    const current = i === carouselIndex;
+    card.classList.toggle("is-current", current);
+    card.inert = !current;
+    card.setAttribute("aria-hidden", String(!current));
+  });
+  if (!animate || still() || previous === carouselIndex) {
+    gsap.set(list, { clearProps: "transform,opacity" });
+    return;
+  }
+  gsap.killTweensOf(list);
+  outgoing.classList.add("is-leaving");
+  gsap.fromTo(
+    outgoing,
+    { x: 0, rotation: 0, opacity: 1, visibility: "visible" },
+    {
+      x: -direction * 120,
+      rotation: -direction * 4,
+      opacity: 0,
+      duration: 0.45,
+      ease: "power2.in",
+      onComplete: () => {
+        outgoing.classList.remove("is-leaving");
+        gsap.set(outgoing, { clearProps: "transform,opacity,visibility" });
+      },
+    },
+  );
+  gsap.fromTo(
+    incoming,
+    { x: direction * 160, rotation: direction * 5, opacity: 0 },
+    { x: 0, rotation: 0, opacity: 1, duration: 0.8, ease: "back.out(1.4)", delay: 0.12 },
+  );
+}
+function setupCarousel() {
+  const section = document.querySelector<HTMLElement>("#projects");
+  const track = document.querySelector<HTMLElement>(".selected-grid");
+  const list = cards();
+  if (!section || !track || list.length < 2) return;
+  section.classList.add("is-carousel");
+  carouselIndex = Math.min(carouselIndex, list.length - 1);
+  paintCarousel(carouselIndex, 1, false);
+  // Drag or swipe to change project.
+  let startX = 0;
+  let startY = 0;
+  let dragging = false;
+  track.addEventListener("pointerdown", (event) => {
+    if ((event.target as Element).closest("a,button")) return;
+    dragging = true;
+    startX = event.clientX;
+    startY = event.clientY;
+    track.setPointerCapture(event.pointerId);
+  });
+  track.addEventListener("dragstart", (event) => event.preventDefault());
+  track.addEventListener("pointerup", (event) => {
+    if (!dragging) return;
+    dragging = false;
+    const dx = event.clientX - startX;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(event.clientY - startY))
+      paintCarousel(carouselIndex + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+  });
+  track.addEventListener("pointercancel", () => (dragging = false));
+}
+document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest("[data-gallery-prev]")) paintCarousel(carouselIndex - 1, -1);
+  if (target?.closest("[data-gallery-next]")) paintCarousel(carouselIndex + 1, 1);
+  if (target?.closest("[data-world-motion]")) {
+    paused = !paused;
+    syncMotion();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (!(event.target instanceof Element) || !event.target.closest("#projects .work-stage")) return;
+  if (event.key === "ArrowRight") paintCarousel(carouselIndex + 1, 1);
+  if (event.key === "ArrowLeft") paintCarousel(carouselIndex - 1, -1);
+});
+
+/* ---------------- Cards hanging from the wire ---------------- */
+interface Swing {
+  el: HTMLElement;
+  angle: number;
+  velocity: number;
+}
+let swings: Swing[] = [];
+let pointer = { x: 0, y: 0, vx: 0, t: 0 };
+function swingTick() {
+  swingFrame = 0;
+  let moving = false;
+  for (const s of swings) {
+    const acceleration = -0.045 * s.angle - 0.06 * s.velocity;
+    s.velocity += acceleration;
+    s.angle += s.velocity;
+    s.angle = Math.max(-18, Math.min(18, s.angle));
+    if (Math.abs(s.angle) > 0.02 || Math.abs(s.velocity) > 0.02) moving = true;
+    else s.angle = s.velocity = 0;
+    s.el.style.transform = s.angle ? `rotate(${s.angle.toFixed(2)}deg)` : "";
+  }
+  if (moving) swingFrame = requestAnimationFrame(swingTick);
+}
+function nudge(index: number | null, amount: number) {
+  if (still()) return;
+  swings.forEach((s, i) => {
+    if (index === null || index === i) s.velocity += amount * (index === null ? 0.6 + i * 0.25 : 1);
+  });
+  if (!swingFrame) swingFrame = requestAnimationFrame(swingTick);
+}
+function setupSwings() {
+  swings = [...document.querySelectorAll<HTMLElement>("[data-swing]")].map((el) => ({ el, angle: 0, velocity: 0 }));
+  const stage = document.querySelector<HTMLElement>("[data-wire]");
+  if (!stage || !swings.length) return;
+  stage.addEventListener("pointermove", (event) => {
+    const now = performance.now();
+    const dt = Math.max(16, now - pointer.t);
+    pointer.vx = (event.clientX - pointer.x) / dt;
+    pointer = { x: event.clientX, y: event.clientY, vx: pointer.vx, t: now };
+    swings.forEach((s, i) => {
+      const r = s.el.getBoundingClientRect();
+      if (event.clientX > r.left && event.clientX < r.right && event.clientY > r.top && event.clientY < r.bottom)
+        nudge(i, Math.max(-1.6, Math.min(1.6, pointer.vx * 0.9)));
+    });
+  });
+  ScrollTrigger.create({
+    trigger: stage,
+    start: "top 85%",
+    once: true,
+    onEnter: () => nudge(null, 1.4),
+  });
+}
+// Scrolling quickly makes the cards sway a little, like a breeze.
+let lastScroll = scrollY;
+window.addEventListener(
+  "scroll",
+  () => {
+    const delta = scrollY - lastScroll;
+    lastScroll = scrollY;
+    if (Math.abs(delta) > 18 && swings.length) {
+      const stage = document.querySelector("[data-wire]")?.getBoundingClientRect();
+      if (stage && stage.bottom > 0 && stage.top < innerHeight) nudge(null, Math.sign(delta) * 0.12);
+    }
+  },
+  { passive: true },
+);
+
+/* ---------------- Scroll choreography ---------------- */
+function setupScroll() {
+  context?.revert();
+  context = gsap.context(() => {
+    const root = document.documentElement;
+    if (still()) {
+      root.classList.remove("js-motion");
+      return;
+    }
+    root.classList.add("js-motion");
+    // Display headlines rise line by line.
+    gsap.utils.toArray<HTMLElement>(".display").forEach((heading) => {
+      const lines = heading.querySelectorAll(".line > span");
+      const inHero = heading.closest(".hero");
+      gsap.fromTo(
+        lines,
+        { yPercent: 105 },
+        {
+          yPercent: 0,
+          duration: 1,
+          ease: "expo.out",
+          stagger: 0.09,
+          delay: inHero ? 0.25 : 0,
+          scrollTrigger: inHero ? undefined : { trigger: heading, start: "top 88%", once: true },
+        },
+      );
+    });
+    // Panels and cards ease in as they arrive.
+    const reveal = gsap.utils.toArray<HTMLElement>(
+      ".impact-card, .work-stage, .network, .loss-chart, .experience-item, .archive-list, .publication-item, .notebook-panel, .credential, .scoreboard, .airmail-scene, .model-hud",
+    );
+    reveal.forEach((el) => el.setAttribute("data-reveal", ""));
+    ScrollTrigger.batch(reveal, {
+      start: "top 90%",
+      once: true,
+      onEnter: (batch) =>
+        gsap.to(batch, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out", stagger: 0.1, overwrite: true }),
+    });
+    // Parallax for the illustrated scenes.
+    const heroArt = document.querySelector<HTMLElement>("[data-hero-scene]");
+    if (heroArt)
+      gsap.to(heroArt, {
+        "--scene-shift": "120px",
+        ease: "none",
+        scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true },
+      });
+    const land = document.querySelector<HTMLElement>(".work-scene");
+    if (land)
+      gsap.fromTo(
+        land,
+        { "--land-shift": "-40px" },
+        { "--land-shift": "40px", ease: "none", scrollTrigger: { trigger: "#projects", start: "top bottom", end: "bottom top", scrub: true } },
+      );
+    // The career training curve draws itself as you read.
+    const line = document.querySelector<SVGPathElement>("[data-loss-line]");
+    const points = gsap.utils.toArray<SVGGElement>("[data-loss-point]");
+    if (line) {
+      gsap.set(line, { strokeDasharray: 1, strokeDashoffset: 1 });
+      gsap.set(points, { scale: 0, transformOrigin: "50% 50%" });
+      const timeline = gsap.timeline({
+        scrollTrigger: { trigger: ".experience-list", start: "top 70%", end: "bottom 75%", scrub: 0.6 },
+      });
+      timeline.to(line, { strokeDashoffset: 0, ease: "none", duration: 1 }, 0);
+      points.forEach((p, i) =>
+        timeline.to(p, { scale: 1, duration: 0.08, ease: "back.out(3)" }, (i / Math.max(1, points.length - 1)) * 0.92),
+      );
+    }
+    // Scoreboard digits roll into place.
+    const digits = gsap.utils.toArray<HTMLElement>(".score-digits span");
+    ScrollTrigger.create({
+      trigger: "[data-scoreboard]",
+      start: "top 85%",
+      once: true,
+      onEnter: () =>
+        digits.forEach((digit, i) => {
+          const final = digit.textContent ?? "0";
+          const counter = { n: 0 };
+          gsap.to(counter, {
+            n: 12 + i * 3,
+            duration: 1.1 + i * 0.08,
+            ease: "power2.out",
+            onUpdate: () => (digit.textContent = String(Math.floor(counter.n) % 10)),
+            onComplete: () => {
+              digit.textContent = final;
+            },
+          });
+        }),
+    });
+  });
+}
+
+/* ---------------- Motion state ---------------- */
+function syncMotion() {
+  const isStill = still();
+  document.documentElement.dataset.motion = isStill ? "paused" : "running";
+  document.querySelectorAll<HTMLButtonElement>("[data-world-motion]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(isStill));
+    button.innerHTML = `${isStill ? "Play motion" : "Pause motion"} <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="${isStill ? "m6 4 10 6-10 6Z" : "M6 4v12M14 4v12"}" fill="${isStill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="3"/></svg>`;
+  });
+  syncHeroVideo();
+  pauseFlight(isStill);
+  network?.setPaused(isStill);
+  if (isStill) {
+    cancelAnimationFrame(swingFrame);
+    swingFrame = 0;
+    swings.forEach((s) => {
+      s.angle = s.velocity = 0;
+      s.el.style.transform = "";
+    });
+  }
+}
+
 export function initWorld() {
- clearTimeout(machineTimer);
- observer.disconnect(); videoObserver.disconnect();
- document.querySelectorAll<HTMLElement>('.expertise-item,.publication-item,.experience-item').forEach(el => {el.classList.add('reveal-section');observer.observe(el);});
- const video = document.querySelector('[data-world-video]');
- if (video) videoObserver.observe(video);
- const track = document.querySelector<HTMLElement>('.selected-grid');
- if (track) {
-  track.addEventListener('scroll', () => {
-   if (!desktop.matches && track.firstElementChild) {
-    const first = track.firstElementChild as HTMLElement;
-    setGalleryIndex(Math.round(track.scrollLeft/(first.offsetWidth+24)));
-   }
-  }, {passive:true});
- }
- initFlight();
- setGalleryIndex(0); syncMotion(); requestUpdate();
+  heroObserver.disconnect();
+  network?.destroy();
+  const scene = document.querySelector("[data-hero-scene]");
+  if (scene) heroObserver.observe(scene);
+  const networkRoot = document.querySelector<HTMLElement>("[data-network]");
+  network = networkRoot ? initNetwork(networkRoot, still) : null;
+  setupCarousel();
+  setupSwings();
+  setupScroll();
+  initFlight();
+  syncMotion();
+  ScrollTrigger.refresh();
 }
-function resetMachine() {
- clearTimeout(machineTimer);
- document.querySelector('[data-machine]')?.removeAttribute('data-state');
- const status = document.querySelector('.machine-status');
- const caption = document.querySelector('[data-machine-caption]');
- const run = document.querySelector<HTMLButtonElement>('[data-run-machine]');
- if (status) status.textContent='Ready when you are.';
- if (caption) caption.textContent='WAITING FOR A GOOD QUESTION';
- if (run) run.disabled=false;
-}
-document.addEventListener('click', event => {
- const target = event.target instanceof Element ? event.target : null;
- if (target?.closest('[data-world-motion]')) {paused = !paused;syncMotion();}
- if (target?.closest('[data-gallery-prev]')) goToProject(galleryIndex-1);
- if (target?.closest('[data-gallery-next]')) goToProject(galleryIndex+1);
- if (target?.closest('[data-idea]')) {
-  const world = document.querySelector('[data-workshop]');
-  const response = document.querySelector('.idea-response');
-  if (response) response.textContent = ideas[ideaIndex++ % ideas.length];
-  world?.classList.remove('is-sparking');
-  requestAnimationFrame(() => world?.classList.add('is-sparking'));
-  setTimeout(() => world?.classList.remove('is-sparking'),900);
- }
- if (target?.closest('[data-machine-reset]')) resetMachine();
- if (target?.closest('[data-run-machine]')) {
-  resetMachine();
-  const machine = document.querySelector('[data-machine]');
-  const status = document.querySelector('.machine-status');
-  const caption = document.querySelector('[data-machine-caption]');
-  const run = document.querySelector<HTMLButtonElement>('[data-run-machine]');
-  if (run) run.disabled=true;
-  machine?.setAttribute('data-state','working');
-  if (status) status.textContent='Question in. Connecting the dots…';
-  if (caption) caption.textContent='EXPERIMENTING / LEARNING / BUILDING';
-  machineTimer = setTimeout(() => {
-   machine?.setAttribute('data-state','done');
-   if (status) status.textContent='A little curiosity became something useful. Your turn?';
-   if (caption) caption.textContent='AN IDEA, READY FOR THE REAL WORLD';
-   if (run) run.disabled=false;
-  },reduced.matches || paused ? 0 : 2600);
- }
+
+reduced.addEventListener("change", (event) => {
+  paused = event.matches;
+  if (event.matches) teardownLenis();
+  else setupLenis();
+  setupScroll();
+  syncMotion();
 });
-document.addEventListener('focusin', event => {
- if (!(event.target instanceof Element)) return;
- const card = event.target.closest<HTMLElement>('.selected-grid>.project-card');
- if (!card) return;
- const cards=[...document.querySelectorAll('.selected-grid>.project-card')];
- const index=cards.indexOf(card);
- if (index !== galleryIndex) goToProject(index);
-});
-window.addEventListener('scroll',requestUpdate,{passive:true});
-window.addEventListener('resize',requestUpdate,{passive:true});
-document.addEventListener('visibilitychange',syncVideo);
-window.addEventListener('portfolio-theme-change',syncVideo);
-if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
- document.addEventListener('pointermove', event => {
-  pointerX=(event.clientX/innerWidth-.5)*14;pointerY=(event.clientY/innerHeight-.5)*10;requestUpdate();
- },{passive:true});
-}
-reduced.addEventListener('change',event=>{paused=event.matches;syncMotion();requestUpdate();});
-desktop.addEventListener('change',requestUpdate);
+document.addEventListener("visibilitychange", syncHeroVideo);
+window.addEventListener("portfolio-theme-change", syncHeroVideo);
+window.addEventListener("load", () => ScrollTrigger.refresh());
+setupLenis();
 initWorld();
