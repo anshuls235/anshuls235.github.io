@@ -1,3 +1,4 @@
+import { initImpact } from "./impact";
 // Presentation and motion only. Content, Supabase and analytics live elsewhere.
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -13,6 +14,7 @@ let network: NetworkControls | null = null;
 let carouselIndex = 0;
 let heroVisible = true;
 let context: gsap.Context | null = null;
+let destroyImpact: (() => void) | undefined;
 
 /* ---------------- Smooth scrolling ---------------- */
 function headerOffset() {
@@ -313,6 +315,8 @@ function syncMotion() {
 }
 
 export function initWorld() {
+  destroyImpact?.();
+  destroyImpact = initImpact();
   heroObserver.disconnect();
   network?.destroy();
   const scene = document.querySelector("[data-hero-scene]");

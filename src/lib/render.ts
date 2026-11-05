@@ -1,3 +1,4 @@
+import { impactEngine, impactVisual } from "../impact";
 import { heroScene, workScene, vignette, closingScene, logoMark } from "../world";
 import type { Content, Project, Profile } from "./types";
 import { escapeHtml as e, safeUrl } from "./content";
@@ -116,10 +117,10 @@ function impactStories(projects: Project[]) {
 export function renderImpact(projects: Project[]) {
   const stories = impactStories(projects);
   if (!stories.length) return "";
-  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div><div class="impact-stage"><div class="impact-grid container">${stories
+  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div>${impactEngine()}<div class="impact-stage"><div class="impact-grid container">${stories
     .map(
       ({ project, label }, index) =>
-        `<article class="impact-card"><div class="impact-card-inner frame"><p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div></article>`,
+        `<article class="impact-card"><div class="impact-card-inner frame">${impactVisual(index)}<p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div></article>`,
     )
     .join(
       "",

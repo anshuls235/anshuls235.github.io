@@ -703,7 +703,7 @@ ol {
   }
 }
 
-/* ---------- Impact: cards hanging from a wire ---------- */
+/* ---------- Impact: the applied intelligence engine ---------- */
 .impact-section {
   position: relative;
   padding-block: clamp(80px, 10vw, 130px) clamp(60px, 7vw, 90px);
@@ -770,8 +770,7 @@ ol {
   font-weight: 900;
   font-size: clamp(42px, 18cqi, 84px);
   overflow-wrap: anywhere;
-  line-height: 1;
-  line-height: 0.85;
+  line-height: 0.95;
   letter-spacing: -0.01em;
   text-transform: uppercase;
 }
@@ -2668,4 +2667,68 @@ details[open] .summary-icon {
     opacity: 1;
     transform: none;
   }
+}
+
+/* The engine is decorative; reported numbers and links remain steady. */
+.impact-engine { margin-top: 48px; border: 2px solid #0d0f1a; background: #10172f; color: #f4f1e8; box-shadow: 8px 8px 0 #0d0f1a; overflow: hidden; }
+.engine-caption { padding: 16px 22px; display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #37456c; font-size: 10px; }
+.engine-live { color: #7cf0b8; }
+.engine-live::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 8px; background: currentColor; border-radius: 50%; }
+.engine-diagram { display: block; width: 100%; height: auto; }
+.engine-wires { stroke: #4a5b86; stroke-width: 2; }
+.engine-stream { stroke: #7cf0b8; stroke-width: 3; stroke-dasharray: 14 110; animation: engine-flow 4s linear infinite; }
+.engine-stream path:nth-child(3), .engine-outputs g:nth-child(1) circle { stroke: #fffaf0; }
+.engine-stream path:nth-child(5), .engine-outputs g:nth-child(3) circle { stroke: #ffd84a; }
+.engine-inputs rect { fill: #1b2648; stroke: #7180ad; }
+.engine-inputs text, .engine-outputs text, .engine-footer { fill: #d8dff7; font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-anchor: middle; }
+.engine-outputs text { text-anchor: end; }
+.engine-outputs circle { fill: #10172f; stroke: #7cf0b8; stroke-width: 3; }
+.engine-orbit { transform-origin: 500px 124px; animation: engine-orbit 24s linear infinite; }
+.engine-orbit circle { stroke: #657ba9; stroke-dasharray: 3 8; }
+.engine-orbit circle:nth-child(2) { stroke-dasharray: 60 100; stroke: #7cf0b8; }
+.engine-orbit circle:nth-child(n+3) { fill: #ffd84a; stroke: #10172f; stroke-width: 3; }
+.engine-chip-shadow { fill: #050918; }
+.engine-chip { fill: #fffaf0; stroke: #0d0f1a; stroke-width: 3; }
+.engine-neurons path { stroke: #2b45ff; stroke-width: 1.5; opacity: .35; }
+.engine-neurons circle { fill: #2b45ff; stroke: #0d0f1a; stroke-width: 2; }
+.engine-mobile { display: none; }
+.impact-stage { margin-top: 34px; }
+.impact-card-inner { padding-top: 0; transition: box-shadow .25s ease; }
+.impact-card:is(:hover, :focus-within) .impact-card-inner { box-shadow: 10px 12px 0 #0d0f1a; }
+.impact-visual { margin: 0 -26px 24px; padding: 18px 18px 12px; border-bottom: 2px solid #0d0f1a; background: rgb(255 255 255 / 18%); }
+.impact-visual svg { display: block; width: 100%; height: auto; }
+.impact-visual > span { display: block; margin-top: 10px; font-size: 9px; letter-spacing: .12em; }
+.visual-grid { stroke: #0d0f1a; opacity: .13; }
+.visual-track { stroke: #0d0f1a; stroke-width: 2; opacity: .3; }
+.visual-signal { stroke: #2b45ff; stroke-width: 4; stroke-dasharray: 12 60; animation: engine-flow 3s linear infinite; }
+.visual-float { stroke: #0d0f1a; stroke-width: 2.5; fill: #fffaf0; animation: impact-breathe 5s ease-in-out infinite; }
+.visual-delay { animation-delay: -2.5s; fill: #ffd84a; }
+.visual-dot { fill: #2b45ff; stroke: #0d0f1a; stroke-width: 2; }
+.visual-priority circle { fill: #2b45ff; stroke: #0d0f1a; stroke-width: 2; animation: priority-pulse 3s ease-in-out infinite; animation-delay: calc(var(--dot) * -.4s); }
+.impact-section[data-active-lane] .engine-wires [data-lane] { opacity: .3; }
+.impact-section[data-active-lane="0"] [data-lane="0"], .impact-section[data-active-lane="1"] [data-lane="1"], .impact-section[data-active-lane="2"] [data-lane="2"] { opacity: 1; filter: drop-shadow(0 0 5px #7cf0b8); }
+@keyframes engine-flow { to { stroke-dashoffset: -248; } }
+@keyframes engine-orbit { to { transform: rotate(360deg); } }
+@keyframes impact-breathe { 50% { transform: translateY(-7px); } }
+@keyframes priority-pulse { 50% { fill: #fffaf0; } }
+.impact-section:not(.impact-in-view) *, :root[data-motion="paused"] .impact-section * { animation-play-state: paused !important; }
+@media (max-width: 980px) {
+  .impact-engine { max-width: 680px; }
+  .engine-diagram { display: none; }
+  .engine-caption { font-size: 9px; flex-wrap: wrap; }
+  .engine-mobile { display: grid; justify-items: center; gap: 22px; padding: 28px 16px; text-align: center; }
+  .engine-mobile > .mono { font-size: 10px; }
+  .mobile-processor { position: relative; width: 156px; height: 156px; display: grid; place-items: center; }
+  .mobile-processor strong { font-family: var(--display); font-size: 54px; background: #fffaf0; color: #2b45ff; width: 90px; height: 90px; display: grid; place-items: center; border: 3px solid #0d0f1a; border-radius: 16px; box-shadow: 6px 6px 0 #050918; }
+  .processor-ring { position: absolute; inset: 0; border: 1px dashed #7cf0b8; border-radius: 50%; animation: engine-orbit 20s linear infinite; }
+  .processor-ring:nth-child(2) { inset: 12px; border-color: #8394bd; animation-direction: reverse; }
+  .processor-ring::after { content: ''; position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; border-radius: 50%; background: #ffd84a; }
+  .impact-visual svg { max-height: 170px; }
+}
+@media (max-width: 700px) {
+  .impact-card-inner { padding-top: 0; }
+  .impact-visual { margin-inline: -20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .impact-section * { animation: none !important; }
 }

@@ -391,14 +391,8 @@ test('AI contact pipeline and responsive section geometry', async ({page}) => {
       const box = (await art.boundingBox())!;
       expect(box.width / box.height).toBeCloseTo(1.6, 1);
     }
-    if (width === 390) {
-      for (const id of ['impact', 'experience', 'contact']) {
-        await page.locator(`#${id}`).screenshot({path:`test-results/section-${id}.png`});
-      }
-    }
     await page.locator('#experience').scrollIntoViewIfNeeded();
     await expect(page.locator('.experience-side')).toHaveCSS('position','static');
-    await page.screenshot({path:`test-results/responsive-${width}.png`,fullPage:true});
   }
 });
 
@@ -443,4 +437,26 @@ test('published impact, expanded work and grouped career chapters on desktop and
       await page.keyboard.press('Escape');
     }
   }
+});
+
+test('impact engine animates visible signals and respects motion preferences', async ({page}) => {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({width, height:1000});
+    await page.goto('./');
+    await page.locator('.impact-engine').scrollIntoViewIfNeeded();
+    await expect(page.locator('#impact')).toHaveClass(/impact-in-view/);
+    const animated = page.locator(width === 390 ? '.processor-ring' : '.engine-stream').first();
+    await expect(animated).toHaveCSS('animation-play-state', 'running');
+    await page.locator('.impact-card a').first().focus();
+    await expect(page.locator('#impact')).toHaveAttribute('data-active-lane','0');
+    await page.locator('.impact-engine').scrollIntoViewIfNeeded();
+    await page.locator('#impact').screenshot({path:`test-results/engine-${width}.png`});
+    await page.getByRole('button', {name:'Pause motion'}).click();
+    await expect(animated).toHaveCSS('animation-play-state','paused');
+    await page.getByRole('button', {name:'Play motion'}).click();
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto('./');
+  await page.locator('.impact-engine').scrollIntoViewIfNeeded();
+  await expect(page.locator('.engine-stream')).toHaveCSS('animation-name','none');
 });
