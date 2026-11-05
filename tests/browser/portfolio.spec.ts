@@ -449,7 +449,7 @@ test('cinematic films load responsively, pause, and retain accessible contact li
       const video = scene.locator('video');
       await scene.scrollIntoViewIfNeeded();
       await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentTime)).toBeGreaterThan(.1);
-      await expect(video).toHaveAttribute('src', width === 390 ? /720.mp4$/ : /1080.mp4$/);
+      await expect(video).toHaveAttribute('src', width === 390 ? /720\.(mp4|webm)$/ : /1080\.(mp4|webm)$/);
       await page.getByRole('button', {name:`Pause ${name} film`}).click();
       await expect(video).toHaveJSProperty('paused',true);
       await page.getByRole('button', {name:`Play ${name} film`}).click();
@@ -470,4 +470,23 @@ test('cinematic films load responsively, pause, and retain accessible contact li
     await expect(video).not.toHaveAttribute('src');
     await expect(video).toHaveJSProperty('paused',true);
   }
+});
+
+
+test('4K cinematic WebM fallback plays when H264 is unavailable', async ({page}) => {
+  await page.addInitScript(() => {
+    const canPlay = HTMLMediaElement.prototype.canPlayType;
+    HTMLMediaElement.prototype.canPlayType = function(type: string) {
+      return type.includes('mp4') ? '' : canPlay.call(this, type);
+    };
+    Object.defineProperty(window, 'devicePixelRatio', {value:2});
+  });
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('./');
+  await page.locator('.cinema-impact').scrollIntoViewIfNeeded();
+  const video = page.locator('.cinema-impact video');
+  await expect(video).toHaveAttribute('src', /impact-4k.webm$/);
+  await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentTime), {timeout:10000}).toBeGreaterThan(.1);
+  await expect(video).toHaveJSProperty('videoWidth',3840);
+  await expect(video).toHaveJSProperty('videoHeight',2160);
 });

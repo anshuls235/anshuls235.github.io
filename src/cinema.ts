@@ -14,6 +14,8 @@ export function initCinema(isStill: () => boolean) {
     let visible = false;
     let localPaused = !!saveData;
     let failed = false;
+    let triedAlternate = false;
+    let extension = video.canPlayType('video/mp4; codecs="avc1.64001f"') ? "mp4" : "webm";
     function sync() {
       const stopped = isStill() || localPaused || document.hidden;
       button.disabled = isStill() || failed;
@@ -23,16 +25,28 @@ export function initCinema(isStill: () => boolean) {
       if (!visible || stopped || failed) { video.pause(); return; }
       if (!video.getAttribute('src')) {
         const resolution = innerWidth <= 700 ? '720' : innerWidth * Math.min(devicePixelRatio, 2) > 1920 ? '4k' : '1080';
-        video.src = `${video.dataset.stem}-${resolution}.mp4`;
+        video.src = `${video.dataset.stem}-${resolution}.${extension}`;
       }
+      const playbackSource = video.getAttribute("src");
       void video.play().catch((error: unknown) => {
+        if (video.getAttribute("src") !== playbackSource) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
         localPaused = true;
         sync();
       });
     }
     video.addEventListener('playing', () => root.classList.add('is-playing'));
-    video.addEventListener('error', () => { failed = true; root.classList.remove('is-playing'); sync(); });
+    video.addEventListener('error', () => {
+      root.classList.remove('is-playing');
+      if (!triedAlternate) {
+        triedAlternate = true;
+        extension = extension === 'mp4' ? 'webm' : 'mp4';
+        localPaused = !!saveData;
+        video.removeAttribute('src');
+        video.load();
+      } else failed = true;
+      sync();
+    });
     button.hidden = false;
     button.addEventListener('click', () => { localPaused = !localPaused; sync(); });
     return {root, video, sync, setVisible(value: boolean) { visible = value; sync(); }};
