@@ -50,10 +50,14 @@ export function initNetwork(
   const inputEls = [...root.querySelectorAll<HTMLButtonElement>(".node-input")];
   const [h1Layer, h2Layer] = [...root.querySelectorAll<HTMLElement>(".layer-hidden")];
   const outputEls = [...root.querySelectorAll<HTMLElement>(".node-output")];
-  const tones = inputEls.map((b) => {
+  const lightTones: Record<string, string> = {mint: "#087b4a", yellow: "#916300", coral: "#b43c22", sky: "#2b45ff", lilac: "#7941b8", lime: "#557800"};
+  let wire = "#8f95b8";
+  const readTones = () => inputEls.map((b) => {
     const tone = [...b.classList].find((c) => c.startsWith("tone-"))?.slice(5) ?? "mint";
-    return TONES[tone] ?? TONES.mint;
+    const palette = document.documentElement.dataset.theme === "dark" ? TONES : lightTones;
+    return palette[tone] ?? palette.mint;
   });
+  let tones = readTones();
   const names = inputEls.map((b) => b.querySelector(".node-name")?.textContent ?? "");
 
   let inputs: Box[] = [];
@@ -158,7 +162,7 @@ export function initNetwork(
         ctx!.globalAlpha = edge.layer === 2 ? 0.32 : 0.55;
         ctx!.lineWidth = 1.6;
       } else {
-        ctx!.strokeStyle = "#8f95b8";
+        ctx!.strokeStyle = wire;
         ctx!.globalAlpha = active >= 0 ? 0.06 : 0.13;
         ctx!.lineWidth = 1;
       }
@@ -304,6 +308,13 @@ export function initNetwork(
     b.addEventListener("pointerleave", onLeave);
   });
 
+  const refreshTheme = () => {
+    tones = readTones();
+    wire = getComputedStyle(root).getPropertyValue('--model-wire').trim() || '#8f95b8';
+    draw();
+  };
+  window.addEventListener('portfolio-theme-change', refreshTheme);
+  refreshTheme();
   const resize = new ResizeObserver(() => layout());
   resize.observe(root);
   const seen = new IntersectionObserver(
@@ -341,6 +352,7 @@ export function initNetwork(
     destroy() {
       clearTimeout(cycleTimer);
       cancelAnimationFrame(frame);
+      window.removeEventListener('portfolio-theme-change', refreshTheme);
       resize.disconnect();
       seen.disconnect();
       root.removeEventListener("click", onClick);

@@ -490,3 +490,23 @@ test('4K cinematic WebM fallback plays when H264 is unavailable', async ({page})
   await expect(video).toHaveJSProperty('videoWidth',3840);
   await expect(video).toHaveJSProperty('videoHeight',2160);
 });
+
+test('expertise follows both themes without losing the selected network', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  for (const width of [390,1440]) {
+    await page.setViewportSize({width,height:1000});
+    await page.goto('./');
+    await page.locator('#skills').scrollIntoViewIfNeeded();
+    const input = page.locator('#skills .node-input').first();
+    await input.click();
+    for (const theme of ['light','dark','light']) {
+      if (await page.locator('html').getAttribute('data-theme') !== theme) await page.locator('.theme-toggle').click();
+      await expect(page.locator('#skills')).toHaveCSS('background-color', theme === 'light' ? 'rgb(244, 241, 232)' : 'rgb(8, 10, 24)');
+      await expect(input).toHaveAttribute('aria-pressed','true');
+      await expect(page.locator('.node-output.is-lit')).toHaveCount(3);
+      const audit=await new AxeBuilder({page}).include('#skills').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+      expect(audit.violations).toEqual([]);
+      await page.locator('#skills').screenshot({path:`test-results/expertise-${theme}-${width}.png`});
+    }
+  }
+});

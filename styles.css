@@ -1124,10 +1124,19 @@ ol {
 
 /* ---------- The model: skills as a neural network ---------- */
 .model-section {
+  --model-bg: #f4f1e8;
+  --model-fg: #0d0f1a;
+  --model-muted: #50566e;
+  --model-border: #9298ad;
+  --model-surface: #fffaf0;
+  --model-node: #ffffff;
+  --model-accent: #2b45ff;
+  --model-wire: #566186;
+  --model-grid: rgb(43 69 255 / 7%);
   position: relative;
   padding-block: clamp(80px, 10vw, 140px);
-  background: #080a18;
-  color: #f4f1e8;
+  background: var(--model-bg);
+  color: var(--model-fg);
   overflow: hidden;
   border-top: var(--stroke) solid var(--line);
 }
@@ -1135,14 +1144,14 @@ ol {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgb(143 160 255 / 7%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(143 160 255 / 7%) 1px, transparent 1px);
+  background-image: linear-gradient(var(--model-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--model-grid) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%);
   pointer-events: none;
 }
 .model-section .section-intro {
-  color: #bfc3dc;
+  color: var(--model-muted);
 }
 .model-heading {
   display: flex;
@@ -1165,8 +1174,8 @@ ol {
   align-items: center;
   gap: 18px;
   padding: 12px 16px;
-  border: 2px solid #3a3f66;
-  background: rgb(21 26 61 / 60%);
+  border: 2px solid var(--model-border);
+  background: var(--model-surface);
 }
 .model-hud div {
   display: grid;
@@ -1174,11 +1183,11 @@ ol {
 }
 .model-hud span {
   font-size: 10px;
-  color: #8f95b8;
+  color: var(--model-muted);
 }
 .model-hud strong {
   font-size: 18px;
-  color: var(--mint);
+  color: var(--model-accent);
   font-variant-numeric: tabular-nums;
 }
 .model-hud svg {
@@ -1188,7 +1197,7 @@ ol {
 }
 .model-hud path {
   fill: none;
-  stroke: var(--mint);
+  stroke: var(--model-accent);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
@@ -1199,8 +1208,8 @@ ol {
   gap: 0 clamp(30px, 5vw, 90px);
   margin-top: clamp(50px, 6vw, 80px);
   padding: 46px clamp(16px, 2vw, 30px) 30px;
-  border: 2px solid #2a2f55;
-  background: rgb(13 16 40 / 70%);
+  border: 2px solid var(--model-border);
+  background: var(--model-surface);
 }
 .network-canvas {
   position: absolute;
@@ -1221,7 +1230,7 @@ ol {
   top: -32px;
   left: 0;
   font-size: 10px;
-  color: #7c82a8;
+  color: var(--model-muted);
   white-space: nowrap;
 }
 .band {
@@ -1236,10 +1245,10 @@ ol {
 }
 .node-skill {
   padding: 3px 10px;
-  border: 1.5px solid #3a3f66;
+  border: 1.5px solid var(--model-border);
   border-radius: 99px;
-  background: #11153a;
-  color: #c9cde6;
+  background: var(--model-node);
+  color: var(--model-fg);
   font-family: var(--mono);
   font-size: 11.5px;
   line-height: 1.5;
@@ -1255,8 +1264,8 @@ ol {
   transform: translateX(4px);
 }
 .network.has-focus .node-skill:not(.is-lit) {
-  color: #6b7099;
-  border-color: #23284d;
+  color: var(--model-muted);
+  border-color: var(--model-border);
 }
 .tone-mint {
   --tone: var(--mint);
@@ -1287,8 +1296,8 @@ ol {
   width: 100%;
   padding: 14px 14px;
   text-align: left;
-  background: #11153a;
-  color: #f4f1e8;
+  background: var(--model-node);
+  color: var(--model-fg);
   border: 2px solid var(--tone);
   box-shadow: 4px 4px 0 rgb(0 0 0 / 50%);
   transition: background 0.25s, color 0.25s, transform 0.2s var(--ease);
@@ -1304,7 +1313,7 @@ ol {
   height: 14px;
   border-radius: 50%;
   background: var(--tone);
-  box-shadow: 0 0 0 3px #11153a, 0 0 0 5px var(--tone);
+  box-shadow: 0 0 0 3px var(--model-node), 0 0 0 5px var(--tone);
 }
 .node-input[aria-pressed="true"] .node-dot,
 .node-input:hover .node-dot {
@@ -1325,8 +1334,8 @@ ol {
 .node-output {
   display: block;
   padding: 16px 14px;
-  border: 2px solid #f4f1e8;
-  background: #11153a;
+  border: 2px solid var(--model-fg);
+  background: var(--model-node);
   font-family: var(--display);
   font-weight: 800;
   font-size: 22px;
@@ -1344,11 +1353,27 @@ ol {
   margin-top: 22px;
   min-height: 20px;
   font-size: 12px;
-  color: #a9aed0;
+  color: var(--model-muted);
 }
 .network-readout strong {
-  color: var(--mint);
+  color: var(--model-accent);
 }
+
+
+:root[data-theme="dark"] .model-section {
+  --model-bg: #080a18;
+  --model-fg: #f4f1e8;
+  --model-muted: #bfc3dc;
+  --model-border: #3a3f66;
+  --model-surface: #0d1028;
+  --model-node: #11153a;
+  --model-accent: #7cf0b8;
+  --model-wire: #8f95b8;
+  --model-grid: rgb(143 160 255 / 7%);
+}
+:root:not([data-theme="dark"]) .node-input { border-color: #687087; }
+:root:not([data-theme="dark"]) .node-skill.is-lit { border-color: #687087; box-shadow: 2px 3px 0 rgb(13 15 26 / 15%); }
+:root:not([data-theme="dark"]) .node-output.is-lit { background: #0d0f1a; color: #fffaf0; box-shadow: 4px 4px 0 #7cf0b8; }
 
 /* ---------- Experience: a training log ---------- */
 .experience-section {
