@@ -439,24 +439,35 @@ test('published impact, expanded work and grouped career chapters on desktop and
   }
 });
 
-test('impact engine animates visible signals and respects motion preferences', async ({page}) => {
+test('cinematic films load responsively, pause, and retain accessible contact links', async ({page}) => {
+  test.setTimeout(60000);
   for (const width of [390, 1440]) {
     await page.setViewportSize({width, height:1000});
     await page.goto('./');
-    await page.locator('.impact-engine').scrollIntoViewIfNeeded();
-    await expect(page.locator('#impact')).toHaveClass(/impact-in-view/);
-    const animated = page.locator(width === 390 ? '.processor-ring' : '.engine-stream').first();
-    await expect(animated).toHaveCSS('animation-play-state', 'running');
-    await page.locator('.impact-card a').first().focus();
-    await expect(page.locator('#impact')).toHaveAttribute('data-active-lane','0');
-    await page.locator('.impact-engine').scrollIntoViewIfNeeded();
-    await page.locator('#impact').screenshot({path:`test-results/engine-${width}.png`});
+    for (const name of ['impact', 'contact']) {
+      const scene = page.locator(`.cinema-${name}`);
+      const video = scene.locator('video');
+      await scene.scrollIntoViewIfNeeded();
+      await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentTime)).toBeGreaterThan(.1);
+      await expect(video).toHaveAttribute('src', width === 390 ? /720.mp4$/ : /1080.mp4$/);
+      await page.getByRole('button', {name:`Pause ${name} film`}).click();
+      await expect(video).toHaveJSProperty('paused',true);
+      await page.getByRole('button', {name:`Play ${name} film`}).click();
+      await expect(video).toHaveJSProperty('paused',false);
+    }
+    await page.locator('.contact-pipeline').screenshot({path:`test-results/film-contact-${width}.png`});
+    await page.locator('.impact-engine').screenshot({path:`test-results/film-impact-${width}.png`});
+    await expect(page.locator('.contact-prompts a')).toHaveCount(3);
+    await expect(page.locator('.contact-prompts a').first()).toHaveAttribute('href', /^mailto:.*\?subject=I%20have%20an%20AI%20idea$/);
     await page.getByRole('button', {name:'Pause motion'}).click();
-    await expect(animated).toHaveCSS('animation-play-state','paused');
+    for (const video of await page.locator('[data-cinema-video]').all()) await expect(video).toHaveJSProperty('paused',true);
     await page.getByRole('button', {name:'Play motion'}).click();
   }
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.goto('./');
-  await page.locator('.impact-engine').scrollIntoViewIfNeeded();
-  await expect(page.locator('.engine-stream')).toHaveCSS('animation-name','none');
+  await page.locator('#contact').scrollIntoViewIfNeeded();
+  for (const video of await page.locator('[data-cinema-video]').all()) {
+    await expect(video).not.toHaveAttribute('src');
+    await expect(video).toHaveJSProperty('paused',true);
+  }
 });

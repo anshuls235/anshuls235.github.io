@@ -1,3 +1,4 @@
+import { cinemaScene } from "./cinema";
 // Presentation-only illustrations. Portfolio data and Supabase stay independent.
 // Presentation-only illustrations. Portfolio data and Supabase stay independent.
 const LOGO_PATHS = `<g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 50 18 14l10 36M12.8 37h10.4"/><path d="M54 14H41a9 9 0 0 0 0 18h4a9 9 0 0 1 0 18H28"/></g><g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="#7cf0b8" stroke="#0d0f1a" stroke-width="2.4"><circle class="logo-node" cx="18" cy="14" r="5.6"/><circle class="logo-node" cx="28" cy="50" r="5.6"/><circle class="logo-node" cx="54" cy="14" r="5.6"/></g>`;
@@ -14,8 +15,8 @@ export function workScene(base: string) {
  const widths = [1400, 2400, 3840];
  return `<div class="work-scene" aria-hidden="true"><img class="scene-art scene-day" src="${base}assets/scenes/land-day-2400.webp" srcset="${set(base, "land-day", widths)}" sizes="100vw" width="3840" height="1648" alt="" loading="lazy"><img class="scene-art scene-night" src="${base}assets/scenes/land-night-2400.webp" srcset="${set(base, "land-night", widths)}" sizes="100vw" width="3840" height="1648" alt="" loading="lazy"></div>`;
 }
-export function closingScene() {
- return `<div class="contact-pipeline frame"><div class="pipeline-bar mono"><span>Human × machine</span><span>Start with a question</span></div><ol class="pipeline-steps"><li><span class="pipeline-index mono">01 / INPUT</span><h3>Your interesting problem.</h3><p>A workflow worth improving. A question your data could answer.</p></li><li><span class="pipeline-index mono">02 / COLLABORATION</span><h3>Let’s think it through.</h3><p>Find the right approach — agents, retrieval, machine learning, or something simpler.</p></li><li><span class="pipeline-index mono">03 / OUTPUT</span><h3>AI that earns its place.</h3><p>Build something useful, evaluate it, and measure what changes.</p></li></ol><p class="pipeline-note mono">You bring the context. I bring the curiosity. Let’s connect below.</p></div>`;
+export function closingScene(base: string) {
+ return `<div class="contact-pipeline frame">${cinemaScene(base, 'contact')}<div class="contact-invitation"><span class="mono">Human curiosity × machine intelligence</span><h3>What if we built<br>your next big idea?</h3><p>A half-formed thought is a perfectly good place to start.</p><ol class="pipeline-steps"><li><span class="pipeline-index mono">01 / BRING A QUESTION</span></li><li><span class="pipeline-index mono">02 / CONNECT THE DOTS</span></li><li><span class="pipeline-index mono">03 / MAKE IT REAL</span></li></ol></div></div>`;
 }
 export function vignette(kind:string,index:number) {
  const common=`<svg class="world-vignette" viewBox="0 0 640 390" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g stroke="#202941" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">`;

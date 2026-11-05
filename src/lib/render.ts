@@ -24,6 +24,11 @@ function link(
   const external = href.startsWith("https:");
   return `<a class="${cls}" href="${e(href)}" ${external ? 'target="_blank" rel="noopener noreferrer"' : ""} ${attrs}>${label}${external ? '<span class="sr-only"> (opens in a new tab)</span>' : ""}</a>`;
 }
+function conversationStarter(email: string, subject: string) {
+  const address = safeUrl(`mailto:${email}`);
+  if (!address) return "";
+  return `<a class="box-button box-button-light" href="${e(address)}?subject=${encodeURIComponent(subject)}" data-event="contact_action">${e(subject)} ${arrow}</a>`;
+}
 function date(value: string | null) {
   if (!value) return "Present";
   return new Intl.DateTimeFormat("en", {
@@ -114,10 +119,10 @@ function impactStories(projects: Project[]) {
   });
 }
 
-export function renderImpact(projects: Project[]) {
+export function renderImpact(projects: Project[], base = "/") {
   const stories = impactStories(projects);
   if (!stories.length) return "";
-  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div>${impactEngine()}<div class="impact-stage"><div class="impact-grid container">${stories
+  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div>${impactEngine(base)}<div class="impact-stage"><div class="impact-grid container">${stories
     .map(
       ({ project, label }, index) =>
         `<article class="impact-card"><div class="impact-card-inner frame">${impactVisual(index)}<p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div></article>`,
@@ -255,7 +260,7 @@ export function renderSite(content: Content, base = "/") {
     <div class="hero-foot container"><p class="mono hero-role">${e(p.title)} · Builder at heart</p><a class="scroll-pill mono" href="#impact" aria-label="Scroll to reported impact"><i aria-hidden="true"></i>Scroll</a><button class="world-motion mono" data-world-motion type="button" aria-pressed="false">Pause motion <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 4v12M14 4v12" stroke="currentColor" stroke-width="3"/></svg></button></div>
   </section>
   <div class="ticker" aria-hidden="true"><div class="ticker-track">${ticker}${ticker}${ticker}</div></div>
-  ${renderImpact(content.projects)}
+  ${renderImpact(content.projects, base)}
   <section class="work-section selected-section" id="projects" aria-labelledby="work-heading">
     ${workScene(base)}
     <div class="container work-top"><div><p class="eyebrow"><span>01</span>Selected work</p><h2 class="display display-thin" id="work-heading">${display("Work")}</h2></div><div class="work-intro"><p class="section-intro">From a first question to a working system. A selection of things I’ve helped build.</p><a href="#archive" class="box-button box-button-light">View all projects ${down}</a></div></div>
@@ -281,7 +286,7 @@ export function renderSite(content: Content, base = "/") {
   <section class="writing-section section" id="writing" aria-labelledby="writing-heading"><div class="container">${sectionHead("05", "Notes & explorations", "Learning,\nin public.", "writing-heading", link(content.social_links.find((s) => s.network === "Medium")?.url ?? null, `All writing ${arrow}`, base, "box-button box-button-light", 'data-event="social_click" data-platform="medium"'))}<div class="writing-layout">${content.publications.map((a, i) => `<article class="publication-item frame"><div class="frame-bar mono"><span>Note ${pad(i + 1)}</span><span>${e(a.platform)}${a.published_on ? ` · ${new Date(a.published_on).getUTCFullYear()}` : ""}</span></div><div class="publication-body"><h3>${link(a.url, `${e(a.title)} ${arrow}`, base, "", 'data-event="social_click" data-platform="medium"')}</h3><p>${e(a.summary)}</p></div></article>`).join("") || '<p class="empty-state">New writing will appear here.</p>'}<aside class="notebook-panel frame"><span class="notebook-symbol" aria-hidden="true"></span><p class="eyebrow">Data, openly explored</p><h3>Curiosity has a notebook.</h3><p>Explore my data-science notebooks and experiments on Kaggle.</p>${link(content.social_links.find((s) => s.network === "Kaggle")?.url ?? null, `Explore Kaggle ${arrow}`, base, "box-button", 'data-event="social_click" data-platform="kaggle"')}</aside></div></div></section>
   <section class="education-section section" id="education" aria-labelledby="education-heading"><div class="container">${sectionHead("06", "Foundations", "Always\na student.", "education-heading")}<div class="education-grid">${content.education.map((x) => `<article class="frame credential"><p class="mono">${x.start_year} — ${x.end_year ?? "Present"}</p><h3>${e(x.degree)}</h3><p>${e(x.institution)}</p>${link(x.url, `Institution ${arrow}`, base, "text-link")}</article>`).join("")}${content.certifications.map((x) => `<article class="frame credential"><p class="mono">${x.issued_on ? new Date(x.issued_on).getUTCFullYear() : "Certification"}</p><h3>${e(x.title)}</h3><p>${e(x.issuer)}</p>${link(x.url, `View credential ${arrow}`, base, "text-link")}</article>`).join("")}</div></div></section>
   <section class="about-section section" id="about" aria-labelledby="about-heading"><div class="container about-layout"><div><p class="eyebrow"><span>07</span>Beyond the models</p><h2 class="display" id="about-heading">${display("Engineering\nmeets curiosity.")}</h2></div><div><p class="about-copy">${e(p.about)}</p><p class="mono about-focus">${e(p.current_focus)}</p></div></div><div class="container scoreboard frame" data-scoreboard>${stat(years, "Years shipping")}${stat(chapters.length, "Career epochs")}${stat(content.projects.length, "Projects")}${stat(content.skills.length, "Skills in the model")}</div></section>
-  <section class="contact-section section" id="contact" aria-labelledby="contact-heading"><div class="container"><p class="eyebrow"><span>08</span>Have an interesting problem?</p><div class="contact-heading"><h2 class="display" id="contact-heading">${display("Let’s make\nsomething useful.")}</h2>${link(`mailto:${p.email}`, `${arrow}<span class="sr-only">Email ${e(p.name)}</span>`, base, "contact-arrow", 'data-event="contact_action"')}</div>${closingScene()}<div class="contact-bottom">${link(`mailto:${p.email}`, e(p.email), base, "contact-email", 'data-event="contact_action"')}<div class="social-links">${social}</div></div></div></section>
+  <section class="contact-section section" id="contact" aria-labelledby="contact-heading"><div class="container"><p class="eyebrow"><span>08</span>Have an interesting problem?</p><div class="contact-heading"><h2 class="display" id="contact-heading">${display("Great things\nstart with hello.")}</h2>${link(`mailto:${p.email}`, `${arrow}<span class="sr-only">Email ${e(p.name)}</span>`, base, "contact-arrow", 'data-event="contact_action"')}</div>${closingScene(base)}<div class="contact-prompts"><p class="mono">Pick a conversation starter</p><div>${["I have an AI idea", "Let’s collaborate", "Just saying hello"].map(subject => conversationStarter(p.email, subject)).join("")}</div></div><div class="contact-bottom">${link(`mailto:${p.email}`, e(p.email), base, "contact-email", 'data-event="contact_action"')}<div class="social-links">${social}</div></div></div></section>
   </main><footer class="site-footer"><div class="container footer-inner"><a class="footer-mark" href="#home" aria-label="Back to the top">${logoMark()}</a><p>© ${new Date().getUTCFullYear()} ${e(p.name)}</p><div><a href="${base}privacy.html">Privacy & analytics</a><a href="#home">Back to top ↑</a></div></div></footer>`;
 }
 

@@ -1,3 +1,4 @@
+import { initCinema } from "./cinema";
 import { initImpact } from "./impact";
 // Presentation and motion only. Content, Supabase and analytics live elsewhere.
 import gsap from "gsap";
@@ -14,6 +15,7 @@ let network: NetworkControls | null = null;
 let carouselIndex = 0;
 let heroVisible = true;
 let context: gsap.Context | null = null;
+let cinema: ReturnType<typeof initCinema> | undefined;
 let destroyImpact: (() => void) | undefined;
 
 /* ---------------- Smooth scrolling ---------------- */
@@ -311,10 +313,13 @@ function syncMotion() {
   });
   syncHeroVideo();
   network?.setPaused(isStill);
+  cinema?.sync();
 
 }
 
 export function initWorld() {
+  cinema?.destroy();
+  cinema = initCinema(still);
   destroyImpact?.();
   destroyImpact = initImpact();
   heroObserver.disconnect();
