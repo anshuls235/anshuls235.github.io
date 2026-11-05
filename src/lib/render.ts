@@ -104,9 +104,9 @@ export function renderProjectDetail(
 
 function impactStories(projects: Project[]) {
   return [
-    ["automall-ai-search", "Search → sales"],
-    ["automall-conversational-ai", "Conversations → leads"],
-    ["real-time-lead-scoring", "Intent → opportunity"],
+    ["automall-ai-search", "Search-attributed revenue"],
+    ["automall-conversational-ai", "Conversation-attributed revenue"],
+    ["real-time-lead-scoring", "Pilot opportunity share"],
   ].flatMap(([slug, label]) => {
     const project = projects.find((p) => p.slug === slug && p.outcomes.length);
     return project ? [{ project, label }] : [];
@@ -116,10 +116,10 @@ function impactStories(projects: Project[]) {
 export function renderImpact(projects: Project[]) {
   const stories = impactStories(projects);
   if (!stories.length) return "";
-  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>From the workshop to the real world</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div><div class="wire-stage" data-wire><span class="wire" aria-hidden="true"></span><div class="impact-grid container">${stories
+  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div><div class="impact-stage"><div class="impact-grid container">${stories
     .map(
       ({ project, label }, index) =>
-        `<article class="impact-card" data-swing><span class="lanyard" aria-hidden="true"><i></i></span><div class="impact-card-inner frame"><p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">Explore the evidence ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div></article>`,
+        `<article class="impact-card"><div class="impact-card-inner frame"><p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div></article>`,
     )
     .join(
       "",
@@ -145,7 +145,7 @@ function lossCurve(experiences: Content["experiences"]) {
   const w = 420;
   const h = 220;
   const points = chapters.map((c, i) => {
-    const x = 30 + (i / Math.max(1, chapters.length - 1)) * (w - 60);
+    const x = 54 + (i / Math.max(1, chapters.length - 1)) * (w - 108);
     const y = 40 + (h - 80) * Math.exp(-i * 1.1) ;
     return { x, y: h - y + 20, company: c.company };
   });
@@ -156,7 +156,7 @@ function lossCurve(experiences: Content["experiences"]) {
     d += ` C${mid} ${prev.y} ${mid} ${p.y} ${p.x} ${p.y}`;
   });
   d += ` C${w - 20} ${points.at(-1)!.y} ${w - 10} ${points.at(-1)!.y + 4} ${w} ${points.at(-1)!.y + 4}`;
-  return `<figure class="loss-chart frame" aria-hidden="true"><figcaption class="mono"><span>Training curve</span><span>loss ↓ · experience ↑</span></figcaption><svg viewBox="0 0 ${w} ${h}" fill="none"><g class="loss-grid">${[50, 100, 150, 200].map((y) => `<path d="M0 ${y}H${w}"/>`).join("")}</g><path class="loss-line" data-loss-line d="${d}" pathLength="1"/>${points.map((p, i) => `<g class="loss-point" data-loss-point="${i}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})"><circle r="7"/><text y="${i % 2 ? 26 : -16}" text-anchor="middle">${e(p.company.replace(/\s(India|Automotive|Global)$/, ""))}</text></g>`).join("")}</svg></figure>`;
+  return `<figure class="loss-chart frame" aria-label="Illustrative career learning curve, not measured model loss"><figcaption class="mono"><span>Training curve</span><span>loss ↓ · experience ↑</span></figcaption><svg viewBox="0 0 ${w} ${h}" fill="none" aria-hidden="true"><g class="loss-grid">${[50, 100, 150, 200].map((y) => `<path d="M0 ${y}H${w}"/>`).join("")}</g><path class="loss-line" data-loss-line d="${d}" pathLength="1"/>${points.map((p, i) => `<g class="loss-point" data-loss-point="${i}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})"><circle r="7"/><text y="${i % 2 ? 26 : -16}" text-anchor="${i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}">${e(p.company.replace(/\s(India|Automotive|Global)$/, ""))}</text></g>`).join("")}</svg><p class="curve-note mono">Career checkpoints · illustrative curve</p></figure>`;
 }
 
 const OUTPUTS = ["Shipped products", "Better decisions", "Measured impact"];

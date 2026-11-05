@@ -318,7 +318,8 @@ export function initNetwork(
         frame = 0;
       }
     },
-    { threshold: 0.15 },
+    // Tall mobile networks may only occupy a small visible fraction.
+    { threshold: 0 },
   );
   seen.observe(root);
   document.fonts?.ready.then(() => layout());

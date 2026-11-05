@@ -371,23 +371,35 @@ test('theme switching swaps the illustrated scenes and keeps the hero readable',
 });
 
 
-test('paper airplane follows the route, arrives, replays and respects reduced motion', async ({page}) => {
- for(const width of [1440,390]){
-  await page.setViewportSize({width,height:1000});
-  await page.goto('./');
-  await page.locator('#contact').scrollIntoViewIfNeeded();
-  await page.getByRole('button',{name:'Send it flying'}).click();
-  const plane=page.locator(width===390?'.flight-mobile [data-flight-plane]':'.flight-desktop [data-flight-plane]');
-  const first=await plane.getAttribute('transform');
-  await expect.poll(()=>plane.getAttribute('transform')).not.toBe(first);
-  await expect(page.locator('[data-flight]')).toHaveAttribute('data-flight-state','arrived',{timeout:9000});
-  await expect(page.locator('[data-flight-status]')).toContainText('has arrived');
-  await page.screenshot({path:`test-results/contact-flight-${width}.png`});
+test('AI contact pipeline and responsive section geometry', async ({page}) => {
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.getByRole('button',{name:'Send it flying'}).click();
-  await expect(page.locator('[data-flight]')).toHaveAttribute('data-flight-state','arrived');
-  await page.emulateMedia({reducedMotion:'no-preference'});
- }
+  for (const width of [320, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({width,height:740});
+    await page.goto('./');
+    await expect(page.locator('.pipeline-steps li')).toHaveCount(3);
+    await expect(page.locator('.contact-email')).toHaveAttribute('href', /^mailto:/);
+    for (const selector of ['.impact-card-inner', '.loss-chart', '.experience-item', '.contact-pipeline']) {
+      for (const item of await page.locator(selector).all()) {
+        const box = (await item.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        expect(await item.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBeTruthy();
+      }
+    }
+    const art = page.locator('.project-card.is-current .project-art');
+    if (width <= 980) {
+      const box = (await art.boundingBox())!;
+      expect(box.width / box.height).toBeCloseTo(1.6, 1);
+    }
+    if (width === 390) {
+      for (const id of ['impact', 'experience', 'contact']) {
+        await page.locator(`#${id}`).screenshot({path:`test-results/section-${id}.png`});
+      }
+    }
+    await page.locator('#experience').scrollIntoViewIfNeeded();
+    await expect(page.locator('.experience-side')).toHaveCSS('position','static');
+    await page.screenshot({path:`test-results/responsive-${width}.png`,fullPage:true});
+  }
 });
 
 test('published impact, expanded work and grouped career chapters on desktop and mobile', async ({page}) => {

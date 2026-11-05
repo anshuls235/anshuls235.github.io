@@ -2,7 +2,6 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
-import { initFlight, pauseFlight } from "./flight";
 import { initNetwork, type NetworkControls } from "./network";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -13,7 +12,6 @@ let lenis: Lenis | null = null;
 let network: NetworkControls | null = null;
 let carouselIndex = 0;
 let heroVisible = true;
-let swingFrame = 0;
 let context: gsap.Context | null = null;
 
 /* ---------------- Smooth scrolling ---------------- */
@@ -210,72 +208,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "ArrowLeft") paintCarousel(carouselIndex - 1, -1);
 });
 
-/* ---------------- Cards hanging from the wire ---------------- */
-interface Swing {
-  el: HTMLElement;
-  angle: number;
-  velocity: number;
-}
-let swings: Swing[] = [];
-let pointer = { x: 0, y: 0, vx: 0, t: 0 };
-function swingTick() {
-  swingFrame = 0;
-  let moving = false;
-  for (const s of swings) {
-    const acceleration = -0.045 * s.angle - 0.06 * s.velocity;
-    s.velocity += acceleration;
-    s.angle += s.velocity;
-    s.angle = Math.max(-18, Math.min(18, s.angle));
-    if (Math.abs(s.angle) > 0.02 || Math.abs(s.velocity) > 0.02) moving = true;
-    else s.angle = s.velocity = 0;
-    s.el.style.transform = s.angle ? `rotate(${s.angle.toFixed(2)}deg)` : "";
-  }
-  if (moving) swingFrame = requestAnimationFrame(swingTick);
-}
-function nudge(index: number | null, amount: number) {
-  if (still()) return;
-  swings.forEach((s, i) => {
-    if (index === null || index === i) s.velocity += amount * (index === null ? 0.6 + i * 0.25 : 1);
-  });
-  if (!swingFrame) swingFrame = requestAnimationFrame(swingTick);
-}
-function setupSwings() {
-  swings = [...document.querySelectorAll<HTMLElement>("[data-swing]")].map((el) => ({ el, angle: 0, velocity: 0 }));
-  const stage = document.querySelector<HTMLElement>("[data-wire]");
-  if (!stage || !swings.length) return;
-  stage.addEventListener("pointermove", (event) => {
-    const now = performance.now();
-    const dt = Math.max(16, now - pointer.t);
-    pointer.vx = (event.clientX - pointer.x) / dt;
-    pointer = { x: event.clientX, y: event.clientY, vx: pointer.vx, t: now };
-    swings.forEach((s, i) => {
-      const r = s.el.getBoundingClientRect();
-      if (event.clientX > r.left && event.clientX < r.right && event.clientY > r.top && event.clientY < r.bottom)
-        nudge(i, Math.max(-1.6, Math.min(1.6, pointer.vx * 0.9)));
-    });
-  });
-  ScrollTrigger.create({
-    trigger: stage,
-    start: "top 85%",
-    once: true,
-    onEnter: () => nudge(null, 1.4),
-  });
-}
-// Scrolling quickly makes the cards sway a little, like a breeze.
-let lastScroll = scrollY;
-window.addEventListener(
-  "scroll",
-  () => {
-    const delta = scrollY - lastScroll;
-    lastScroll = scrollY;
-    if (Math.abs(delta) > 18 && swings.length) {
-      const stage = document.querySelector("[data-wire]")?.getBoundingClientRect();
-      if (stage && stage.bottom > 0 && stage.top < innerHeight) nudge(null, Math.sign(delta) * 0.12);
-    }
-  },
-  { passive: true },
-);
-
 /* ---------------- Scroll choreography ---------------- */
 function setupScroll() {
   context?.revert();
@@ -305,7 +237,7 @@ function setupScroll() {
     });
     // Panels and cards ease in as they arrive.
     const reveal = gsap.utils.toArray<HTMLElement>(
-      ".impact-card, .work-stage, .network, .loss-chart, .experience-item, .archive-list, .publication-item, .notebook-panel, .credential, .scoreboard, .airmail-scene, .model-hud",
+      ".impact-card, .work-stage, .network, .experience-item, .archive-list, .publication-item, .notebook-panel, .credential, .scoreboard, .contact-pipeline, .model-hud",
     );
     reveal.forEach((el) => el.setAttribute("data-reveal", ""));
     ScrollTrigger.batch(reveal, {
@@ -336,7 +268,7 @@ function setupScroll() {
       gsap.set(line, { strokeDasharray: 1, strokeDashoffset: 1 });
       gsap.set(points, { scale: 0, transformOrigin: "50% 50%" });
       const timeline = gsap.timeline({
-        scrollTrigger: { trigger: ".experience-list", start: "top 70%", end: "bottom 75%", scrub: 0.6 },
+        scrollTrigger: { trigger: ".loss-chart", start: "top 85%", once: true },
       });
       timeline.to(line, { strokeDashoffset: 0, ease: "none", duration: 1 }, 0);
       points.forEach((p, i) =>
@@ -376,16 +308,8 @@ function syncMotion() {
     button.innerHTML = `${isStill ? "Play motion" : "Pause motion"} <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="${isStill ? "m6 4 10 6-10 6Z" : "M6 4v12M14 4v12"}" fill="${isStill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="3"/></svg>`;
   });
   syncHeroVideo();
-  pauseFlight(isStill);
   network?.setPaused(isStill);
-  if (isStill) {
-    cancelAnimationFrame(swingFrame);
-    swingFrame = 0;
-    swings.forEach((s) => {
-      s.angle = s.velocity = 0;
-      s.el.style.transform = "";
-    });
-  }
+
 }
 
 export function initWorld() {
@@ -396,9 +320,7 @@ export function initWorld() {
   const networkRoot = document.querySelector<HTMLElement>("[data-network]");
   network = networkRoot ? initNetwork(networkRoot, still) : null;
   setupCarousel();
-  setupSwings();
   setupScroll();
-  initFlight();
   syncMotion();
   ScrollTrigger.refresh();
 }
