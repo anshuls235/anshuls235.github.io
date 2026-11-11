@@ -279,9 +279,9 @@ test('illustrated hero: film plays, pauses and respects reduced motion', async (
   await page.screenshot({path:'test-results/hero-mobile.png',fullPage:true});
 });
 
-test('featured work carousel works with buttons, keyboard and swipe', async ({page}) => {
+test('work spiral turns with buttons, keyboard, drag and tile clicks', async ({page}) => {
   const featured = fallback.content.projects.filter(p => p.featured);
-  const total = String(featured.length).padStart(2, '0');
+  const total = String(fallback.content.projects.length).padStart(2, '0');
   for (const width of [1440, 390]) {
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
@@ -289,21 +289,27 @@ test('featured work carousel works with buttons, keyboard and swipe', async ({pa
     await expect(page.locator('#projects')).toHaveClass(/is-carousel/);
     await expect(page.locator('.project-card.is-current h3')).toContainText(featured[0].title);
     await expect(page.locator('[data-gallery-prev]')).toBeDisabled();
-    await page.getByRole('button',{name:'Next featured project'}).click();
+    // Let the anchor glide finish, then bring the controls into view at the start of the stage.
+    let lastY = -1;
+    await expect.poll(async () => { const y = await page.evaluate(() => scrollY); const settled = y === lastY; lastY = y; return settled; }, {intervals:[300]}).toBe(true);
+    await page.locator('[data-work-track]').evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + scrollY));
+    await expect(page.locator('[data-project-position]')).toContainText(`01 / ${total}`);
+    await page.getByRole('button',{name:'Next project'}).click();
     await expect(page.locator('[data-project-position]')).toContainText(`02 / ${total}`);
     await expect(page.locator('.project-card.is-current h3')).toContainText(featured[1].title);
     await expect(page.locator('.project-card:not(.is-current)').first()).toHaveJSProperty('inert', true);
-    await page.getByRole('button',{name:'Next featured project'}).focus();
+    await page.getByRole('button',{name:'Next project'}).focus();
     await page.keyboard.press('ArrowRight');
     await expect(page.locator('[data-project-position]')).toContainText(`03 / ${total}`);
     await page.keyboard.press('ArrowLeft');
     await expect(page.locator('[data-project-position]')).toContainText(`02 / ${total}`);
-    const box = (await page.locator('.project-card.is-current .project-art').boundingBox())!;
-    await page.mouse.move(box.x + box.width * .8, box.y + box.height / 2);
+    const box = (await page.locator('[data-spiral]').boundingBox())!;
+    await page.mouse.move(box.x + box.width * .7, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width * .1, box.y + box.height / 2, {steps:6});
+    await page.mouse.move(box.x + box.width * .3, box.y + box.height / 2, {steps:6});
     await page.mouse.up();
     await expect(page.locator('[data-project-position]')).toContainText(`03 / ${total}`);
+    await expect(page.locator('.spiral-tile.is-front')).toHaveAttribute('data-project', featured[2].slug);
     await page.locator('.project-card.is-current').getByRole('link',{name:/View project/}).click();
     await expect(page.getByRole('dialog')).toContainText(featured[2].title);
     await page.keyboard.press('Escape');
@@ -386,11 +392,9 @@ test('AI contact pipeline and responsive section geometry', async ({page}) => {
         expect(await item.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBeTruthy();
       }
     }
-    const art = page.locator('.project-card.is-current .project-art');
-    if (width <= 980) {
-      const box = (await art.boundingBox())!;
-      expect(box.width / box.height).toBeCloseTo(1.6, 1);
-    }
+    await expect(page.locator('.project-card.is-current')).toBeVisible();
+    await expect(page.locator('.spiral-tile.is-front')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.locator('#experience').scrollIntoViewIfNeeded();
     await expect(page.locator('.experience-side')).toHaveCSS('position','static');
   }
@@ -401,7 +405,7 @@ test('published impact, expanded work and grouped career chapters on desktop and
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
     await expect(page.locator('#archive-list article')).toHaveCount(fallback.content.projects.length);
-    await expect(page.locator('.selected-grid>.project-card')).toHaveCount(fallback.content.projects.filter(p=>p.featured).length);
+    await expect(page.locator('.selected-grid>.project-card')).toHaveCount(fallback.content.projects.length);
     await expect(page.locator('.impact-card')).toHaveCount(3);
     await expect(page.locator('#impact')).toContainText('AED 1.99M');
     await expect(page.locator('#impact')).toContainText('AED 1.33M');

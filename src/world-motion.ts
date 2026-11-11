@@ -1,6 +1,7 @@
 import { initCinema } from "./cinema";
 import { initImpact } from "./impact";
-import { mountFlux, morphFlux, setFluxStill } from "./flux";
+import { initPeek } from "./peek";
+import { initSpiral, type SpiralControls } from "./spiral";
 // Presentation and motion only. Content, Supabase and analytics live elsewhere.
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -13,14 +14,16 @@ let paused = reduced.matches;
 const still = () => paused || reduced.matches;
 let lenis: Lenis | null = null;
 let network: NetworkControls | null = null;
+let spiral: SpiralControls | null = null;
 let carouselIndex = 0;
-// On roomy screens the featured work pins and scrolling steps through it.
+// On roomy screens the work pins and scrolling turns the spiral.
 let workPin: ScrollTrigger | null = null;
 let unpinWork: (() => void) | undefined;
 let heroVisible = true;
 let context: gsap.Context | null = null;
 let cinema: ReturnType<typeof initCinema> | undefined;
 let destroyImpact: (() => void) | undefined;
+let destroyPeek: (() => void) | undefined;
 
 /* ---------------- Smooth scrolling ---------------- */
 function headerOffset() {
@@ -122,11 +125,12 @@ const heroObserver = new IntersectionObserver(
   { threshold: 0.05 },
 );
 
-/* ---------------- Featured work carousel ---------------- */
+/* ---------------- Work spiral ---------------- */
 function cards() {
   return [...document.querySelectorAll<HTMLElement>(".selected-grid > .project-card")];
 }
-function paintCarousel(next: number, direction = 1, animate = true) {
+/** Shows one project's notes; `turn` also brings its tile to the front. */
+function paintCarousel(next: number, direction = 1, animate = true, turn = true) {
   const list = cards();
   if (!list.length) return;
   const previous = carouselIndex;
@@ -136,57 +140,28 @@ function paintCarousel(next: number, direction = 1, animate = true) {
     position.textContent = `${String(carouselIndex + 1).padStart(2, "0")} / ${String(list.length).padStart(2, "0")} — Selected work`;
   document.querySelector<HTMLButtonElement>("[data-gallery-prev]")?.toggleAttribute("disabled", carouselIndex === 0);
   document.querySelector<HTMLButtonElement>("[data-gallery-next]")?.toggleAttribute("disabled", carouselIndex >= list.length - 1);
-  document.querySelectorAll("[data-dot]").forEach((dot, i) => dot.classList.toggle("is-current", i === carouselIndex));
   const incoming = list[carouselIndex];
-  const outgoing = list[previous];
   list.forEach((card, i) => {
     const current = i === carouselIndex;
     card.classList.toggle("is-current", current);
     card.inert = !current;
     card.setAttribute("aria-hidden", String(!current));
   });
-  if (previous !== carouselIndex) morphFlux(outgoing, incoming);
-  if (!animate || still() || previous === carouselIndex) {
-    gsap.set(list, { clearProps: "transform,opacity" });
-    return;
-  }
-  gsap.killTweensOf(list);
-  if (workPin) {
-    // The frame holds still: the copy changes and the flux field morphs.
-    gsap.set(list, { clearProps: "transform,opacity,visibility" });
-    gsap.fromTo(
-      incoming.querySelectorAll(".project-body > *"),
-      { y: direction * 28, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.6, ease: "power3.out", stagger: 0.05, overwrite: true, clearProps: "transform,opacity" },
-    );
-    return;
-  }
-  outgoing.classList.add("is-leaving");
+  if (turn) spiral?.setTarget(carouselIndex, !animate);
+  gsap.killTweensOf(".project-body > *");
+  gsap.set(".project-body > *", { clearProps: "transform,opacity" });
+  if (!animate || still() || previous === carouselIndex) return;
   gsap.fromTo(
-    outgoing,
-    { x: 0, rotation: 0, opacity: 1, visibility: "visible" },
-    {
-      x: -direction * 120,
-      rotation: -direction * 4,
-      opacity: 0,
-      duration: 0.45,
-      ease: "power2.in",
-      onComplete: () => {
-        outgoing.classList.remove("is-leaving");
-        gsap.set(outgoing, { clearProps: "transform,opacity,visibility" });
-      },
-    },
-  );
-  gsap.fromTo(
-    incoming,
-    { x: direction * 160, rotation: direction * 5, opacity: 0 },
-    { x: 0, rotation: 0, opacity: 1, duration: 0.8, ease: "back.out(1.4)", delay: 0.12 },
+    incoming.querySelectorAll(".project-body > *"),
+    { y: direction * 24, opacity: 0 },
+    { y: 0, opacity: 1, duration: 0.55, ease: "power3.out", stagger: 0.04, clearProps: "transform,opacity" },
   );
 }
-/** Buttons, keys and swipes: when pinned they scroll to the project instead. */
-function goTo(next: number, direction: number) {
+/** Buttons, keys, drags and tile clicks: when pinned they scroll to the project. */
+function goTo(next: number) {
   const count = cards().length;
   const index = Math.max(0, Math.min(count - 1, next));
+  const direction = index >= carouselIndex ? 1 : -1;
   if (!workPin) return paintCarousel(index, direction);
   const top = workPin.start + ((index + 0.5) / count) * (workPin.end - workPin.start);
   if (lenis) lenis.scrollTo(top, { duration: 0.9 });
@@ -195,21 +170,21 @@ function goTo(next: number, direction: number) {
 function setupWorkPin() {
   const section = document.querySelector<HTMLElement>("#projects");
   const track = section?.querySelector<HTMLElement>("[data-work-track]");
-  const stage = section?.querySelector<HTMLElement>(".work-stage");
-  const status = section?.querySelector<HTMLElement>(".work-status");
   const hint = section?.querySelector<HTMLElement>(".gallery-hint");
   const count = cards().length;
-  if (!section || !track || !stage || count < 2 || reduced.matches || innerWidth < 981) return;
-  // Pin only when a whole card, with its status row, fits under the header.
-  if (stage.offsetHeight + (status?.offsetHeight ?? 0) + 34 > innerHeight + headerOffset() - 24) return;
+  // Pin only where the spiral and a full set of notes fit side by side.
+  if (!section || !track || count < 2 || reduced.matches || innerWidth < 981 || innerHeight < 720) return;
   section.classList.add("is-pinned");
   track.style.setProperty("--work-steps", String(count));
   const hintText = hint?.textContent ?? "";
-  if (hint) hint.textContent = "Keep scrolling to explore";
+  if (hint) hint.textContent = "Scroll, drag or use the arrows";
   const follow = (self: ScrollTrigger) => {
     track.style.setProperty("--work-progress", self.progress.toFixed(4));
-    const next = Math.min(count - 1, Math.floor(self.progress * count));
-    if (next !== carouselIndex) paintCarousel(next, next > carouselIndex ? 1 : -1);
+    // The spiral turns continuously with the scroll; the notes change at the halfway point.
+    const turn = Math.max(0, Math.min(count - 1, self.progress * count - 0.5));
+    spiral?.setTarget(turn);
+    const next = Math.round(turn);
+    if (next !== carouselIndex) paintCarousel(next, next > carouselIndex ? 1 : -1, true, false);
   };
   workPin = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: follow, onRefresh: follow });
   return () => {
@@ -219,6 +194,7 @@ function setupWorkPin() {
     track.style.removeProperty("--work-steps");
     track.style.removeProperty("--work-progress");
     if (hint) hint.textContent = hintText;
+    spiral?.setTarget(carouselIndex);
   };
 }
 /** The about copy brightens word by word as it is read. */
@@ -244,46 +220,28 @@ function setupReading() {
 }
 function setupCarousel() {
   const section = document.querySelector<HTMLElement>("#projects");
-  const track = document.querySelector<HTMLElement>(".selected-grid");
-  const list = cards();
-  if (!section || !track || list.length < 2) return;
+  const stage = section?.querySelector<HTMLElement>("[data-spiral]");
+  spiral?.destroy();
+  spiral = null;
+  if (!section || !stage || cards().length < 2) return;
   section.classList.add("is-carousel");
-  carouselIndex = Math.min(carouselIndex, list.length - 1);
+  spiral = initSpiral(stage, still, goTo);
+  carouselIndex = Math.min(carouselIndex, cards().length - 1);
   paintCarousel(carouselIndex, 1, false);
-  // Drag or swipe to change project.
-  let startX = 0;
-  let startY = 0;
-  let dragging = false;
-  track.addEventListener("pointerdown", (event) => {
-    if ((event.target as Element).closest("a,button")) return;
-    dragging = true;
-    startX = event.clientX;
-    startY = event.clientY;
-    track.setPointerCapture(event.pointerId);
-  });
-  track.addEventListener("dragstart", (event) => event.preventDefault());
-  track.addEventListener("pointerup", (event) => {
-    if (!dragging) return;
-    dragging = false;
-    const dx = event.clientX - startX;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(event.clientY - startY))
-      goTo(carouselIndex + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
-  });
-  track.addEventListener("pointercancel", () => (dragging = false));
 }
 document.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest("[data-gallery-prev]")) goTo(carouselIndex - 1, -1);
-  if (target?.closest("[data-gallery-next]")) goTo(carouselIndex + 1, 1);
+  if (target?.closest("[data-gallery-prev]")) goTo(carouselIndex - 1);
+  if (target?.closest("[data-gallery-next]")) goTo(carouselIndex + 1);
   if (target?.closest("[data-world-motion]")) {
     paused = !paused;
     syncMotion();
   }
 });
 document.addEventListener("keydown", (event) => {
-  if (!(event.target instanceof Element) || !event.target.closest("#projects .work-stage")) return;
-  if (event.key === "ArrowRight") goTo(carouselIndex + 1, 1);
-  if (event.key === "ArrowLeft") goTo(carouselIndex - 1, -1);
+  if (!(event.target instanceof Element) || !event.target.closest("#projects .work-pin")) return;
+  if (event.key === "ArrowRight") goTo(carouselIndex + 1);
+  if (event.key === "ArrowLeft") goTo(carouselIndex - 1);
 });
 
 /* ---------------- Scroll choreography ---------------- */
@@ -299,6 +257,14 @@ function setupScroll() {
     }
     root.classList.add("js-motion");
     const unread = setupReading();
+    // Each impact number slides in from the side as its band arrives.
+    gsap.utils.toArray<HTMLElement>(".impact-metric").forEach((metric) => {
+      gsap.fromTo(
+        metric,
+        { xPercent: 14 },
+        { xPercent: 0, ease: "none", scrollTrigger: { trigger: metric, start: "top bottom", end: "top 45%", scrub: true } },
+      );
+    });
     // The impact film grows into its frame as it arrives.
     const engine = document.querySelector<HTMLElement>(".impact-engine");
     if (engine) {
@@ -325,7 +291,7 @@ function setupScroll() {
     });
     // Panels and cards ease in as they arrive.
     const reveal = gsap.utils.toArray<HTMLElement>(
-      ".impact-card, .work-stage, .network, .experience-item, .archive-list, .publication-item, .notebook-panel, .credential, .scoreboard, .contact-pipeline, .model-hud",
+      ".network, .experience-item, .archive-list, .publication-item, .notebook-panel, .credential, .scoreboard, .contact-pipeline, .model-hud",
     );
     reveal.forEach((el) => el.setAttribute("data-reveal", ""));
     ScrollTrigger.batch(reveal, {
@@ -342,13 +308,6 @@ function setupScroll() {
         ease: "none",
         scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true },
       });
-    const land = document.querySelector<HTMLElement>(".work-scene");
-    if (land)
-      gsap.fromTo(
-        land,
-        { "--land-shift": "-40px" },
-        { "--land-shift": "40px", ease: "none", scrollTrigger: { trigger: "#projects", start: "top bottom", end: "bottom top", scrub: true } },
-      );
     // The career training curve draws itself as you read.
     const line = document.querySelector<SVGPathElement>("[data-loss-line]");
     const points = gsap.utils.toArray<SVGGElement>("[data-loss-point]");
@@ -399,7 +358,6 @@ function syncMotion() {
   });
   syncHeroVideo();
   network?.setPaused(isStill);
-  setFluxStill(isStill);
   cinema?.sync();
 
 }
@@ -415,7 +373,8 @@ export function initWorld() {
   if (scene) heroObserver.observe(scene);
   const networkRoot = document.querySelector<HTMLElement>("[data-network]");
   network = networkRoot ? initNetwork(networkRoot, still) : null;
-  mountFlux();
+  destroyPeek?.();
+  destroyPeek = initPeek(still);
   setupCarousel();
   setupScroll();
   syncMotion();

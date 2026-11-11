@@ -1,6 +1,6 @@
 import { impactEngine, impactVisual } from "../impact";
-import { fluxCanvas, fluxFormation } from "../flux";
-import { heroScene, workScene, vignette, closingScene, logoMark } from "../world";
+import { coverImage, hasCover } from "../art";
+import { heroScene, vignette, closingScene, logoMark } from "../world";
 import type { Content, Project, Profile } from "./types";
 import { escapeHtml as e, safeUrl } from "./content";
 import { careerChapters } from "./experience";
@@ -65,38 +65,37 @@ export function headlineMetric(summary: string) {
   return count ? count[0] : "";
 }
 
-/** How many earlier projects share this one's visual kind; picks its flux formation. */
-function kindVariant(project: Project, projects: Project[]) {
-  return projects
-    .slice(0, projects.indexOf(project))
-    .filter((p) => p.visual_kind === project.visual_kind).length;
-}
-
-export function projectArt(
-  project: Project,
-  index: number,
-  base: string,
-  variant = 0,
-) {
+export function projectArt(project: Project, index: number, base: string) {
   const image = safeUrl(project.image_url, base);
   if (image)
     return `<div class="project-art art-image"><img src="${e(image)}" alt="${e(project.image_alt || project.title)}" loading="lazy" width="720" height="450"></div>`;
-  return `<div class="project-art art-${e(project.visual_kind)}" aria-hidden="true">${vignette(project.slug === "automall-conversational-ai" ? "retrieval" : project.visual_kind, index)}${fluxCanvas(fluxFormation(project.visual_kind, variant))}</div>`;
+  if (hasCover(project.slug))
+    return `<div class="project-art art-cover" aria-hidden="true">${coverImage(project.slug, base, "(max-width: 900px) 92vw, 800px")}</div>`;
+  return `<div class="project-art art-${e(project.visual_kind)}" aria-hidden="true">${vignette(project.slug === "automall-conversational-ai" ? "retrieval" : project.visual_kind, index)}</div>`;
 }
 
 export function renderProject(
   project: Project,
   index: number,
-  base: string,
   total = 1,
-  variant = 0,
 ) {
   return `<article class="project-card frame" id="project-${e(project.slug)}" data-index="${index}"><div class="project-body"><div class="project-badge"><span class="mono">Project</span><strong>${pad(index + 1)}</strong><span class="mono">${e(project.category)}</span></div><dl class="project-meta"><div><dt class="mono">Client</dt><dd>${e(project.organization || "Independent exploration")}</dd></div></dl><h3><a href="#work/${e(project.slug)}" data-project="${e(project.slug)}">${e(project.title)}</a></h3><p class="project-summary">${e(project.summary)}</p><ul class="tags" aria-label="Technologies">${project.technologies
     .slice(0, 4)
     .map((t) => `<li>${e(t)}</li>`)
     .join(
       "",
-    )}</ul><div class="project-foot"><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project ${right}<span class="sr-only"> notes for ${e(project.title)}</span></a><span class="mono project-count" aria-hidden="true">${index + 1}/${total}</span></div></div>${projectArt(project, index, base, variant)}</article>`;
+    )}</ul><div class="project-foot"><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project ${right}<span class="sr-only"> notes for ${e(project.title)}</span></a><span class="mono project-count" aria-hidden="true">${index + 1}/${total}</span></div></div></article>`;
+}
+
+/** A tile for the spiral: the project's cover, or a typographic poster without one. */
+function spiralTile(project: Project, index: number, base: string) {
+  const metric = headlineMetric(project.summary);
+  const top = `<span class="tile-top mono"><span>${pad(index + 1)}</span><span>${e(project.category)}</span></span>`;
+  const attrs = `href="#work/${e(project.slug)}" data-project="${e(project.slug)}" data-spiral-tile="${index}" tabindex="-1" draggable="false"`;
+  if (hasCover(project.slug))
+    return `<a class="spiral-tile has-cover" ${attrs}>${coverImage(project.slug, base, "(max-width: 980px) 60vw, 40vw")}${top}${metric ? `<strong class="tile-metric">${e(metric)}</strong>` : ""}</a>`;
+  const mark = metric || project.technologies[0] || project.category;
+  return `<a class="spiral-tile tone-${index % 6}" ${attrs}>${top}<strong class="tile-mark${mark.length > 10 ? " is-long" : mark.length > 5 ? " is-mid" : ""}">${e(mark)}</strong><span class="tile-title">${e(project.title)}</span><span class="tile-foot mono">${e(project.organization || "Independent")}</span></a>`;
 }
 
 export function renderProjectDetail(
@@ -111,7 +110,7 @@ export function renderProjectDetail(
   const links = content.project_links.filter(
     (l) => l.project_id === project.id,
   );
-  return `<p class="eyebrow">${e(project.category)} / ${e(project.organization || "Independent project")}</p><h2 id="detail-title">${e(project.title)}</h2><p class="detail-intro">${e(project.description)}</p>${projectArt(project, 0, base, kindVariant(project, content.projects))}<dl class="project-facts">${project.role ? `<div><dt>My role</dt><dd>${e(project.role)}</dd></div>` : ""}${project.start_date ? `<div><dt>Timeline</dt><dd>${date(project.start_date)} – ${date(project.end_date)}</dd></div>` : ""}<div><dt>Stack</dt><dd>${e(project.technologies.join(" · "))}</dd></div></dl>${blocks
+  return `<p class="eyebrow">${e(project.category)} / ${e(project.organization || "Independent project")}</p><h2 id="detail-title">${e(project.title)}</h2><p class="detail-intro">${e(project.description)}</p>${projectArt(project, 0, base)}<dl class="project-facts">${project.role ? `<div><dt>My role</dt><dd>${e(project.role)}</dd></div>` : ""}${project.start_date ? `<div><dt>Timeline</dt><dd>${date(project.start_date)} – ${date(project.end_date)}</dd></div>` : ""}<div><dt>Stack</dt><dd>${e(project.technologies.join(" · "))}</dd></div></dl>${blocks
     .filter(([, body]) => body)
     .map(
       ([title, body]) =>
@@ -136,10 +135,10 @@ function impactStories(projects: Project[]) {
 export function renderImpact(projects: Project[], base = "/") {
   const stories = impactStories(projects);
   if (!stories.length) return "";
-  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div>${impactEngine(base)}<div class="impact-stage"><div class="impact-grid container">${stories
+  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div>${impactEngine(base)}<div class="impact-stage"><div class="impact-grid">${stories
     .map(
       ({ project, label }, index) =>
-        `<article class="impact-card"><div class="impact-card-inner frame">${impactVisual(index)}<p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div></article>`,
+        `<article class="impact-card"><div class="impact-card-inner container"><p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><div class="impact-copy"><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div>${impactVisual(index)}</div></article>`,
     )
     .join(
       "",
@@ -240,7 +239,11 @@ export function renderSite(content: Content, base = "/") {
     "All work",
     ...new Set(content.projects.map((p) => p.category)),
   ];
-  const featured = content.projects.filter((x) => x.featured);
+  // Featured work leads the spiral; everything else follows it round.
+  const showcase = [
+    ...content.projects.filter((x) => x.featured),
+    ...content.projects.filter((x) => !x.featured),
+  ];
   const chapters = careerChapters(content.experiences);
   const firstYear = content.experiences
     .map((x) => Number(x.start_date.slice(0, 4)))
@@ -276,18 +279,16 @@ export function renderSite(content: Content, base = "/") {
   <div class="ticker" aria-hidden="true"><div class="ticker-track">${ticker}${ticker}${ticker}</div></div>
   ${renderImpact(content.projects, base)}
   <section class="work-section selected-section" id="projects" aria-labelledby="work-heading">
-    ${workScene(base)}
-    <div class="container work-top"><div><p class="eyebrow"><span>01</span>Selected work</p><h2 class="display display-thin" id="work-heading">${display("Work")}</h2></div><div class="work-intro"><p class="section-intro">From a first question to a working system. A selection of things I’ve helped build.</p><a href="#archive" class="box-button box-button-light">View all projects ${down}</a></div></div>
+    <div class="container work-top"><div><p class="eyebrow"><span>01</span>Selected work</p><h2 class="display display-thin" id="work-heading">${display("Work")}</h2></div><div class="work-intro"><p class="section-intro">From a first question to a working system. Every project rides the spiral: turn it to find one, open it to read the notes.</p><a href="#archive" class="box-button box-button-light">Search the archive ${down}</a></div></div>
     <div class="work-track" data-work-track><div class="work-pin">
     <div class="work-stage container">
-      <button class="edge-button edge-prev" type="button" data-gallery-prev data-interactive hidden aria-label="Previous featured project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
+      <div class="spiral-stage" data-spiral aria-hidden="true"><div class="spiral-rig">${showcase.map((x, i) => spiralTile(x, i, base)).join("")}</div></div>
       <div class="selected-grid" data-carousel>${
-        featured.map((x, i) => renderProject(x, i, base, featured.length, kindVariant(x, content.projects))).join("") ||
+        showcase.map((x, i) => renderProject(x, i, showcase.length)).join("") ||
         '<p class="empty-state frame">Selected work is being updated. Explore the archive below.</p>'
       }</div>
-      <button class="edge-button edge-next" type="button" data-gallery-next data-interactive hidden aria-label="Next featured project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
     </div>
-    <div class="container work-status" data-interactive hidden><p class="mono" data-project-position aria-live="polite">01 / ${pad(featured.length)} — Selected work</p><div class="work-dots" aria-hidden="true">${featured.map((_, i) => `<i data-dot="${i}"></i>`).join("")}</div><p class="mono gallery-hint">Swipe, drag or use the arrows</p></div>
+    <div class="container work-status" data-interactive hidden><p class="mono" data-project-position aria-live="polite">01 / ${pad(showcase.length)} — Selected work</p><p class="mono gallery-hint">Drag the spiral or use the arrows</p><div class="spin-buttons"><button class="spin-button" type="button" data-gallery-prev aria-label="Previous project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button><button class="spin-button" type="button" data-gallery-next aria-label="Next project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button></div></div>
     </div></div>
   </section>
   <section class="model-section" id="skills" aria-labelledby="skills-heading">
@@ -312,7 +313,7 @@ export function renderArchive(projects: Project[]) {
   return projects
     .map(
       (p, i) =>
-        `<article class="archive-row"><span class="mono archive-index">${pad(i + 1)}</span><div><p class="mono">${e(p.organization || "Independent exploration")}</p><h3><a href="#work/${e(p.slug)}" data-project="${e(p.slug)}">${e(p.title)}</a></h3><p class="archive-summary">${e(p.summary)}</p></div><span class="archive-category mono">${e(p.category)}</span><a class="archive-arrow" href="#work/${e(p.slug)}" data-project="${e(p.slug)}" aria-label="Read about ${e(p.title)}">${icon(arrowPath)}</a></article>`,
+        `<article class="archive-row"${hasCover(p.slug) ? ` data-cover="${e(p.slug)}"` : ""}><span class="mono archive-index">${pad(i + 1)}</span><div><p class="mono">${e(p.organization || "Independent exploration")}</p><h3><a href="#work/${e(p.slug)}" data-project="${e(p.slug)}">${e(p.title)}</a></h3><p class="archive-summary">${e(p.summary)}</p></div><span class="archive-category mono">${e(p.category)}</span><a class="archive-arrow" href="#work/${e(p.slug)}" data-project="${e(p.slug)}" aria-label="Read about ${e(p.title)}">${icon(arrowPath)}</a></article>`,
     )
     .join("");
 }

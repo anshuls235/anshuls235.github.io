@@ -11,10 +11,6 @@ export function heroScene(base: string) {
  const widths = [960, 1600, 2560, 3840];
  return `<div class="hero-scene" data-hero-scene aria-hidden="true"><img class="scene-art scene-day" src="${base}assets/scenes/hero-day-1600.webp" srcset="${set(base, "hero-day", widths)}" sizes="100vw" width="3840" height="2160" alt="" fetchpriority="high"><img class="scene-art scene-night" src="${base}assets/scenes/hero-night-1600.webp" srcset="${set(base, "hero-night", widths)}" sizes="100vw" width="3840" height="2160" alt="" loading="lazy"><video class="hero-film" data-hero-video data-day="${base}assets/scenes/hero-day-1080.mp4" data-day-hd="${base}assets/scenes/hero-day-1440.mp4" data-night="${base}assets/scenes/hero-night-1080.mp4" data-night-hd="${base}assets/scenes/hero-night-1440.mp4" muted loop playsinline preload="none"></video></div>`;
 }
-export function workScene(base: string) {
- const widths = [1400, 2400, 3840];
- return `<div class="work-scene" aria-hidden="true"><img class="scene-art scene-day" src="${base}assets/scenes/land-day-2400.webp" srcset="${set(base, "land-day", widths)}" sizes="100vw" width="3840" height="1648" alt="" loading="lazy"><img class="scene-art scene-night" src="${base}assets/scenes/land-night-2400.webp" srcset="${set(base, "land-night", widths)}" sizes="100vw" width="3840" height="1648" alt="" loading="lazy"></div>`;
-}
 export function closingScene(base: string) {
  return `<div class="contact-pipeline frame">${cinemaScene(base, 'contact')}<div class="contact-invitation"><span class="mono">Human curiosity × machine intelligence</span><h3>What if we built<br>your next big idea?</h3><p>A half-formed thought is a perfectly good place to start.</p><ol class="pipeline-steps"><li><span class="pipeline-index mono">01 / BRING A QUESTION</span></li><li><span class="pipeline-index mono">02 / CONNECT THE DOTS</span></li><li><span class="pipeline-index mono">03 / MAKE IT REAL</span></li></ol></div></div>`;
 }
