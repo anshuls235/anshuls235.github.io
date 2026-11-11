@@ -1,6 +1,6 @@
 import { initCinema } from "./cinema";
 import { initImpact } from "./impact";
-import { initPeek } from "./peek";
+import { initSignal, type SignalControls } from "./signal";
 import { initSpiral, type SpiralControls } from "./spiral";
 // Presentation and motion only. Content, Supabase and analytics live elsewhere.
 import gsap from "gsap";
@@ -23,7 +23,7 @@ let heroVisible = true;
 let context: gsap.Context | null = null;
 let cinema: ReturnType<typeof initCinema> | undefined;
 let destroyImpact: (() => void) | undefined;
-let destroyPeek: (() => void) | undefined;
+let signal: SignalControls | null = null;
 
 /* ---------------- Smooth scrolling ---------------- */
 function headerOffset() {
@@ -265,13 +265,6 @@ function setupScroll() {
         { xPercent: 0, ease: "none", scrollTrigger: { trigger: metric, start: "top bottom", end: "top 45%", scrub: true } },
       );
     });
-    // The impact film grows into its frame as it arrives.
-    const engine = document.querySelector<HTMLElement>(".impact-engine");
-    if (engine) {
-      const arrive = { trigger: engine, start: "top 95%", end: "top 25%", scrub: true };
-      gsap.fromTo(engine, { scale: 0.84 }, { scale: 1, ease: "none", scrollTrigger: arrive });
-      gsap.fromTo(engine.querySelectorAll(".cinema-poster, .cinema-video"), { scale: 1.22 }, { scale: 1, ease: "none", scrollTrigger: arrive });
-    }
     // Display headlines rise line by line.
     gsap.utils.toArray<HTMLElement>(".display").forEach((heading) => {
       const lines = heading.querySelectorAll(".line > span");
@@ -291,7 +284,7 @@ function setupScroll() {
     });
     // Panels and cards ease in as they arrive.
     const reveal = gsap.utils.toArray<HTMLElement>(
-      ".network, .experience-item, .archive-list, .publication-item, .notebook-panel, .credential, .scoreboard, .contact-pipeline, .model-hud",
+      ".network, .experience-item, .publication-item, .notebook-panel, .credential, .scoreboard, .contact-pipeline, .model-hud",
     );
     reveal.forEach((el) => el.setAttribute("data-reveal", ""));
     ScrollTrigger.batch(reveal, {
@@ -359,7 +352,7 @@ function syncMotion() {
   syncHeroVideo();
   network?.setPaused(isStill);
   cinema?.sync();
-
+  signal?.sync();
 }
 
 export function initWorld() {
@@ -373,8 +366,8 @@ export function initWorld() {
   if (scene) heroObserver.observe(scene);
   const networkRoot = document.querySelector<HTMLElement>("[data-network]");
   network = networkRoot ? initNetwork(networkRoot, still) : null;
-  destroyPeek?.();
-  destroyPeek = initPeek(still);
+  signal?.destroy();
+  signal = initSignal(still);
   setupCarousel();
   setupScroll();
   syncMotion();

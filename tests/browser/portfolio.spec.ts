@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
 const previewUrl = (process.env.PORTFOLIO_PREVIEW_URL || "http://127.0.0.1:4173/").replace(/\/?$/, "/");
 const previewOrigin = new URL(previewUrl).origin;
 const expectedTitle = "Making intelligence work in the real world.";
-test("desktop project, filter, search, deep link, CV and theme flows", async ({
+test("desktop project, deep link, CV and theme flows", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -50,18 +50,6 @@ test("desktop project, filter, search, deep link, CV and theme flows", async ({
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  await page
-    .getByRole("button", { name: "Machine learning", exact: true })
-    .click();
-  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.filter(p => p.category === "Machine learning").length);
-  await page
-    .getByRole("searchbox", { name: "Search projects" })
-    .fill("no matching project");
-  await expect(
-    page.getByRole("heading", { name: "No matching projects." }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Clear filters/ }).click();
-  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.length);
   await page.getByRole("button", { name: "Switch to dark theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
@@ -153,7 +141,7 @@ test("static content works without JavaScript", async ({ browser }) => {
   await expect(
     page.getByRole("link", { name: "Visit Automall", exact: false }),
   ).toBeVisible();
-  expect(await page.locator("#archive-list article").count()).toBe(fallback.content.projects.length);
+  expect(await page.locator(".selected-grid>.project-card").count()).toBe(fallback.content.projects.length);
   await context.close();
 });
 test("all local assets load and no third-party resources are requested", async ({
@@ -214,22 +202,16 @@ test("configured content: live edits, empty collections, errors and paused datab
   ).toBeVisible();
   mode = "empty";
   await page.reload();
-  await expect(page.locator("#archive-list article")).toHaveCount(0);
+  await expect(page.locator(".selected-grid>.project-card")).toHaveCount(0);
   await expect(
     page.getByText("Selected work is being updated.", { exact: false }),
   ).toBeVisible();
   mode = "paused";
   await page.reload();
-  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.length);
+  await expect(page.locator(".selected-grid>.project-card")).toHaveCount(fallback.content.projects.length);
   await expect(
     page.getByRole("status").filter({ hasText: "Showing a saved portfolio" }),
   ).toBeVisible();
-  await page.context().setOffline(true);
-  await page
-    .getByRole("button", { name: "Generative AI", exact: true })
-    .click();
-  await expect(page.locator("#archive-list article")).toHaveCount(fallback.content.projects.filter(p => p.category === "Generative AI").length);
-  await page.context().setOffline(false);
 });
 test("configured analytics respects DNT and never delays a link", async ({
   browser,
@@ -310,6 +292,9 @@ test('work spiral turns with buttons, keyboard, drag and tile clicks', async ({p
     await page.mouse.up();
     await expect(page.locator('[data-project-position]')).toContainText(`03 / ${total}`);
     await expect(page.locator('.spiral-tile.is-front')).toHaveAttribute('data-project', featured[2].slug);
+    // The pinned stage glides to the picked project; let it land before clicking.
+    lastY = -1;
+    await expect.poll(async () => { const y = await page.evaluate(() => scrollY); const settled = y === lastY; lastY = y; return settled; }, {intervals:[300]}).toBe(true);
     await page.locator('.project-card.is-current').getByRole('link',{name:/View project/}).click();
     await expect(page.getByRole('dialog')).toContainText(featured[2].title);
     await page.keyboard.press('Escape');
@@ -404,7 +389,7 @@ test('published impact, expanded work and grouped career chapters on desktop and
   for (const width of [1440,390]) {
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
-    await expect(page.locator('#archive-list article')).toHaveCount(fallback.content.projects.length);
+    await expect(page.locator('#archive')).toHaveCount(0);
     await expect(page.locator('.selected-grid>.project-card')).toHaveCount(fallback.content.projects.length);
     await expect(page.locator('.impact-card')).toHaveCount(3);
     await expect(page.locator('#impact')).toContainText('AED 1.99M');
@@ -435,7 +420,7 @@ test('published impact, expanded work and grouped career chapters on desktop and
     await page.locator('#impact').scrollIntoViewIfNeeded();
     await page.screenshot({path:`test-results/impact-${width}.png`});
     for (const slug of ['command-center-ask-ai','qualification-bot','test-drive-mcp','genie-builder']) {
-      await page.locator(`#archive-list a[data-project="${slug}"]`).first().click();
+      await page.evaluate(hash => { location.hash = hash; }, `#work/${slug}`);
       await expect(page.getByRole('dialog')).toBeVisible();
       await expect(page.getByRole('dialog')).toContainText(fallback.content.projects.find(p=>p.slug===slug)!.outcomes.at(-1)!);
       await page.keyboard.press('Escape');
@@ -448,7 +433,7 @@ test('cinematic films load responsively, pause, and retain accessible contact li
   for (const width of [390, 1440]) {
     await page.setViewportSize({width, height:1000});
     await page.goto('./');
-    for (const name of ['impact', 'contact']) {
+    for (const name of ['contact']) {
       const scene = page.locator(`.cinema-${name}`);
       const video = scene.locator('video');
       await scene.scrollIntoViewIfNeeded();
@@ -460,7 +445,6 @@ test('cinematic films load responsively, pause, and retain accessible contact li
       await expect(video).toHaveJSProperty('paused',false);
     }
     await page.locator('.contact-pipeline').screenshot({path:`test-results/film-contact-${width}.png`});
-    await page.locator('.impact-engine').screenshot({path:`test-results/film-impact-${width}.png`});
     await expect(page.locator('.contact-prompts a')).toHaveCount(3);
     await expect(page.locator('.contact-prompts a').first()).toHaveAttribute('href', /^mailto:.*\?subject=I%20have%20an%20AI%20idea$/);
     await page.getByRole('button', {name:'Pause motion'}).click();
@@ -487,9 +471,9 @@ test('4K cinematic WebM fallback plays when H264 is unavailable', async ({page})
   });
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('./');
-  await page.locator('.cinema-impact').scrollIntoViewIfNeeded();
-  const video = page.locator('.cinema-impact video');
-  await expect(video).toHaveAttribute('src', /impact-4k.webm$/);
+  await page.locator('.cinema-contact').scrollIntoViewIfNeeded();
+  const video = page.locator('.cinema-contact video');
+  await expect(video).toHaveAttribute('src', /contact-4k.webm$/);
   await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentTime), {timeout:10000}).toBeGreaterThan(.1);
   await expect(video).toHaveJSProperty('videoWidth',3840);
   await expect(video).toHaveJSProperty('videoHeight',2160);
@@ -513,4 +497,41 @@ test('expertise follows both themes without losing the selected network', async 
       await page.locator('#skills').screenshot({path:`test-results/expertise-${theme}-${width}.png`});
     }
   }
+});
+
+test('impact signal field draws, keeps moving and holds still when motion is paused', async ({page}) => {
+  // A cheap fingerprint of the canvas: how many sampled pixels are lit, and where.
+  const read = () => page.locator('[data-signal] canvas').evaluate(el => {
+    const canvas = el as HTMLCanvasElement;
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let lit = 0, sum = 0;
+    for (let i = 3; i < data.length; i += 4 * 7) if (data[i] > 0) { lit++; sum = (sum + i) % 1000003; }
+    return {lit, sum};
+  });
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({width, height:900});
+    await page.goto('./');
+    const field = page.locator('[data-signal]');
+    await field.scrollIntoViewIfNeeded();
+    await expect(field).toBeVisible();
+    await expect(field).toHaveAttribute('aria-hidden', 'true');
+    await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
+    const before = await read();
+    await expect.poll(async () => (await read()).sum).not.toBe(before.sum);
+    await expect(page.locator('[data-signal-step]')).toHaveText(/^0[1-4] \/ /);
+    await page.getByRole('button', {name:'Pause motion'}).click();
+    await expect(page.locator('[data-signal-step]')).toHaveText('Signal out');
+    const held = await read();
+    expect(held.lit).toBeGreaterThan(200);
+    await page.waitForTimeout(400);
+    expect(await read()).toEqual(held);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto('./');
+  await page.locator('[data-signal]').scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
+  const still = await read();
+  await page.waitForTimeout(400);
+  expect(await read()).toEqual(still);
 });

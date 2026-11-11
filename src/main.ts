@@ -1,8 +1,8 @@
 import { initWorld } from "./world-motion";
 import fallback from "./content/fallback.json";
-import { validateSnapshot, fetchContent, filterProjects } from "./lib/content";
+import { validateSnapshot, fetchContent } from "./lib/content";
 import { configuredProject, configuredAnalytics } from "./lib/settings";
-import { renderSite, renderProjectDetail, renderArchive } from "./lib/render";
+import { renderSite, renderProjectDetail } from "./lib/render";
 import { createAnalytics, type EventName } from "./lib/analytics";
 let content = validateSnapshot(fallback).content;
 const base = import.meta.env.BASE_URL;
@@ -18,25 +18,8 @@ const portfolio = document.querySelector<HTMLElement>("#portfolio")!;
 const dialog = document.querySelector<HTMLDialogElement>("#project-dialog")!;
 const detail = document.querySelector<HTMLElement>("#project-detail")!;
 const status = document.querySelector<HTMLElement>("#content-status")!;
-let category = "All work";
-let query = "";
 let opener: HTMLElement | null = null;
 let returnHash = "#projects";
-function updateArchive() {
-  const projects = filterProjects(content.projects, category, query);
-  const list = document.querySelector("#archive-list");
-  if (list) list.innerHTML = renderArchive(projects);
-  const count = document.querySelector("#archive-count");
-  if (count)
-    count.textContent = `${projects.length} ${projects.length === 1 ? "project" : "projects"}${query ? " matching your search" : ""}`;
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-category]")
-    .forEach((button) => {
-      const active = button.dataset.category === category;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-}
 function enableInteractions() {
   document
     .querySelectorAll<HTMLElement>("[data-interactive]")
@@ -118,18 +101,6 @@ document.addEventListener("click", (event) => {
     history.pushState(null, "", "#work/" + slug);
     openProject(slug);
   }
-  if (target.hasAttribute("data-category")) {
-    category = target.dataset.category!;
-    updateArchive();
-  }
-  if (target.hasAttribute("data-reset")) {
-    category = "All work";
-    query = "";
-    const input = document.querySelector<HTMLInputElement>("#project-search");
-    if (input) input.value = "";
-    updateArchive();
-    input?.focus();
-  }
   if (target.dataset.event)
     track(target.dataset.event as EventName, {
       ...(target.dataset.projectId
@@ -138,15 +109,6 @@ document.addEventListener("click", (event) => {
       ...(target.dataset.linkId ? { link_id: target.dataset.linkId } : {}),
       ...(target.dataset.platform ? { platform: target.dataset.platform } : {}),
     });
-});
-document.addEventListener("input", (event) => {
-  if (
-    event.target instanceof HTMLInputElement &&
-    event.target.id === "project-search"
-  ) {
-    query = event.target.value;
-    updateArchive();
-  }
 });
 const menu = document.querySelector<HTMLButtonElement>(".menu-toggle")!;
 const nav = document.querySelector<HTMLElement>("#main-nav")!;
@@ -195,11 +157,7 @@ async function refresh() {
       portfolio.removeAttribute("aria-busy");
       return;
     }
-    // Preserve focus and the search query when replacing refreshed content.
-    const active = document.activeElement;
     content = fresh;
-    if (active instanceof HTMLInputElement && active.id === "project-search")
-      query = active.value;
     portfolio.innerHTML = renderSite(content, base);
     const profile = content.profile[0];
     if (profile) {
@@ -211,13 +169,6 @@ async function refresh() {
     }
     enableInteractions();
     initWorld();
-    if (!content.projects.some((p) => p.category === category))
-      category = "All work";
-    const input = document.querySelector<HTMLInputElement>("#project-search");
-    if (input) input.value = query;
-    updateArchive();
-    if (active instanceof HTMLElement && active.id === "project-search")
-      input?.focus();
     routeProject();
     portfolio.removeAttribute("aria-busy");
     status.textContent = "";

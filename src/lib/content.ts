@@ -238,17 +238,3 @@ export async function fetchContent(
     clearTimeout(timeout);
   }
 }
-export function filterProjects(
-  projects: Content["projects"],
-  category: string,
-  query: string,
-) {
-  const search = query.trim().toLocaleLowerCase();
-  return projects.filter(
-    (p) =>
-      (category === "All work" || p.category === category) &&
-      `${p.title} ${p.summary} ${p.technologies.join(" ")} ${p.organization ?? ""}`
-        .toLocaleLowerCase()
-        .includes(search),
-  );
-}

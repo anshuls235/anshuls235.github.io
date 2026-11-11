@@ -4,7 +4,7 @@ The portfolio is configured for public deployment at https://anshuls235.github.i
 
 ## Ready now
 
-- Editorial, responsive portfolio with coordinated light/dark themes, accessible navigation, search/filter archive, shareable project dialogs, role details, writing, skills, education and contact links.
+- Editorial, responsive portfolio with coordinated light/dark themes, accessible navigation, a spiral gallery of every project, shareable project dialogs, role details, writing, skills, education and contact links.
 - Owner Supabase project: [anshul-portfolio](https://supabase.com/dashboard/project/dopakyjcuasdjxzubwyy), Mumbai, free personal organization.
 - Eight public projects; territory planning and lead scoring are private editorial drafts. Profile, roles, skills, links, projects and writing update through the dashboard and are fetched on the next page load.
 - Primary schema migration plus dashboard-trigger hardening migration, generated public database types, repeatable published-content seed, tested RLS/grants, live analytics function, and private reporting queries.

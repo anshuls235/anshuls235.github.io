@@ -1,7 +1,7 @@
-import { cinemaScene } from "./cinema";
+import { signalScene } from "./signal";
 /** Decorative diagrams: every reported figure still comes from published content. */
-export function impactEngine(base: string) {
-  return `<div class="impact-engine container">${cinemaScene(base, 'impact')}</div>`;
+export function impactEngine() {
+  return signalScene();
 }
 
 export function impactVisual(index: number) {

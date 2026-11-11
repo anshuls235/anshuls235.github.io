@@ -8,7 +8,6 @@ import {
   escapeHtml,
   publicConfig,
   fetchContent,
-  filterProjects,
 } from "../src/lib/content";
 import { renderSite, renderProjectDetail } from "../src/lib/render";
 const snapshot = validateSnapshot(fallback);
@@ -109,22 +108,6 @@ test("paused, invalid and empty responses have distinct semantics", async () => 
   );
   assert.deepEqual(content, empty);
   assert.match(renderSite(content), /More to come/);
-});
-test("filters combine text and category without changing source content", () => {
-  assert.equal(
-    filterProjects(snapshot.content.projects, "Generative AI", "LangGraph")
-      .length,
-    snapshot.content.projects.filter(p => p.category === "Generative AI" && p.technologies.join(" ").toLowerCase().includes("langgraph")).length,
-  );
-  assert.equal(
-    filterProjects(snapshot.content.projects, "All work", "nothing matches")
-      .length,
-    0,
-  );
-  assert.equal(
-    filterProjects(snapshot.content.projects, "All work", "  ").length,
-    snapshot.content.projects.length,
-  );
 });
 test("renderer preserves deep links and never renders content as executable HTML", () => {
   const c = structuredClone(snapshot.content);
