@@ -40,7 +40,11 @@ jobs:
           BASE_PATH: ${{ vars.BASE_PATH || '/' }}
       - run: npm run security:scan
       - name: Install test browser
-        run: npx playwright install --with-deps chromium
+        # The runner image already carries Chromium's libraries; the extra system
+        # packages are best-effort so an Ubuntu mirror outage cannot block a deploy.
+        run: |
+          npx playwright install chromium
+          timeout 120 npx playwright install-deps chromium || echo "::warning::Playwright system packages were not installed; using the runner image's libraries."
       - name: Browser checks against production build
         run: |
           npm run preview -- --port 4173 &
