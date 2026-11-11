@@ -1,4 +1,5 @@
 import { initWorld } from "./world-motion";
+import { mountFlux } from "./flux";
 import fallback from "./content/fallback.json";
 import { validateSnapshot, fetchContent, filterProjects } from "./lib/content";
 import { configuredProject, configuredAnalytics } from "./lib/settings";
@@ -50,6 +51,7 @@ function openProject(slug: string) {
     return;
   }
   detail.innerHTML = renderProjectDetail(project, content, base);
+  mountFlux(detail);
   if (!dialog.open) dialog.showModal();
   track("project_view", {
     project_id: project.id,

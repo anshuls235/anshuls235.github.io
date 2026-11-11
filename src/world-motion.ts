@@ -1,5 +1,6 @@
 import { initCinema } from "./cinema";
 import { initImpact } from "./impact";
+import { mountFlux, morphFlux, setFluxStill } from "./flux";
 // Presentation and motion only. Content, Supabase and analytics live elsewhere.
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -13,6 +14,9 @@ const still = () => paused || reduced.matches;
 let lenis: Lenis | null = null;
 let network: NetworkControls | null = null;
 let carouselIndex = 0;
+// On roomy screens the featured work pins and scrolling steps through it.
+let workPin: ScrollTrigger | null = null;
+let unpinWork: (() => void) | undefined;
 let heroVisible = true;
 let context: gsap.Context | null = null;
 let cinema: ReturnType<typeof initCinema> | undefined;
@@ -141,11 +145,22 @@ function paintCarousel(next: number, direction = 1, animate = true) {
     card.inert = !current;
     card.setAttribute("aria-hidden", String(!current));
   });
+  if (previous !== carouselIndex) morphFlux(outgoing, incoming);
   if (!animate || still() || previous === carouselIndex) {
     gsap.set(list, { clearProps: "transform,opacity" });
     return;
   }
   gsap.killTweensOf(list);
+  if (workPin) {
+    // The frame holds still: the copy changes and the flux field morphs.
+    gsap.set(list, { clearProps: "transform,opacity,visibility" });
+    gsap.fromTo(
+      incoming.querySelectorAll(".project-body > *"),
+      { y: direction * 28, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.6, ease: "power3.out", stagger: 0.05, overwrite: true, clearProps: "transform,opacity" },
+    );
+    return;
+  }
   outgoing.classList.add("is-leaving");
   gsap.fromTo(
     outgoing,
@@ -167,6 +182,65 @@ function paintCarousel(next: number, direction = 1, animate = true) {
     { x: direction * 160, rotation: direction * 5, opacity: 0 },
     { x: 0, rotation: 0, opacity: 1, duration: 0.8, ease: "back.out(1.4)", delay: 0.12 },
   );
+}
+/** Buttons, keys and swipes: when pinned they scroll to the project instead. */
+function goTo(next: number, direction: number) {
+  const count = cards().length;
+  const index = Math.max(0, Math.min(count - 1, next));
+  if (!workPin) return paintCarousel(index, direction);
+  const top = workPin.start + ((index + 0.5) / count) * (workPin.end - workPin.start);
+  if (lenis) lenis.scrollTo(top, { duration: 0.9 });
+  else scrollTo({ top });
+}
+function setupWorkPin() {
+  const section = document.querySelector<HTMLElement>("#projects");
+  const track = section?.querySelector<HTMLElement>("[data-work-track]");
+  const stage = section?.querySelector<HTMLElement>(".work-stage");
+  const status = section?.querySelector<HTMLElement>(".work-status");
+  const hint = section?.querySelector<HTMLElement>(".gallery-hint");
+  const count = cards().length;
+  if (!section || !track || !stage || count < 2 || reduced.matches || innerWidth < 981) return;
+  // Pin only when a whole card, with its status row, fits under the header.
+  if (stage.offsetHeight + (status?.offsetHeight ?? 0) + 34 > innerHeight + headerOffset() - 24) return;
+  section.classList.add("is-pinned");
+  track.style.setProperty("--work-steps", String(count));
+  const hintText = hint?.textContent ?? "";
+  if (hint) hint.textContent = "Keep scrolling to explore";
+  const follow = (self: ScrollTrigger) => {
+    track.style.setProperty("--work-progress", self.progress.toFixed(4));
+    const next = Math.min(count - 1, Math.floor(self.progress * count));
+    if (next !== carouselIndex) paintCarousel(next, next > carouselIndex ? 1 : -1);
+  };
+  workPin = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: follow, onRefresh: follow });
+  return () => {
+    workPin?.kill();
+    workPin = null;
+    section.classList.remove("is-pinned");
+    track.style.removeProperty("--work-steps");
+    track.style.removeProperty("--work-progress");
+    if (hint) hint.textContent = hintText;
+  };
+}
+/** The about copy brightens word by word as it is read. */
+function setupReading() {
+  const copy = document.querySelector<HTMLElement>("[data-read]");
+  const text = copy?.textContent ?? "";
+  if (!copy || !text) return;
+  const words = text.split(/\s+/).filter(Boolean).map((word) => {
+    const span = document.createElement("span");
+    span.textContent = word;
+    return span;
+  });
+  copy.replaceChildren(...words.flatMap((word, i) => (i ? [" ", word] : [word])));
+  // Half strength keeps the unread words above AA contrast.
+  gsap.fromTo(
+    words,
+    { opacity: 0.5 },
+    { opacity: 1, ease: "none", stagger: 0.1, scrollTrigger: { trigger: copy, start: "top 85%", end: "bottom 65%", scrub: true } },
+  );
+  return () => {
+    copy.textContent = text;
+  };
 }
 function setupCarousel() {
   const section = document.querySelector<HTMLElement>("#projects");
@@ -193,14 +267,14 @@ function setupCarousel() {
     dragging = false;
     const dx = event.clientX - startX;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(event.clientY - startY))
-      paintCarousel(carouselIndex + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+      goTo(carouselIndex + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
   });
   track.addEventListener("pointercancel", () => (dragging = false));
 }
 document.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest("[data-gallery-prev]")) paintCarousel(carouselIndex - 1, -1);
-  if (target?.closest("[data-gallery-next]")) paintCarousel(carouselIndex + 1, 1);
+  if (target?.closest("[data-gallery-prev]")) goTo(carouselIndex - 1, -1);
+  if (target?.closest("[data-gallery-next]")) goTo(carouselIndex + 1, 1);
   if (target?.closest("[data-world-motion]")) {
     paused = !paused;
     syncMotion();
@@ -208,12 +282,14 @@ document.addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (event) => {
   if (!(event.target instanceof Element) || !event.target.closest("#projects .work-stage")) return;
-  if (event.key === "ArrowRight") paintCarousel(carouselIndex + 1, 1);
-  if (event.key === "ArrowLeft") paintCarousel(carouselIndex - 1, -1);
+  if (event.key === "ArrowRight") goTo(carouselIndex + 1, 1);
+  if (event.key === "ArrowLeft") goTo(carouselIndex - 1, -1);
 });
 
 /* ---------------- Scroll choreography ---------------- */
 function setupScroll() {
+  unpinWork?.();
+  unpinWork = undefined;
   context?.revert();
   context = gsap.context(() => {
     const root = document.documentElement;
@@ -222,6 +298,14 @@ function setupScroll() {
       return;
     }
     root.classList.add("js-motion");
+    const unread = setupReading();
+    // The impact film grows into its frame as it arrives.
+    const engine = document.querySelector<HTMLElement>(".impact-engine");
+    if (engine) {
+      const arrive = { trigger: engine, start: "top 95%", end: "top 25%", scrub: true };
+      gsap.fromTo(engine, { scale: 0.84 }, { scale: 1, ease: "none", scrollTrigger: arrive });
+      gsap.fromTo(engine.querySelectorAll(".cinema-poster, .cinema-video"), { scale: 1.22 }, { scale: 1, ease: "none", scrollTrigger: arrive });
+    }
     // Display headlines rise line by line.
     gsap.utils.toArray<HTMLElement>(".display").forEach((heading) => {
       const lines = heading.querySelectorAll(".line > span");
@@ -300,7 +384,9 @@ function setupScroll() {
           });
         }),
     });
+    return unread;
   });
+  if (!still()) unpinWork = setupWorkPin();
 }
 
 /* ---------------- Motion state ---------------- */
@@ -313,6 +399,7 @@ function syncMotion() {
   });
   syncHeroVideo();
   network?.setPaused(isStill);
+  setFluxStill(isStill);
   cinema?.sync();
 
 }
@@ -328,6 +415,7 @@ export function initWorld() {
   if (scene) heroObserver.observe(scene);
   const networkRoot = document.querySelector<HTMLElement>("[data-network]");
   network = networkRoot ? initNetwork(networkRoot, still) : null;
+  mountFlux();
   setupCarousel();
   setupScroll();
   syncMotion();
@@ -344,5 +432,22 @@ reduced.addEventListener("change", (event) => {
 document.addEventListener("visibilitychange", syncHeroVideo);
 window.addEventListener("portfolio-theme-change", syncHeroVideo);
 window.addEventListener("load", () => ScrollTrigger.refresh());
+// Whether the work section can pin depends on the viewport, so re-check on resize.
+let resizeTimer = 0;
+let lastWidth = innerWidth;
+let lastHeight = innerHeight;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    // Mobile address bars resize the viewport constantly; ignore those nudges.
+    if (innerWidth === lastWidth && Math.abs(innerHeight - lastHeight) < 120) return;
+    lastWidth = innerWidth;
+    lastHeight = innerHeight;
+    if (!document.documentElement.classList.contains("js-motion")) return;
+    unpinWork?.();
+    unpinWork = setupWorkPin();
+    ScrollTrigger.refresh();
+  }, 200);
+});
 setupLenis();
 initWorld();

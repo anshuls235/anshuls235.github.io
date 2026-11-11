@@ -1,4 +1,5 @@
 import { impactEngine, impactVisual } from "../impact";
+import { fluxCanvas, fluxFormation } from "../flux";
 import { heroScene, workScene, vignette, closingScene, logoMark } from "../world";
 import type { Content, Project, Profile } from "./types";
 import { escapeHtml as e, safeUrl } from "./content";
@@ -64,11 +65,23 @@ export function headlineMetric(summary: string) {
   return count ? count[0] : "";
 }
 
-export function projectArt(project: Project, index: number, base: string) {
+/** How many earlier projects share this one's visual kind; picks its flux formation. */
+function kindVariant(project: Project, projects: Project[]) {
+  return projects
+    .slice(0, projects.indexOf(project))
+    .filter((p) => p.visual_kind === project.visual_kind).length;
+}
+
+export function projectArt(
+  project: Project,
+  index: number,
+  base: string,
+  variant = 0,
+) {
   const image = safeUrl(project.image_url, base);
   if (image)
     return `<div class="project-art art-image"><img src="${e(image)}" alt="${e(project.image_alt || project.title)}" loading="lazy" width="720" height="450"></div>`;
-  return `<div class="project-art art-${e(project.visual_kind)}" aria-hidden="true">${vignette(project.slug === "automall-conversational-ai" ? "retrieval" : project.visual_kind, index)}</div>`;
+  return `<div class="project-art art-${e(project.visual_kind)}" aria-hidden="true">${vignette(project.slug === "automall-conversational-ai" ? "retrieval" : project.visual_kind, index)}${fluxCanvas(fluxFormation(project.visual_kind, variant))}</div>`;
 }
 
 export function renderProject(
@@ -76,13 +89,14 @@ export function renderProject(
   index: number,
   base: string,
   total = 1,
+  variant = 0,
 ) {
   return `<article class="project-card frame" id="project-${e(project.slug)}" data-index="${index}"><div class="project-body"><div class="project-badge"><span class="mono">Project</span><strong>${pad(index + 1)}</strong><span class="mono">${e(project.category)}</span></div><dl class="project-meta"><div><dt class="mono">Client</dt><dd>${e(project.organization || "Independent exploration")}</dd></div></dl><h3><a href="#work/${e(project.slug)}" data-project="${e(project.slug)}">${e(project.title)}</a></h3><p class="project-summary">${e(project.summary)}</p><ul class="tags" aria-label="Technologies">${project.technologies
     .slice(0, 4)
     .map((t) => `<li>${e(t)}</li>`)
     .join(
       "",
-    )}</ul><div class="project-foot"><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project ${right}<span class="sr-only"> notes for ${e(project.title)}</span></a><span class="mono project-count" aria-hidden="true">${index + 1}/${total}</span></div></div>${projectArt(project, index, base)}</article>`;
+    )}</ul><div class="project-foot"><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project ${right}<span class="sr-only"> notes for ${e(project.title)}</span></a><span class="mono project-count" aria-hidden="true">${index + 1}/${total}</span></div></div>${projectArt(project, index, base, variant)}</article>`;
 }
 
 export function renderProjectDetail(
@@ -97,7 +111,7 @@ export function renderProjectDetail(
   const links = content.project_links.filter(
     (l) => l.project_id === project.id,
   );
-  return `<p class="eyebrow">${e(project.category)} / ${e(project.organization || "Independent project")}</p><h2 id="detail-title">${e(project.title)}</h2><p class="detail-intro">${e(project.description)}</p>${projectArt(project, 0, base)}<dl class="project-facts">${project.role ? `<div><dt>My role</dt><dd>${e(project.role)}</dd></div>` : ""}${project.start_date ? `<div><dt>Timeline</dt><dd>${date(project.start_date)} – ${date(project.end_date)}</dd></div>` : ""}<div><dt>Stack</dt><dd>${e(project.technologies.join(" · "))}</dd></div></dl>${blocks
+  return `<p class="eyebrow">${e(project.category)} / ${e(project.organization || "Independent project")}</p><h2 id="detail-title">${e(project.title)}</h2><p class="detail-intro">${e(project.description)}</p>${projectArt(project, 0, base, kindVariant(project, content.projects))}<dl class="project-facts">${project.role ? `<div><dt>My role</dt><dd>${e(project.role)}</dd></div>` : ""}${project.start_date ? `<div><dt>Timeline</dt><dd>${date(project.start_date)} – ${date(project.end_date)}</dd></div>` : ""}<div><dt>Stack</dt><dd>${e(project.technologies.join(" · "))}</dd></div></dl>${blocks
     .filter(([, body]) => body)
     .map(
       ([title, body]) =>
@@ -264,15 +278,17 @@ export function renderSite(content: Content, base = "/") {
   <section class="work-section selected-section" id="projects" aria-labelledby="work-heading">
     ${workScene(base)}
     <div class="container work-top"><div><p class="eyebrow"><span>01</span>Selected work</p><h2 class="display display-thin" id="work-heading">${display("Work")}</h2></div><div class="work-intro"><p class="section-intro">From a first question to a working system. A selection of things I’ve helped build.</p><a href="#archive" class="box-button box-button-light">View all projects ${down}</a></div></div>
+    <div class="work-track" data-work-track><div class="work-pin">
     <div class="work-stage container">
       <button class="edge-button edge-prev" type="button" data-gallery-prev data-interactive hidden aria-label="Previous featured project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
       <div class="selected-grid" data-carousel>${
-        featured.map((x, i) => renderProject(x, i, base, featured.length)).join("") ||
+        featured.map((x, i) => renderProject(x, i, base, featured.length, kindVariant(x, content.projects))).join("") ||
         '<p class="empty-state frame">Selected work is being updated. Explore the archive below.</p>'
       }</div>
       <button class="edge-button edge-next" type="button" data-gallery-next data-interactive hidden aria-label="Next featured project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
     </div>
     <div class="container work-status" data-interactive hidden><p class="mono" data-project-position aria-live="polite">01 / ${pad(featured.length)} — Selected work</p><div class="work-dots" aria-hidden="true">${featured.map((_, i) => `<i data-dot="${i}"></i>`).join("")}</div><p class="mono gallery-hint">Swipe, drag or use the arrows</p></div>
+    </div></div>
   </section>
   <section class="model-section" id="skills" aria-labelledby="skills-heading">
     <div class="container">
@@ -285,7 +301,7 @@ export function renderSite(content: Content, base = "/") {
   <section class="archive-section section" id="archive" aria-labelledby="archive-heading"><div class="container">${sectionHead("04", "The project archive", "The curiosity\ncabinet.", "archive-heading")}<div class="archive-tools" data-interactive hidden><div class="filters" role="group" aria-label="Filter projects">${categories.map((c, i) => `<button class="filter ${i === 0 ? "is-active" : ""}" type="button" data-category="${e(c)}" aria-pressed="${i === 0}">${e(c)}</button>`).join("")}</div><div class="search-field"><label class="sr-only" for="project-search">Search projects</label><span aria-hidden="true">⌕</span><input id="project-search" type="search" placeholder="Search projects…" maxlength="120" autocomplete="off"></div></div><p id="archive-count" class="mono archive-count" role="status" aria-live="polite">${content.projects.length} projects</p><div id="archive-list" class="archive-list frame">${renderArchive(content.projects)}</div><noscript><p class="notice">All work is shown. Project filtering and expanded case studies need JavaScript; external source links remain available below.</p><div>${content.project_links.map((l) => link(l.url, `${e(l.label)} ${arrow}`, base, "text-link")).join(" · ")}</div></noscript></div></section>
   <section class="writing-section section" id="writing" aria-labelledby="writing-heading"><div class="container">${sectionHead("05", "Notes & explorations", "Learning,\nin public.", "writing-heading", link(content.social_links.find((s) => s.network === "Medium")?.url ?? null, `All writing ${arrow}`, base, "box-button box-button-light", 'data-event="social_click" data-platform="medium"'))}<div class="writing-layout">${content.publications.map((a, i) => `<article class="publication-item frame"><div class="frame-bar mono"><span>Note ${pad(i + 1)}</span><span>${e(a.platform)}${a.published_on ? ` · ${new Date(a.published_on).getUTCFullYear()}` : ""}</span></div><div class="publication-body"><h3>${link(a.url, `${e(a.title)} ${arrow}`, base, "", 'data-event="social_click" data-platform="medium"')}</h3><p>${e(a.summary)}</p></div></article>`).join("") || '<p class="empty-state">New writing will appear here.</p>'}<aside class="notebook-panel frame"><span class="notebook-symbol" aria-hidden="true"></span><p class="eyebrow">Data, openly explored</p><h3>Curiosity has a notebook.</h3><p>Explore my data-science notebooks and experiments on Kaggle.</p>${link(content.social_links.find((s) => s.network === "Kaggle")?.url ?? null, `Explore Kaggle ${arrow}`, base, "box-button", 'data-event="social_click" data-platform="kaggle"')}</aside></div></div></section>
   <section class="education-section section" id="education" aria-labelledby="education-heading"><div class="container">${sectionHead("06", "Foundations", "Always\na student.", "education-heading")}<div class="education-grid">${content.education.map((x) => `<article class="frame credential"><p class="mono">${x.start_year} — ${x.end_year ?? "Present"}</p><h3>${e(x.degree)}</h3><p>${e(x.institution)}</p>${link(x.url, `Institution ${arrow}`, base, "text-link")}</article>`).join("")}${content.certifications.map((x) => `<article class="frame credential"><p class="mono">${x.issued_on ? new Date(x.issued_on).getUTCFullYear() : "Certification"}</p><h3>${e(x.title)}</h3><p>${e(x.issuer)}</p>${link(x.url, `View credential ${arrow}`, base, "text-link")}</article>`).join("")}</div></div></section>
-  <section class="about-section section" id="about" aria-labelledby="about-heading"><div class="container about-layout"><div><p class="eyebrow"><span>07</span>Beyond the models</p><h2 class="display" id="about-heading">${display("Engineering\nmeets curiosity.")}</h2></div><div><p class="about-copy">${e(p.about)}</p><p class="mono about-focus">${e(p.current_focus)}</p></div></div><div class="container scoreboard frame" data-scoreboard>${stat(years, "Years shipping")}${stat(chapters.length, "Career epochs")}${stat(content.projects.length, "Projects")}${stat(content.skills.length, "Skills in the model")}</div></section>
+  <section class="about-section section" id="about" aria-labelledby="about-heading"><div class="container about-layout"><div><p class="eyebrow"><span>07</span>Beyond the models</p><h2 class="display" id="about-heading">${display("Engineering\nmeets curiosity.")}</h2></div><div><p class="about-copy" data-read>${e(p.about)}</p><p class="mono about-focus">${e(p.current_focus)}</p></div></div><div class="container scoreboard frame" data-scoreboard>${stat(years, "Years shipping")}${stat(chapters.length, "Career epochs")}${stat(content.projects.length, "Projects")}${stat(content.skills.length, "Skills in the model")}</div></section>
   <section class="contact-section section" id="contact" aria-labelledby="contact-heading"><div class="container"><p class="eyebrow"><span>08</span>Have an interesting problem?</p><div class="contact-heading"><h2 class="display" id="contact-heading">${display("Great things\nstart with hello.")}</h2>${link(`mailto:${p.email}`, `${arrow}<span class="sr-only">Email ${e(p.name)}</span>`, base, "contact-arrow", 'data-event="contact_action"')}</div>${closingScene(base)}<div class="contact-prompts"><p class="mono">Pick a conversation starter</p><div>${["I have an AI idea", "Let’s collaborate", "Just saying hello"].map(subject => conversationStarter(p.email, subject)).join("")}</div></div><div class="contact-bottom">${link(`mailto:${p.email}`, e(p.email), base, "contact-email", 'data-event="contact_action"')}<div class="social-links">${social}</div></div></div></section>
   </main><footer class="site-footer"><div class="container footer-inner"><a class="footer-mark" href="#home" aria-label="Back to the top">${logoMark()}</a><p>© ${new Date().getUTCFullYear()} ${e(p.name)}</p><div><a href="${base}privacy.html">Privacy & analytics</a><a href="#home">Back to top ↑</a></div></div></footer>`;
 }

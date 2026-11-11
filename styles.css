@@ -2773,3 +2773,35 @@ details[open] .summary-icon {
 @media (max-width: 700px) {
   .cinema-caption { padding: 12px; }
 }
+
+/* Generative flux fields replace the illustrated vignettes once script runs. */
+.project-art { --flux-accent: #8fa0ff; }
+.project-card:nth-child(5n + 2) .project-art { --flux-accent: #7cf0b8; }
+.project-card:nth-child(5n + 3) .project-art { --flux-accent: #ffd84a; }
+.project-card:nth-child(5n + 4) .project-art { --flux-accent: #ff8a6b; }
+.project-card:nth-child(5n) .project-art { --flux-accent: #d7b8ff; }
+.flux-canvas, .flux-label { display: none; }
+.project-art.has-flux { background: #0d0f1a; }
+.has-flux .world-vignette { display: none; }
+.has-flux::before { z-index: 1; pointer-events: none; background-image: radial-gradient(rgb(255 255 255 / 9%) 1px, transparent 1.4px); }
+.has-flux .flux-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; }
+.has-flux .flux-label { display: block; position: absolute; top: 16px; left: 18px; padding: 4px 8px; border: 1px solid var(--flux-accent); color: var(--flux-accent); font-size: 10px; }
+.has-flux .flux-label, .has-flux .vignette-caption { z-index: 2; }
+.has-flux .vignette-caption { background: #fffaf0; color: #0d0f1a; }
+
+/* Pinned work: the frame holds while scrolling steps through each project. */
+.work-section { --work-pad: clamp(70px, 8vw, 110px); padding-top: var(--work-pad); }
+.is-pinned.work-section { overflow: clip; }
+.is-pinned .work-scene { position: sticky; inset: 0 auto auto; width: 100%; height: 100vh; margin-block: calc(var(--work-pad) * -1) calc(var(--work-pad) - 100vh); }
+.is-pinned .work-track { height: calc(100vh + var(--work-steps, 1) * 62vh); }
+.is-pinned .work-pin { position: sticky; top: 0; display: flex; flex-direction: column; justify-content: center; height: 100vh; padding-top: var(--header-h); }
+.is-pinned .work-stage { margin-top: 0; }
+.is-pinned .work-stage::before, .is-pinned .work-stage::after { content: ""; position: absolute; left: 0; bottom: -18px; width: 100%; height: 6px; background: rgb(13 15 26 / 45%); }
+.is-pinned .work-stage::after { background: var(--mint); transform: scaleX(var(--work-progress, 0)); transform-origin: 0 50%; }
+.is-pinned .work-status { margin-top: 44px; padding-right: 124px; }
+.is-pinned .edge-button { top: auto; bottom: -92px; width: 48px; height: 48px; margin: 0; }
+.is-pinned .edge-prev { left: auto; right: 60px; }
+.is-pinned .edge-next { right: 0; }
+@media print {
+  .flux-canvas { display: none !important; }
+}
