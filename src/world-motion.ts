@@ -1,4 +1,4 @@
-import { initCinema } from "./cinema";
+import { initHello, type HelloControls } from "./hello";
 import { initImpact } from "./impact";
 import { initSignal, type SignalControls } from "./signal";
 import { initSpiral, type SpiralControls } from "./spiral";
@@ -21,7 +21,7 @@ let workPin: ScrollTrigger | null = null;
 let unpinWork: (() => void) | undefined;
 let heroVisible = true;
 let context: gsap.Context | null = null;
-let cinema: ReturnType<typeof initCinema> | undefined;
+let hello: HelloControls | null = null;
 let destroyImpact: (() => void) | undefined;
 let signal: SignalControls | null = null;
 
@@ -290,7 +290,7 @@ function setupScroll() {
     });
     // Panels and cards ease in as they arrive.
     const reveal = gsap.utils.toArray<HTMLElement>(
-      ".network, .experience-item, .publication-item, .notebook-panel, .credential, .scoreboard, .contact-pipeline, .model-hud",
+      ".network, .experience-item, .publication-item, .notebook-panel, .credential, .scoreboard, .model-hud",
     );
     reveal.forEach((el) => el.setAttribute("data-reveal", ""));
     ScrollTrigger.batch(reveal, {
@@ -357,13 +357,13 @@ function syncMotion() {
   });
   syncHeroVideo();
   network?.setPaused(isStill);
-  cinema?.sync();
+  hello?.sync();
   signal?.sync();
 }
 
 export function initWorld() {
-  cinema?.destroy();
-  cinema = initCinema(still);
+  hello?.destroy();
+  hello = initHello(still);
   destroyImpact?.();
   destroyImpact = initImpact();
   heroObserver.disconnect();

@@ -362,14 +362,13 @@ test('theme switching swaps the illustrated scenes and keeps the hero readable',
 });
 
 
-test('AI contact pipeline and responsive section geometry', async ({page}) => {
+test('contact links and responsive section geometry', async ({page}) => {
   await page.emulateMedia({reducedMotion:'reduce'});
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({width,height:740});
     await page.goto('./');
-    await expect(page.locator('.pipeline-steps li')).toHaveCount(3);
     await expect(page.locator('.contact-email')).toHaveAttribute('href', /^mailto:/);
-    for (const selector of ['.impact-card-inner', '.loss-chart', '.experience-item', '.contact-pipeline']) {
+    for (const selector of ['.impact-card-inner', '.loss-chart', '.experience-item', '.contact-prompts']) {
       for (const item of await page.locator(selector).all()) {
         const box = (await item.boundingBox())!;
         expect(box.x).toBeGreaterThanOrEqual(0);
@@ -429,55 +428,43 @@ test('published impact, expanded work and grouped career chapters on desktop and
   }
 });
 
-test('cinematic films load responsively, pause, and retain accessible contact links', async ({page}) => {
-  test.setTimeout(60000);
+test('contact dots say hello, spell out a starter on hover and hold still when motion is paused', async ({page}) => {
+  // A cheap fingerprint of the canvas: how many sampled pixels are lit, and where.
+  const read = () => page.locator('[data-hello] canvas').evaluate(el => {
+    const canvas = el as HTMLCanvasElement;
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let lit = 0, sum = 0;
+    for (let i = 3; i < data.length; i += 4 * 7) if (data[i] > 0) { lit++; sum = (sum + i) % 1000003; }
+    return {lit, sum};
+  });
+  const films:string[]=[];
+  page.on('request',r=>{if(/assets\/films\//.test(r.url()))films.push(r.url());});
   for (const width of [390, 1440]) {
     await page.setViewportSize({width, height:1000});
     await page.goto('./');
-    for (const name of ['contact']) {
-      const scene = page.locator(`.cinema-${name}`);
-      const video = scene.locator('video');
-      await scene.scrollIntoViewIfNeeded();
-      await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentTime)).toBeGreaterThan(.1);
-      await expect(video).toHaveAttribute('src', width === 390 ? /720\.(mp4|webm)$/ : /1080\.(mp4|webm)$/);
-      await page.getByRole('button', {name:`Pause ${name} film`}).click();
-      await expect(video).toHaveJSProperty('paused',true);
-      await page.getByRole('button', {name:`Play ${name} film`}).click();
-      await expect(video).toHaveJSProperty('paused',false);
-    }
-    await page.locator('.contact-pipeline').screenshot({path:`test-results/film-contact-${width}.png`});
-    await expect(page.locator('.contact-prompts a')).toHaveCount(3);
-    await expect(page.locator('.contact-prompts a').first()).toHaveAttribute('href', /^mailto:.*\?subject=I%20have%20an%20AI%20idea$/);
+    const field = page.locator('[data-hello]');
+    await field.scrollIntoViewIfNeeded();
+    await expect(field).toBeVisible();
+    await expect(field).toHaveAttribute('aria-hidden', 'true');
+    await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
+    const starters = page.locator('.contact-prompts a');
+    await expect(starters).toHaveCount(3);
+    await expect(starters.first()).toHaveAttribute('href', /^mailto:.*\?subject=I%20have%20an%20AI%20idea$/);
     await page.getByRole('button', {name:'Pause motion'}).click();
-    for (const video of await page.locator('[data-cinema-video]').all()) await expect(video).toHaveJSProperty('paused',true);
-    await page.getByRole('button', {name:'Play motion'}).click();
+    const held = await read();
+    expect(held.lit).toBeGreaterThan(200);
+    await page.waitForTimeout(400);
+    expect(await read()).toEqual(held);
+    // Pointing at a starter redraws the dots as that starter, and leaving restores the greeting.
+    await starters.first().hover();
+    const said = await read();
+    expect(said.sum).not.toBe(held.sum);
+    await page.locator('.contact-email').hover();
+    expect(await read()).toEqual(held);
+    await page.locator('#contact').screenshot({path:`test-results/hello-${width}.png`});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
-  await page.emulateMedia({reducedMotion:'reduce'});
-  await page.goto('./');
-  await page.locator('#contact').scrollIntoViewIfNeeded();
-  for (const video of await page.locator('[data-cinema-video]').all()) {
-    await expect(video).not.toHaveAttribute('src');
-    await expect(video).toHaveJSProperty('paused',true);
-  }
-});
-
-
-test('4K cinematic WebM fallback plays when H264 is unavailable', async ({page}) => {
-  await page.addInitScript(() => {
-    const canPlay = HTMLMediaElement.prototype.canPlayType;
-    HTMLMediaElement.prototype.canPlayType = function(type: string) {
-      return type.includes('mp4') ? '' : canPlay.call(this, type);
-    };
-    Object.defineProperty(window, 'devicePixelRatio', {value:2});
-  });
-  await page.setViewportSize({width:1440,height:1000});
-  await page.goto('./');
-  await page.locator('.cinema-contact').scrollIntoViewIfNeeded();
-  const video = page.locator('.cinema-contact video');
-  await expect(video).toHaveAttribute('src', /contact-4k.webm$/);
-  await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentTime), {timeout:10000}).toBeGreaterThan(.1);
-  await expect(video).toHaveJSProperty('videoWidth',3840);
-  await expect(video).toHaveJSProperty('videoHeight',2160);
+  expect(films).toEqual([]);
 });
 
 test('expertise follows both themes without losing the selected network', async ({page}) => {
