@@ -2851,3 +2851,7 @@ details[open] .summary-icon {
   .is-pinned .project-card h3 { font-size: clamp(24px, 2.6vw, 34px); }
   .is-pinned .project-foot { padding-block: 14px 0; }
 }
+
+/* The footer follows the page: paper by day, black by night. */
+:root:not([data-theme="dark"]) .site-footer { background: var(--bg); color: var(--fg); border-top-color: var(--fg); }
+:root:not([data-theme="dark"]) .footer-mark svg { border-color: var(--fg); }
