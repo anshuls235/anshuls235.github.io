@@ -1,10 +1,10 @@
 import { cinemaScene } from "./cinema";
 // Presentation-only illustrations. Portfolio data and Supabase stay independent.
 // Presentation-only illustrations. Portfolio data and Supabase stay independent.
-const LOGO_PATHS = `<g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 50 18 14l10 36M12.8 37h10.4"/><path d="M54 14H41a9 9 0 0 0 0 18h4a9 9 0 0 1 0 18H28"/></g><g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="#7cf0b8" stroke="#0d0f1a" stroke-width="2.4"><circle class="logo-node" cx="18" cy="14" r="5.6"/><circle class="logo-node" cx="28" cy="50" r="5.6"/><circle class="logo-node" cx="54" cy="14" r="5.6"/></g>`;
+const LOGO_PATHS = `<g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="none" stroke="#0d0f1a" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 50 18 14l10 36M12.8 37h10.4"/><path d="M54 14H41a9 9 0 0 0 0 18h4a9 9 0 0 1 0 18H28"/></g><g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="#fffaf0" stroke="#0d0f1a" stroke-width="2.4"><circle class="logo-node" cx="18" cy="14" r="5.6"/><circle class="logo-node" cx="28" cy="50" r="5.6"/><circle class="logo-node" cx="54" cy="14" r="5.6"/></g>`;
 /** The "AS" monogram drawn as a tiny neural graph: A and S share a node. */
 export function logoMark() {
- return `<svg class="logo-svg" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#2b45ff"/>${LOGO_PATHS}</svg>`;
+ return `<svg class="logo-svg" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#ff4d1c"/>${LOGO_PATHS}</svg>`;
 }
 const set = (base: string, name: string, widths: number[]) => widths.map(w => `${base}assets/scenes/${name}-${w}.webp ${w}w`).join(", ");
 export function heroScene(base: string) {

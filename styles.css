@@ -2727,15 +2727,6 @@ details[open] .summary-icon {
 
 /* The impact opener: dots gather from noise into words. Drawn in src/signal.ts. */
 .impact-signal { position: relative; margin-top: clamp(40px, 5vw, 72px); border-top: var(--stroke) solid var(--line); background: var(--signal-bg); }
-.signal-pin { position: relative; height: clamp(230px, 40vw, 540px); overflow: hidden; }
-/* With motion on, the field pins under the header and scrolling forms each word in turn. */
-.js-motion .impact-signal { height: calc(100vh - var(--header-h) + 260vh); }
-.js-motion .signal-pin { position: sticky; top: var(--header-h); height: calc(100vh - var(--header-h)); }
-@supports (height: 100svh) {
-  .js-motion .impact-signal { height: calc(100svh - var(--header-h) + 260svh); }
-  .js-motion .signal-pin { height: calc(100svh - var(--header-h)); }
-}
-.impact-signal canvas { display: block; width: 100%; height: 100%; }
 .signal-note { position: absolute; inset: auto 0 0; display: flex; justify-content: space-between; gap: 16px; margin: 0; padding: 14px clamp(16px, 3vw, 40px); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--work-muted); pointer-events: none; }
 .impact-signal + .impact-stage { margin-top: 0; }
 .work-plain { padding-block: 32px 8px; }
@@ -2805,3 +2796,96 @@ details[open] .summary-icon {
 .about-focus { color: var(--pop); }
 .impact-section .display, .writing-section .display, .impact-section .eyebrow, .writing-section .eyebrow { text-shadow: none; }
 .notebook-panel .box-button { --btn-bg: var(--accent); --btn-fg: var(--accent-fg); }
+
+/* ==========================================================================
+   Palette, final: warm paper and true ink, with one hot vermilion that is
+   only ever a fill behind ink text or large display type. Each theme gets
+   one inverted section (the work stage) so the page has a dark and a light
+   beat in both modes, and the contact section closes the page in full colour.
+   ========================================================================== */
+:root {
+  --hot: #ff4d1c; --hot-deep: #c2330a;
+  --cobalt: var(--hot); --cobalt-deep: var(--hot-deep); --yellow: var(--hot); --mint: var(--hot);
+  --coral: var(--tint); --sky: var(--tint); --lilac: var(--tint); --lime: var(--tint);
+  --accent: var(--hot); --accent-fg: #0d0f1a; --pop: var(--hot); --tint: #ffd3c4;
+  --work-bg: #0d0f1a; --work-fg: #f4f1e8; --work-muted: #bfc3dc; --work-accent: var(--hot); --work-rail: rgb(244 241 232 / 18%);
+  --signal-bg: transparent;
+}
+:root[data-theme="dark"] {
+  --bg: #0b0b0d; --panel: #17171a; --shadow: #3d3d45; --band: #000; --accent: #ff5a2b; --accent-fg: #0d0f1a; --tint: #ff7a52;
+  --work-bg: #f4f1e8; --work-fg: #0d0f1a; --work-muted: #464a5c; --work-accent: var(--hot-deep); --work-rail: rgb(13 15 26 / 14%);
+  --signal-bg: transparent;
+}
+:focus-visible { outline-color: var(--hot); }
+.hero { background: #2b45ff; }
+#hero-heading { color: var(--hot-deep); }
+:root[data-theme="dark"] #hero-heading { color: var(--accent); }
+.project-badge { background: #0d0f1a; }
+.project-card h3 a, .work-section.is-carousel .project-card h3 a, :root[data-theme="dark"] .project-card h3 a, :root[data-theme="dark"] .work-section.is-carousel .project-card h3 a { background-image: linear-gradient(rgb(255 77 28 / 45%), rgb(255 77 28 / 45%)); }
+.model-section { --model-accent: var(--hot-deep); --model-grid: rgb(13 15 26 / 5%); }
+:root[data-theme="dark"] .model-section { --model-bg: #0b0b0d; --model-surface: #121214; --model-node: #1c1c20; --model-border: #3d3d45; --model-wire: #8a8a92; --model-accent: #ff6a3d; --model-grid: rgb(255 255 255 / 4%); }
+.visual-signal { stroke: var(--hot); }
+.visual-dot, .visual-priority circle { fill: var(--hot); }
+.visual-delay { fill: var(--tint); }
+.cinema-scene { background: #16161a; }
+.cinema-caption, .cinema-toggle { background: #111114; }
+.cinema-toggle { border-color: #55555e; }
+.cinema-caption small { color: #d6d6dc; }
+.spiral-tile.tone-0 { color: #0d0f1a; }
+.about-focus { color: var(--hot); }
+/* The work stage keeps its own colours whichever way it is inverted. */
+.work-section { --fg: var(--work-fg); --line: var(--work-fg); --muted: var(--work-muted); --panel-fg: var(--work-fg); }
+.work-section .eyebrow span { border-color: currentColor; }
+/* Writing sits on ink in the day theme to break up the paper. */
+:root:not([data-theme="dark"]) .writing-section { --blue-bg: #0d0f1a; --blue-fg: #f4f1e8; --blue-muted: #bfc3dc; }
+/* Contact closes the page in full colour, with ink type. */
+.contact-section { --blue-bg: var(--hot); --blue-fg: #0d0f1a; --blue-muted: #0d0f1a; }
+.contact-section .display, .contact-section .eyebrow { text-shadow: none; }
+.contact-arrow { background: #0d0f1a; color: #f4f1e8; }
+
+/* Impact: the dots draw the figure and the tabs choose which result is shown. */
+.impact-signal { height: clamp(190px, 30vw, 430px); margin-top: clamp(28px, 4vw, 56px); border-top: 0; }
+.impact-tabs { display: flex; flex-wrap: wrap; gap: 0; margin-top: 8px; border: var(--stroke) solid var(--line); padding: 0; }
+.impact-tab { flex: 1 1 220px; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 18px; border: 0; border-left: var(--stroke) solid var(--line); background: none; color: var(--fg); font: inherit; font-weight: 600; font-size: 14px; text-align: left; cursor: pointer; }
+.impact-tab:first-child { border-left: 0; }
+.impact-tab .mono { font-size: 11px; }
+.impact-tab:hover { background: var(--panel); }
+.impact-tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.is-live .impact-stage { margin-top: 0; }
+.is-live .impact-grid { display: grid; }
+.is-live .impact-card, :root[data-theme="dark"] .is-live .impact-card { grid-area: 1 / 1; border-top: 0; background: none !important; }
+.is-live .impact-card:not(.is-current) { visibility: hidden; }
+.is-live .impact-card .impact-card-inner { min-height: 0; padding: clamp(28px, 4vw, 52px) 0 clamp(20px, 3vw, 36px); align-items: center; }
+.is-live .impact-metric, .is-live .impact-label { display: none; }
+.is-live .impact-visual { background: var(--panel); border-color: var(--line); }
+:root[data-theme="dark"] .is-live .impact-visual { background: #fffaf0; }
+@media (max-width: 700px) {
+  .impact-tab { flex-basis: 100%; border-left: 0; border-top: var(--stroke) solid var(--line); }
+  .impact-tab:first-child { border-top: 0; }
+}
+.is-live .impact-card { min-height: 0; display: block; }
+/* The work stage pins on any screen it fits, so scrolling always turns the spiral. */
+@supports (height: 100svh) {
+  .is-pinned .work-track { height: calc(100svh + var(--work-steps, 1) * 34svh); }
+  .is-pinned .work-pin { height: 100svh; }
+}
+.is-pinned .spiral-stage { --tile: min(clamp(240px, 32vw, 500px), 56vh); }
+@media (max-height: 700px) {
+  .is-pinned .project-summary { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-section.is-pinned .project-badge strong { font-size: 64px; }
+  .is-pinned .project-card h3 { font-size: clamp(28px, 3vw, 40px); }
+}
+@media (max-width: 980px) {
+  .is-pinned .work-pin { padding-bottom: 14px; }
+  .is-pinned .work-stage { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+  .is-pinned .spiral-stage { --tile: min(58vw, 30vh); min-height: 0; }
+  .is-pinned .spiral-rig { top: 46%; }
+  .is-pinned .tags, .is-pinned .project-meta, .is-pinned .project-count { display: none; }
+  .work-section.is-pinned .project-badge strong { font-size: 44px; }
+  .is-pinned .project-card h3 { padding-top: 4px; font-size: clamp(24px, 6.6vw, 32px); }
+  .is-pinned .project-summary { display: -webkit-box; overflow: hidden; font-size: 14px; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; }
+  .is-pinned .project-foot { padding-block: 14px 0; }
+  .is-pinned .work-status { padding-top: 16px; }
+}
+.is-live .impact-grid { grid-template-columns: minmax(0, 1fr); }
+.is-live .impact-card { min-width: 0; }

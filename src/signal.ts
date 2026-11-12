@@ -1,10 +1,10 @@
-// The impact opener: a field of square dots that scrolling pulls out of noise
-// into one word after another. Drawn in code; purely decorative.
-const WORDS = ["QUESTION", "DATA", "MODEL", "IMPACT"];
-// Dot colours for the night and day themes, most common first.
-const NIGHT = ["#f4f1e8", "#8fa0ff"];
-const DAY = ["#0d0f1a", "#2b45ff"];
-const SHARES = [0.74, 0.26];
+// The impact stage: a field of square dots gathers into each reported result
+// in turn, while the matching project is shown beneath it. The figures come
+// from the published cards; the canvas only draws them.
+const DWELL = 5200; // ms each result stays up before the next one forms
+const NIGHT = ["#f4f1e8", "#ff5a2b"];
+const DAY = ["#0d0f1a", "#ff4d1c"];
+const SHARES = [0.72, 0.28];
 
 export interface SignalControls {
   /** Re-read the site's motion setting. */
@@ -13,27 +13,23 @@ export interface SignalControls {
 }
 
 export function signalScene() {
-  return `<div class="impact-signal" data-signal aria-hidden="true" hidden><div class="signal-pin"><canvas></canvas><p class="signal-note mono"><span>How every project runs</span><span class="signal-steps">${WORDS.map((word, i) => `<span data-signal-step><b>0${i + 1}</b> ${word}</span>`).join("")}</span></p></div></div>`;
+  return `<div class="impact-signal" data-signal aria-hidden="true" hidden><canvas></canvas></div>`;
 }
 
-const smooth = (from: number, to: number, value: number) => {
-  const t = Math.max(0, Math.min(1, (value - from) / (to - from)));
-  return t * t * (3 - 2 * t);
-};
-
 export function initSignal(isStill: () => boolean): SignalControls | null {
-  const outer = document.querySelector<HTMLElement>("[data-signal]");
-  const found = outer?.querySelector<HTMLElement>(".signal-pin");
+  const section = document.querySelector<HTMLElement>("#impact");
+  const found = section?.querySelector<HTMLElement>("[data-signal]");
   const canvas = found?.querySelector("canvas");
   const pen = canvas?.getContext("2d");
-  if (!outer || !found || !canvas || !pen) return null;
-  const track = outer;
+  const cards = [...(section?.querySelectorAll<HTMLElement>(".impact-card[data-metric]") ?? [])];
+  if (!section || !found || !canvas || !pen || !cards.length) return null;
   const root = found;
   const surface = canvas;
   const ctx = pen;
-  const steps = [...root.querySelectorAll<HTMLElement>("[data-signal-step]")];
-  const mark = (index: number) => steps.forEach((step, i) => step.classList.toggle("is-on", i === index));
-  track.hidden = false;
+  const tabs = [...section.querySelectorAll<HTMLButtonElement>("[data-impact-tab]")];
+  const figures = cards.map((card) => card.dataset.metric ?? "");
+  root.hidden = false;
+  section.classList.add("is-live");
 
   let width = 0;
   let height = 0;
@@ -43,13 +39,13 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   let y = new Float32Array(0);
   let vx = new Float32Array(0);
   let vy = new Float32Array(0);
-  let tx = new Float32Array(0); // where each dot sits in the current word
+  let tx = new Float32Array(0);
   let ty = new Float32Array(0);
-  let hx = new Float32Array(0); // where it drifts while the field is noise
-  let hy = new Float32Array(0);
   let shapes: Float32Array[] = [];
   let bounds: number[] = []; // where each colour's run of dots ends
-  let word = -1;
+  let current = 0;
+  let auto = true; // stops once the visitor picks a result
+  let since = 0;
   let last = 0;
   let frame = 0;
   let visible = false;
@@ -57,7 +53,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   let pointerX = -9999;
   let pointerY = -9999;
 
-  /** Dot positions that spell one word, as x,y pairs in a random order. */
+  /** Dot positions that spell one figure, as x,y pairs in a random order. */
   function sample(text: string) {
     const off = document.createElement("canvas");
     off.width = width;
@@ -65,11 +61,11 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     const draw = off.getContext("2d", { willReadFrequently: true })!;
     const family = '"Big Shoulders", Impact, "Arial Narrow", sans-serif';
     draw.font = `900 100px ${family}`;
-    const size = Math.min((width * 0.86 * 100) / draw.measureText(text).width, height * 0.6);
+    const size = Math.min((width * 0.88 * 100) / draw.measureText(text).width, height * 0.78);
     draw.font = `900 ${size}px ${family}`;
     draw.textAlign = "center";
     draw.textBaseline = "middle";
-    draw.fillText(text, width / 2, height * 0.47 + size * 0.04);
+    draw.fillText(text, width / 2, height / 2 + size * 0.04);
     const data = draw.getImageData(0, 0, width, height).data;
     const points: number[] = [];
     for (let py = cell / 2; py < height; py += cell)
@@ -84,7 +80,6 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   }
 
   function aim(index: number) {
-    word = index;
     const shape = shapes[index];
     const points = shape.length / 2;
     for (let i = 0; i < count; i++) {
@@ -102,7 +97,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     surface.height = height * ratio;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     cell = Math.max(4, Math.round(width / 210));
-    shapes = WORDS.map(sample);
+    shapes = figures.map(sample);
     count = Math.max(...shapes.map((shape) => shape.length / 2));
     x = new Float32Array(count);
     y = new Float32Array(count);
@@ -110,17 +105,16 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     vy = new Float32Array(count);
     tx = new Float32Array(count);
     ty = new Float32Array(count);
-    hx = new Float32Array(count);
-    hy = new Float32Array(count);
+    // The field starts as noise and gathers when it first comes into view.
     for (let i = 0; i < count; i++) {
-      x[i] = hx[i] = Math.random() * width;
-      y[i] = hy[i] = Math.random() * height;
+      x[i] = Math.random() * width;
+      y[i] = Math.random() * height;
     }
     let total = 0;
     bounds = SHARES.map((share) => Math.round((total += share) * count));
     bounds[bounds.length - 1] = count;
     ready = true;
-    aim(0);
+    aim(current);
     if (isStill()) settle();
     else {
       paint();
@@ -139,49 +133,49 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     });
   }
 
-  /** The finished picture, for paused or reduced motion. */
+  /** The finished figure, for paused or reduced motion. */
   function settle() {
     cancelAnimationFrame(frame);
     frame = 0;
     if (!ready) return;
-    aim(WORDS.length - 1);
     x.set(tx);
     y.set(ty);
     vx.fill(0);
     vy.fill(0);
-    mark(word);
     paint();
   }
 
-  /** How far the page has scrolled through the pinned stretch, from 0 to 1. */
-  function progress() {
-    const box = track.getBoundingClientRect();
-    const travel = box.height - root.offsetHeight;
-    if (travel < 2) return 1;
-    const top = parseFloat(getComputedStyle(root).top) || 0;
-    return Math.max(0, Math.min(1, (top - box.top) / travel));
+  /** Show one result: its card, its tab and its figure in the dots. */
+  function select(index: number, burst = true) {
+    current = (index + cards.length) % cards.length;
+    cards.forEach((card, i) => {
+      card.classList.toggle("is-current", i === current);
+      card.inert = i !== current;
+    });
+    tabs.forEach((tab, i) => tab.setAttribute("aria-pressed", String(i === current)));
+    since = performance.now();
+    if (!ready) return;
+    aim(current);
+    if (isStill()) return settle();
+    // A kick outwards first, so each figure forms out of a burst of noise.
+    if (burst)
+      for (let i = 0; i < count; i++) {
+        vx[i] += (Math.random() - 0.5) * cell * 6;
+        vy[i] += (Math.random() - 0.5) * cell * 6;
+      }
+    run();
   }
 
   function tick(now: number) {
     frame = 0;
     const scale = Math.min(2.5, (now - (last || now)) / 16.7) || 1;
     last = now;
-    // Each word owns an equal share of the scroll: it gathers, holds, then
-    // breaks back into noise before the next one. The last word stays.
-    const along = progress() * WORDS.length;
-    const index = Math.min(WORDS.length - 1, Math.floor(along));
-    const within = along - index;
-    if (index !== word) aim(index);
-    const leaving = index === WORDS.length - 1 ? 0 : smooth(0.74, 1, within);
-    const loose = Math.max(1 - smooth(0, 0.34, within), leaving);
-    mark(loose < 0.5 ? index : -1);
+    if (auto && cards.length > 1 && now - since > DWELL) select(current + 1);
     const reach = Math.max(70, width * 0.085);
     const drag = Math.pow(0.84, scale);
     for (let i = 0; i < count; i++) {
-      const goalX = tx[i] + (hx[i] - tx[i]) * loose;
-      const goalY = ty[i] + (hy[i] - ty[i]) * loose;
-      vx[i] += ((goalX - x[i]) * 0.07 + (Math.random() - 0.5) * 0.5 * loose) * scale;
-      vy[i] += ((goalY - y[i]) * 0.07 + (Math.random() - 0.5) * 0.5 * loose) * scale;
+      vx[i] += (tx[i] - x[i]) * 0.06 * scale;
+      vy[i] += (ty[i] - y[i]) * 0.06 * scale;
       const dx = x[i] - pointerX;
       const dy = y[i] - pointerY;
       const near = dx * dx + dy * dy;
@@ -207,12 +201,17 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   }
   function sync() {
     if (isStill()) settle();
-    else run();
+    else {
+      since = performance.now();
+      run();
+    }
   }
 
   const watch = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
+      const was = visible;
       visible = entry.isIntersecting;
+      if (visible && !was) since = performance.now();
       if (visible) run();
       else {
         cancelAnimationFrame(frame);
@@ -235,14 +234,22 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   function leave() {
     pointerX = pointerY = -9999;
   }
+  function pick(event: Event) {
+    const tab = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-impact-tab]") : null;
+    if (!tab) return;
+    auto = false;
+    select(Number(tab.dataset.impactTab));
+  }
   root.addEventListener("pointermove", move);
   root.addEventListener("pointerleave", leave);
+  section.addEventListener("click", pick);
   document.addEventListener("visibilitychange", run);
   const recolour = () => {
     if (ready) paint();
   };
   window.addEventListener("portfolio-theme-change", recolour);
-  // The words are set in the display face, so wait for it before sampling.
+  select(0, false);
+  // The figures are set in the display face, so wait for it before sampling.
   let alive = true;
   void Promise.race([document.fonts.load('900 100px "Big Shoulders"'), new Promise((done) => setTimeout(done, 1500))]).then(() => {
     if (!alive) return;
@@ -260,6 +267,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
       sizes.disconnect();
       root.removeEventListener("pointermove", move);
       root.removeEventListener("pointerleave", leave);
+      section.removeEventListener("click", pick);
       document.removeEventListener("visibilitychange", run);
       window.removeEventListener("portfolio-theme-change", recolour);
     },

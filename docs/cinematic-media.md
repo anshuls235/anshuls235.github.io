@@ -15,10 +15,10 @@ Created with Higgsfield / GPT Image 2.6 on 2026-11-11: one 4:3 still per publish
 
 `src/art.ts` lists the slugs that have a cover. The work spiral and the project dialog use it; a project without a cover falls back to a typographic tile and its illustrated vignette. Covers are decorative (`alt=""`): titles, results and links stay in HTML. A project's own `image_url` from the database still takes priority in the dialog.
 
-## Impact signal field
+## Impact results field
 
-`src/signal.ts` draws the band that opens the impact section. With motion on, the band pins under the header and scrolling pulls its square dots out of noise into QUESTION, DATA, MODEL and IMPACT in turn; the dots also scatter around the pointer. It is generated in the browser, with no media files, and takes its two colours from the theme. It is decorative (`aria-hidden`), runs only while on screen, and under reduced motion or the global motion toggle it is a short unpinned band showing the finished word IMPACT. Without JavaScript the band stays hidden.
+`src/signal.ts` draws the band that opens the impact section: square dots gather into each reported figure in turn (taken from the published impact cards), while the matching project is shown beneath. Tabs choose a result and stop the automatic turn; the dots also scatter around the pointer. It is generated in the browser, with no media files, and takes its colours from the theme. The canvas is decorative (`aria-hidden`); the figures remain in the HTML summaries. Under reduced motion or the global motion toggle the current figure is shown still. Without JavaScript the canvas and tabs stay hidden and all three results are listed.
 
 ## Colour
 
-The site uses three colours: paper for most surfaces, ink for type, frames and the dark sections, and cobalt as the only accent (a lighter cobalt on dark surfaces). The older mint, yellow, coral, sky, lilac and lime tokens are no longer used for interface colour; the final block of `styles.css` maps their uses onto this palette. Project covers and the hero and contact artwork keep their own colours.
+The palette is warm paper, ink and one vermilion accent (`--hot`, `#ff4d1c`), used as a fill behind ink text or for large display type; small accent text on paper uses the deeper `--hot-deep`. The work section is inverted against the page in each theme, and the contact section is set on the accent. The older cobalt, mint, yellow, coral, sky, lilac and lime tokens are remapped to this palette at the end of `styles.css`. Project covers and the hero and contact artwork keep their own colours.

@@ -25,7 +25,7 @@ const apply = (dark: boolean) => {
   }
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#0b0e24" : "#f4f1e8");
+    ?.setAttribute("content", dark ? "#0b0b0d" : "#f4f1e8");
 };
 apply(chosen ? chosen === "dark" : preference.matches);
 document.addEventListener("DOMContentLoaded", () => {

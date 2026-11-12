@@ -348,7 +348,7 @@ test('theme switching swaps the illustrated scenes and keeps the hero readable',
       const current=await page.locator('html').getAttribute('data-theme');
       if(current!==theme) await page.locator('.theme-toggle').click();
       await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
-      await expect(page.locator('.hero-panel')).toHaveCSS('background-color',theme==='dark'?'rgb(21, 26, 61)':'rgb(255, 250, 240)');
+      await expect(page.locator('.hero-panel')).toHaveCSS('background-color',theme==='dark'?'rgb(23, 23, 26)':'rgb(255, 250, 240)');
       await expect(page.locator('.hero-hello')).toHaveCSS('color',theme==='dark'?'rgb(244, 241, 232)':'rgb(13, 15, 26)');
       await expect(page.locator(theme==='dark'?'.hero .scene-night':'.hero .scene-day')).toBeVisible();
       await expect(page.locator(theme==='dark'?'.hero .scene-day':'.hero .scene-night')).toBeHidden();
@@ -396,6 +396,7 @@ test('published impact, expanded work and grouped career chapters on desktop and
     await expect(page.locator('#impact')).toContainText('AED 1.33M');
     await expect(page.locator('#impact')).toContainText('45%');
     await expect(page.locator('#impact')).toContainText('not causal uplift');
+    await page.getByRole('button',{name:/Conversation-attributed revenue/}).click();
     await page.locator('.impact-card').nth(1).getByRole('link').click();
     await expect(page.getByRole('dialog')).toContainText('Attribution is by lead match, not proof of causation.');
     await page.keyboard.press('Escape');
@@ -489,7 +490,7 @@ test('expertise follows both themes without losing the selected network', async 
     await input.click();
     for (const theme of ['light','dark','light']) {
       if (await page.locator('html').getAttribute('data-theme') !== theme) await page.locator('.theme-toggle').click();
-      await expect(page.locator('#skills')).toHaveCSS('background-color', theme === 'light' ? 'rgb(244, 241, 232)' : 'rgb(8, 10, 24)');
+      await expect(page.locator('#skills')).toHaveCSS('background-color', theme === 'light' ? 'rgb(244, 241, 232)' : 'rgb(11, 11, 13)');
       await expect(input).toHaveAttribute('aria-pressed','true');
       await expect(page.locator('.node-output.is-lit')).toHaveCount(3);
       const audit=await new AxeBuilder({page}).include('#skills').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
@@ -499,7 +500,7 @@ test('expertise follows both themes without losing the selected network', async 
   }
 });
 
-test('impact signal field draws, keeps moving and holds still when motion is paused', async ({page}) => {
+test('impact dots draw each reported result, follow the tabs and hold still when motion is paused', async ({page}) => {
   // A cheap fingerprint of the canvas: how many sampled pixels are lit, and where.
   const read = () => page.locator('[data-signal] canvas').evaluate(el => {
     const canvas = el as HTMLCanvasElement;
@@ -508,6 +509,7 @@ test('impact signal field draws, keeps moving and holds still when motion is pau
     for (let i = 3; i < data.length; i += 4 * 7) if (data[i] > 0) { lit++; sum = (sum + i) % 1000003; }
     return {lit, sum};
   });
+  const stories = ['automall-ai-search', 'automall-conversational-ai', 'real-time-lead-scoring'].map(slug => fallback.content.projects.find(p => p.slug === slug)!);
   for (const width of [390, 1440]) {
     await page.setViewportSize({width, height:900});
     await page.goto('./');
@@ -518,24 +520,23 @@ test('impact signal field draws, keeps moving and holds still when motion is pau
     await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
     const before = await read();
     await expect.poll(async () => (await read()).sum).not.toBe(before.sum);
-    await expect(page.locator('[data-signal-step]')).toHaveCount(4);
-    // Scrolling through the pinned stretch forms each word in turn.
-    for (const [share, label] of [[0.14, '01 QUESTION'], [0.63, '03 MODEL'], [1, '04 IMPACT']] as const) {
-      await field.evaluate((node, part) => {
-        const el = node as HTMLElement;
-        const pin = el.querySelector<HTMLElement>('.signal-pin')!;
-        const top = el.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(pin).top);
-        window.scrollTo(0, top + (el.offsetHeight - pin.offsetHeight) * part);
-      }, share);
-      await expect(page.locator('[data-signal-step].is-on')).toHaveText(label);
-      await expect(page.locator('.signal-pin')).toBeInViewport();
-    }
+    // Picking a result shows its project and stops the automatic turn.
+    const tabs = page.locator('[data-impact-tab]');
+    await expect(tabs).toHaveCount(3);
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.impact-card.is-current h3')).toHaveText(stories[2].title);
+    await expect(page.locator('.impact-card:not(.is-current)').first()).toBeHidden();
+    await page.waitForTimeout(6000);
+    await expect(tabs.nth(2)).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', {name:'Pause motion'}).click();
-    await expect(page.locator('[data-signal-step].is-on')).toHaveText('04 IMPACT');
     const held = await read();
     expect(held.lit).toBeGreaterThan(200);
     await page.waitForTimeout(400);
     expect(await read()).toEqual(held);
+    await tabs.nth(0).click();
+    await expect(page.locator('.impact-card.is-current h3')).toHaveText(stories[0].title);
+    expect((await read()).sum).not.toBe(held.sum);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
   await page.emulateMedia({reducedMotion:'reduce'});

@@ -172,10 +172,16 @@ function setupWorkPin() {
   const track = section?.querySelector<HTMLElement>("[data-work-track]");
   const hint = section?.querySelector<HTMLElement>(".gallery-hint");
   const count = cards().length;
-  // Pin only where the spiral and a full set of notes fit side by side.
-  if (!section || !track || count < 2 || reduced.matches || innerWidth < 981 || innerHeight < 720) return;
+  const pin = section?.querySelector<HTMLElement>(".work-pin");
+  if (!section || !track || !pin || count < 2 || reduced.matches || innerHeight < 520) return;
   section.classList.add("is-pinned");
   track.style.setProperty("--work-steps", String(count));
+  // Pin only where the spiral and the longest set of notes fit on one screen.
+  if (pin.scrollHeight > pin.clientHeight + 2) {
+    section.classList.remove("is-pinned");
+    track.style.removeProperty("--work-steps");
+    return;
+  }
   const hintText = hint?.textContent ?? "";
   if (hint) hint.textContent = "Scroll, drag or use the arrows";
   const follow = (self: ScrollTrigger) => {
