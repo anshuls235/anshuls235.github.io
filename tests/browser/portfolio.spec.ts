@@ -536,7 +536,7 @@ test('impact dots draw each reported result, follow the tabs and hold still when
 });
 
 test('work spiral pins and turns with scroll on laptop-height and phone windows', async ({page}) => {
-  for (const [width, height] of [[1366, 650], [1280, 620], [1440, 900], [390, 780]]) {
+  for (const [width, height] of [[1366, 650], [1200, 560], [1024, 480], [1440, 900], [390, 780]]) {
     await page.setViewportSize({width, height});
     await page.goto('./');
     const section = page.locator('#projects');

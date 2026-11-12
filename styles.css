@@ -2651,7 +2651,7 @@ details[open] .summary-icon {
 .spin-button:hover:not(:disabled) { background: var(--yellow); transform: scale(1.08); }
 .spin-button:disabled { opacity: 0.35; cursor: default; }
 /* Pinned: the stage holds while scrolling turns the spiral. */
-.is-pinned .work-track { height: calc(100vh + var(--work-steps, 1) * 34vh); }
+.is-pinned .work-track { height: calc(100vh + var(--work-steps, 1) * 55vh); }
 .is-pinned .work-pin { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: var(--header-h) 0 28px; }
 .is-pinned .work-stage { flex: 1; min-height: 0; }
 .is-pinned .spiral-stage { min-height: 0; }
@@ -2747,20 +2747,19 @@ details[open] .summary-icon {
 /* ==========================================================================
    Palette, final: warm paper and true ink, with one hot vermilion that is
    only ever a fill behind ink text or large display type. Sections follow
-   the theme, except the work stage (dark in both) and the contact section,
-   which closes the page in full colour.
+   the theme, except the contact section, which closes the page in full colour.
    ========================================================================== */
 :root {
   --hot: #ff4d1c; --hot-deep: #c2330a;
   --cobalt: var(--hot); --cobalt-deep: var(--hot-deep); --yellow: var(--hot); --mint: var(--hot);
   --coral: var(--tint); --sky: var(--tint); --lilac: var(--tint); --lime: var(--tint);
   --accent: var(--hot); --accent-fg: #0d0f1a; --pop: var(--hot); --tint: #ffd3c4;
-  --work-bg: #0d0f1a; --work-fg: #f4f1e8; --work-muted: #bfc3dc; --work-accent: var(--hot); --work-rail: rgb(244 241 232 / 18%);
+  --work-bg: var(--bg); --work-fg: #0d0f1a; --work-muted: #464a5c; --work-accent: var(--hot-deep); --work-rail: rgb(13 15 26 / 14%);
   --signal-bg: transparent;
 }
 :root[data-theme="dark"] {
   --bg: #0b0b0d; --panel: #17171a; --shadow: #3d3d45; --band: #000; --accent: #ff5a2b; --accent-fg: #0d0f1a; --tint: #ff7a52;
-  --work-bg: var(--bg); --work-accent: var(--accent);
+  --work-bg: var(--bg); --work-fg: #f4f1e8; --work-muted: #bfc3dc; --work-accent: var(--accent); --work-rail: rgb(244 241 232 / 18%);
   --signal-bg: transparent;
 }
 :focus-visible { outline-color: var(--hot); }
@@ -2776,7 +2775,7 @@ details[open] .summary-icon {
 .visual-delay { fill: var(--tint); }
 .spiral-tile.tone-0 { color: #0d0f1a; }
 .about-focus { color: var(--hot); }
-/* The work stage is dark in both themes and keeps its own colours. */
+/* The work stage follows the theme through its own colour tokens. */
 .work-section { --fg: var(--work-fg); --line: var(--work-fg); --muted: var(--work-muted); --panel-fg: var(--work-fg); }
 .work-section .eyebrow span { border-color: currentColor; }
 /* About follows the page: paper by day, black by night. */
@@ -2810,7 +2809,7 @@ details[open] .summary-icon {
 .is-live .impact-card { min-height: 0; display: block; }
 /* The work stage pins on any screen it fits, so scrolling always turns the spiral. */
 @supports (height: 100svh) {
-  .is-pinned .work-track { height: calc(100svh + var(--work-steps, 1) * 34svh); }
+  .is-pinned .work-track { height: calc(100svh + var(--work-steps, 1) * 55svh); }
   .is-pinned .work-pin { height: 100svh; }
 }
 .is-pinned .spiral-stage { --tile: min(clamp(240px, 32vw, 500px), 56vh); }
@@ -2837,3 +2836,13 @@ details[open] .summary-icon {
 /* Contact: the dots say hello, and spell out a starter while it is pointed at. */
 .contact-hello { position: relative; height: clamp(170px, 30vw, 430px); margin-top: clamp(28px, 4vw, 56px); border-block: var(--stroke) solid #0d0f1a; }
 .contact-hello canvas { display: block; width: 100%; height: 100%; }
+
+/* Short desktop windows (zoomed browsers, small laptops): trim the notes so the stage still pins. */
+@media (max-height: 640px) and (min-width: 981px) {
+  .is-pinned .project-summary, .is-pinned .tags, .is-pinned .project-meta { display: none; }
+  .is-pinned .work-pin { padding-bottom: 14px; }
+  .is-pinned .work-status { padding-top: 14px; }
+  .work-section.is-pinned .project-badge strong { font-size: 48px; }
+  .is-pinned .project-card h3 { font-size: clamp(24px, 2.6vw, 34px); }
+  .is-pinned .project-foot { padding-block: 14px 0; }
+}

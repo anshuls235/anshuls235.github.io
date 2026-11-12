@@ -173,7 +173,7 @@ function setupWorkPin() {
   const hint = section?.querySelector<HTMLElement>(".gallery-hint");
   const count = cards().length;
   const pin = section?.querySelector<HTMLElement>(".work-pin");
-  if (!section || !track || !pin || count < 2 || reduced.matches || innerHeight < 520) return;
+  if (!section || !track || !pin || count < 2 || reduced.matches || innerHeight < 400) return;
   section.classList.add("is-pinned");
   track.style.setProperty("--work-steps", String(count));
   // Pin only where the longest set of notes fits on one screen. The spiral's
