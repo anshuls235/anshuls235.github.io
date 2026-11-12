@@ -4,7 +4,9 @@ const WORDS = ["QUESTION", "DATA", "MODEL", "IMPACT"];
 const HOLD = 2600; // ms a word stays assembled
 const LAST_HOLD = 4200;
 const GATHER = 900; // ms for the pull towards a new word to reach full strength
-const COLOURS = ["#fffaf0", "#7cf0b8", "#ffd84a", "#a9b8ff"];
+// Dot colours for the night and day themes, most common first.
+const NIGHT = ["#fffaf0", "#7cf0b8", "#ffd84a", "#a9b8ff"];
+const DAY = ["#0d0f1a", "#2b45ff", "#ff6b4a", "#e0a800"];
 const SHARES = [0.68, 0.16, 0.1, 0.06];
 
 export interface SignalControls {
@@ -14,7 +16,7 @@ export interface SignalControls {
 }
 
 export function signalScene() {
-  return `<div class="impact-signal" data-signal aria-hidden="true" hidden><canvas></canvas><p class="signal-note mono"><span>Noise in</span><span data-signal-step>Signal out</span></p></div>`;
+  return `<div class="impact-signal" data-signal aria-hidden="true" hidden><canvas></canvas><p class="signal-note mono"><span>How every project runs</span><span class="signal-steps">${WORDS.map((word, i) => `<span data-signal-step><b>0${i + 1}</b> ${word}</span>`).join("")}</span></p></div>`;
 }
 
 export function initSignal(isStill: () => boolean): SignalControls | null {
@@ -25,7 +27,8 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   const root = found;
   const surface = canvas;
   const ctx = pen;
-  const step = root.querySelector<HTMLElement>("[data-signal-step]");
+  const steps = [...root.querySelectorAll<HTMLElement>("[data-signal-step]")];
+  const mark = (index: number) => steps.forEach((step, i) => step.classList.toggle("is-on", i === index));
   root.hidden = false;
 
   let width = 0;
@@ -119,11 +122,12 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   }
 
   function paint() {
+    const colours = document.documentElement.dataset.theme === "dark" ? NIGHT : DAY;
     ctx.clearRect(0, 0, width, height);
     const dot = Math.max(2, cell * 0.62);
     let i = 0;
     bounds.forEach((end, colour) => {
-      ctx.fillStyle = COLOURS[colour];
+      ctx.fillStyle = colours[colour];
       for (; i < end; i++) ctx.fillRect(x[i] - dot / 2, y[i] - dot / 2, dot, dot);
     });
   }
@@ -139,7 +143,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     y.set(ty);
     vx.fill(0);
     vy.fill(0);
-    if (step) step.textContent = "Signal out";
+    mark(word);
     paint();
   }
 
@@ -152,7 +156,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
       vx[i] += (Math.random() - 0.5) * cell * 5;
       vy[i] += (Math.random() - 0.5) * cell * 5;
     }
-    if (step) step.textContent = `0${index + 1} / ${WORDS[index]}`;
+    mark(index);
   }
 
   function tick(now: number) {
@@ -240,6 +244,10 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   root.addEventListener("pointermove", move);
   root.addEventListener("pointerleave", leave);
   document.addEventListener("visibilitychange", run);
+  const recolour = () => {
+    if (ready) paint();
+  };
+  window.addEventListener("portfolio-theme-change", recolour);
   // The words are set in the display face, so wait for it before sampling.
   const fonts = document.fonts;
   let alive = true;
@@ -260,6 +268,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
       root.removeEventListener("pointermove", move);
       root.removeEventListener("pointerleave", leave);
       document.removeEventListener("visibilitychange", run);
+      window.removeEventListener("portfolio-theme-change", recolour);
     },
   };
 }

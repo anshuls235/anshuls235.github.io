@@ -262,7 +262,7 @@ test('illustrated hero: film plays, pauses and respects reduced motion', async (
 });
 
 test('work spiral turns with buttons, keyboard, drag and tile clicks', async ({page}) => {
-  const featured = fallback.content.projects.filter(p => p.featured);
+  const featured = fallback.content.projects; // the spiral keeps the published order
   const total = String(fallback.content.projects.length).padStart(2, '0');
   for (const width of [1440, 390]) {
     await page.setViewportSize({width,height:1000});
@@ -518,9 +518,10 @@ test('impact signal field draws, keeps moving and holds still when motion is pau
     await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
     const before = await read();
     await expect.poll(async () => (await read()).sum).not.toBe(before.sum);
-    await expect(page.locator('[data-signal-step]')).toHaveText(/^0[1-4] \/ /);
+    await expect(page.locator('[data-signal-step]')).toHaveCount(4);
+    await expect(page.locator('[data-signal-step].is-on')).toHaveCount(1);
     await page.getByRole('button', {name:'Pause motion'}).click();
-    await expect(page.locator('[data-signal-step]')).toHaveText('Signal out');
+    await expect(page.locator('[data-signal-step].is-on')).toHaveText('04 IMPACT');
     const held = await read();
     expect(held.lit).toBeGreaterThan(200);
     await page.waitForTimeout(400);

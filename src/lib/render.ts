@@ -235,11 +235,8 @@ export function renderSite(content: Content, base = "/") {
       ),
     )
     .join("");
-  // Featured work leads the spiral; everything else follows it round.
-  const showcase = [
-    ...content.projects.filter((x) => x.featured),
-    ...content.projects.filter((x) => !x.featured),
-  ];
+  // The spiral follows the published order of the projects.
+  const showcase = content.projects;
   const chapters = careerChapters(content.experiences);
   const firstYear = content.experiences
     .map((x) => Number(x.start_date.slice(0, 4)))
