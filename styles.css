@@ -2746,8 +2746,9 @@ details[open] .summary-icon {
 
 /* ==========================================================================
    Palette, final: warm paper and true ink, with one hot vermilion that is
-   only ever a fill behind ink text or large display type. Sections follow
-   the theme, except the contact section, which closes the page in full colour.
+   only ever a fill behind ink text or large display type. Every section
+   follows the theme; contact is ink on the accent by day and the accent on
+   black by night.
    ========================================================================== */
 :root {
   --hot: #ff4d1c; --hot-deep: #c2330a;
@@ -2781,10 +2782,14 @@ details[open] .summary-icon {
 /* About follows the page: paper by day, black by night. */
 :root:not([data-theme="dark"]) .about-section { background: var(--bg); color: var(--fg); }
 :root:not([data-theme="dark"]) .about-focus { color: var(--hot-deep); }
-/* Contact closes the page in full colour, with ink type. */
+/* Contact closes the page loudly: ink on the accent by day, the accent on black by night. */
 .contact-section { --blue-bg: var(--hot); --blue-fg: #0d0f1a; --blue-muted: #0d0f1a; }
+:root[data-theme="dark"] .contact-section { --blue-bg: #000; --blue-fg: #f4f1e8; --blue-muted: #bfc3dc; }
+:root[data-theme="dark"] .contact-section .display { color: var(--accent); }
+:root[data-theme="dark"] .contact-hello { border-color: #3d3d45; }
 .contact-section .display, .contact-section .eyebrow { text-shadow: none; }
 .contact-arrow { background: #0d0f1a; color: #f4f1e8; }
+:root[data-theme="dark"] .contact-arrow { background: var(--accent); color: #0d0f1a; }
 
 /* Impact: the dots draw the figure and the tabs choose which result is shown. */
 .impact-signal { height: clamp(190px, 30vw, 430px); margin-top: clamp(28px, 4vw, 56px); border-top: 0; }

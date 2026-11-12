@@ -158,13 +158,13 @@ function paintCarousel(next: number, direction = 1, animate = true, turn = true)
   );
 }
 /** Buttons, keys, drags and tile clicks: when pinned they scroll to the project. */
-function goTo(next: number) {
+function goTo(next: number, duration = 0.9) {
   const count = cards().length;
   const index = Math.max(0, Math.min(count - 1, next));
   const direction = index >= carouselIndex ? 1 : -1;
   if (!workPin) return paintCarousel(index, direction);
   const top = workPin.start + ((index + 0.5) / count) * (workPin.end - workPin.start);
-  if (lenis) lenis.scrollTo(top, { duration: 0.9 });
+  if (lenis) lenis.scrollTo(top, { duration });
   else scrollTo({ top });
 }
 function setupWorkPin() {
@@ -195,8 +195,53 @@ function setupWorkPin() {
     const next = Math.round(turn);
     if (next !== carouselIndex) paintCarousel(next, next > carouselIndex ? 1 : -1, true, false);
   };
-  workPin = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: follow, onRefresh: follow });
+  // While the stage is pinned, one wheel or trackpad gesture moves one project,
+  // so a hard flick cannot sweep past the work. A new gesture at either end
+  // lets the page go.
+  let held = false; // the stage has caught the scroll
+  let leaving = 0; // direction in which the page was let go
+  let lastTime = 0;
+  let lastSize = 0;
+  let holdUntil = 0;
+  const release = () => {
+    held = false;
+    leaving = 0;
+  };
+  const step = (event: WheelEvent) => {
+    if (!workPin || event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    if (scrollY < workPin.start || scrollY > workPin.end) return release();
+    const direction = Math.sign(event.deltaY);
+    const now = event.timeStamp; // when the input happened, not when it was handled
+    const size = Math.abs(event.deltaY);
+    // The fading tail of a flick keeps arriving with shrinking sizes; ignore it.
+    const fresh = now - lastTime > 200 || size > lastSize || (size === lastSize && size >= 50);
+    lastTime = now;
+    lastSize = size;
+    if (leaving === direction) return;
+    leaving = 0;
+    if (!held) {
+      held = true;
+      holdUntil = now + 600;
+      event.preventDefault();
+      event.stopPropagation();
+      return goTo(direction > 0 ? 0 : count - 1, 0.7);
+    }
+    const next = carouselIndex + direction;
+    const ready = fresh && now > holdUntil;
+    if (ready && (next < 0 || next >= count)) {
+      leaving = direction;
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (!ready) return;
+    holdUntil = now + 520;
+    goTo(next, 0.7);
+  };
+  window.addEventListener("wheel", step, { passive: false, capture: true });
+  workPin = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: follow, onRefresh: follow, onLeave: release, onLeaveBack: release });
   return () => {
+    window.removeEventListener("wheel", step, { capture: true });
     workPin?.kill();
     workPin = null;
     section.classList.remove("is-pinned");

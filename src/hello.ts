@@ -4,7 +4,8 @@ import { dotField } from "./dots";
 
 const GREETINGS = ["HELLO", "नमस्ते", "مرحبا", "HOLA", "BONJOUR", "こんにちは"];
 const DWELL = 3400;
-const COLOURS = ["#0d0f1a", "#fff6e6"]; // ink and cream on the accent band
+const DAY = ["#0d0f1a", "#fff6e6"]; // ink and cream on the accent band
+const NIGHT = ["#ff5a2b", "#f4f1e8"]; // accent and cream on black
 
 export interface HelloControls {
   /** Re-read the site's motion setting. */
@@ -24,7 +25,7 @@ export function initHello(isStill: () => boolean): HelloControls | null {
   let greeting = 0;
   const field = dotField(root, {
     texts: [...GREETINGS, ...starters.map((starter) => starter.dataset.say ?? "")],
-    colours: () => COLOURS,
+    colours: () => (document.documentElement.dataset.theme === "dark" ? NIGHT : DAY),
     isStill,
     fitInk: true,
     dwell: DWELL,
@@ -48,12 +49,14 @@ export function initHello(isStill: () => boolean): HelloControls | null {
     starter.addEventListener("pointerleave", resume);
     starter.addEventListener("blur", resume);
   });
+  window.addEventListener("portfolio-theme-change", field.repaint);
   field.show(0, false);
 
   return {
     sync: field.sync,
     destroy() {
       field.destroy();
+      window.removeEventListener("portfolio-theme-change", field.repaint);
       starters.forEach((starter) => {
         starter.removeEventListener("pointerenter", say);
         starter.removeEventListener("focus", say);

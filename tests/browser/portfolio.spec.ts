@@ -547,3 +547,41 @@ test('work spiral pins and turns with scroll on laptop-height and phone windows'
     await expect(page.locator('.work-pin')).toBeInViewport();
   }
 });
+
+test('one wheel gesture moves the pinned work stage by exactly one project', async ({page}) => {
+  test.setTimeout(60000);
+  const position = page.locator('[data-project-position]');
+  // A trackpad flick: a short rise, then a long fading run of wheel events,
+  // sent from inside the page so their spacing matches a real device.
+  const flick = async (direction: number) => {
+    await page.evaluate(direction => new Promise<void>(done => {
+      const sizes: number[] = [];
+      let size = 20;
+      while (size < 160) { sizes.push(size); size *= 1.6; }
+      while (size > 1) { sizes.push(Math.round(size)); size *= 0.93; }
+      const send = () => {
+        const next = sizes.shift();
+        if (next === undefined) return done();
+        document.querySelector('.work-pin')!.dispatchEvent(new WheelEvent('wheel', {deltaY: direction * next, bubbles: true, cancelable: true}));
+        setTimeout(send, 12);
+      };
+      send();
+    }), direction);
+    await page.waitForTimeout(500);
+  };
+  for (const [width, height] of [[1100, 600], [1440, 900]]) {
+    await page.setViewportSize({width, height});
+    await page.goto('./');
+    const top = await page.locator('[data-work-track]').evaluate(el => el.getBoundingClientRect().top + scrollY);
+    await page.evaluate(y => window.scrollTo(0, y + 10), top);
+    await flick(1);
+    await expect(position).toContainText('01 / 13');
+    for (const label of ['02', '03', '04']) {
+      await flick(1);
+      await expect(position).toContainText(`${label} / 13`);
+      await expect(page.locator('.work-pin')).toBeInViewport();
+    }
+    await flick(-1);
+    await expect(position).toContainText('03 / 13');
+  }
+});
