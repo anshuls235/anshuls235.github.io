@@ -2,12 +2,12 @@
 // it reflows naturally; the canvas only reads node positions and draws the
 // weights and the "forward pass" signals between them.
 const TONES: Record<string, string> = {
-  mint: "#7cf0b8",
-  yellow: "#ffd84a",
-  coral: "#ff8a6b",
-  sky: "#a9b8ff",
-  lilac: "#d7b8ff",
-  lime: "#c6f36b",
+  mint: "#8fa0ff",
+  yellow: "#8fa0ff",
+  coral: "#8fa0ff",
+  sky: "#8fa0ff",
+  lilac: "#8fa0ff",
+  lime: "#8fa0ff",
 };
 interface Box {
   el: HTMLElement;
@@ -50,7 +50,7 @@ export function initNetwork(
   const inputEls = [...root.querySelectorAll<HTMLButtonElement>(".node-input")];
   const [h1Layer, h2Layer] = [...root.querySelectorAll<HTMLElement>(".layer-hidden")];
   const outputEls = [...root.querySelectorAll<HTMLElement>(".node-output")];
-  const lightTones: Record<string, string> = {mint: "#087b4a", yellow: "#916300", coral: "#b43c22", sky: "#2b45ff", lilac: "#7941b8", lime: "#557800"};
+  const lightTones: Record<string, string> = {mint: "#2b45ff", yellow: "#2b45ff", coral: "#2b45ff", sky: "#2b45ff", lilac: "#2b45ff", lime: "#2b45ff"};
   let wire = "#8f95b8";
   const readTones = () => inputEls.map((b) => {
     const tone = [...b.classList].find((c) => c.startsWith("tone-"))?.slice(5) ?? "mint";

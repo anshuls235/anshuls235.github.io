@@ -2726,7 +2726,15 @@ details[open] .summary-icon {
 }
 
 /* The impact opener: dots gather from noise into words. Drawn in src/signal.ts. */
-.impact-signal { position: relative; height: clamp(230px, 40vw, 540px); margin-top: clamp(40px, 5vw, 72px); border-top: var(--stroke) solid var(--line); background: var(--signal-bg); overflow: hidden; }
+.impact-signal { position: relative; margin-top: clamp(40px, 5vw, 72px); border-top: var(--stroke) solid var(--line); background: var(--signal-bg); }
+.signal-pin { position: relative; height: clamp(230px, 40vw, 540px); overflow: hidden; }
+/* With motion on, the field pins under the header and scrolling forms each word in turn. */
+.js-motion .impact-signal { height: calc(100vh - var(--header-h) + 260vh); }
+.js-motion .signal-pin { position: sticky; top: var(--header-h); height: calc(100vh - var(--header-h)); }
+@supports (height: 100svh) {
+  .js-motion .impact-signal { height: calc(100svh - var(--header-h) + 260svh); }
+  .js-motion .signal-pin { height: calc(100svh - var(--header-h)); }
+}
 .impact-signal canvas { display: block; width: 100%; height: 100%; }
 .signal-note { position: absolute; inset: auto 0 0; display: flex; justify-content: space-between; gap: 16px; margin: 0; padding: 14px clamp(16px, 3vw, 40px); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--work-muted); pointer-events: none; }
 .impact-signal + .impact-stage { margin-top: 0; }
@@ -2754,3 +2762,46 @@ details[open] .summary-icon {
 .impact-section .impact-card:nth-child(n) .impact-card-inner { background: none; color: inherit; }
 :root[data-theme="dark"] .impact-label span { background: #f4f1e8; color: #0d0f1a; }
 :root[data-theme="dark"] .impact-card .box-button { --btn-bg: #fffaf0; --btn-fg: #0d0f1a; border-color: #fffaf0; box-shadow: 4px 4px 0 var(--cobalt); }
+
+/* ==========================================================================
+   One palette: paper carries the page, ink does the talking, and cobalt is
+   the only loud colour. Night mode swaps paper for ink and softens the cobalt.
+   ========================================================================== */
+:root { --pop: #8fa0ff; --tint: #cfd6ff; --blue-bg: var(--bg); --blue-fg: var(--fg); --blue-muted: var(--muted); --work-accent: var(--cobalt-deep); }
+:root[data-theme="dark"] { --tint: #8fa0ff; --blue-bg: var(--bg); --blue-fg: var(--fg); --blue-muted: var(--muted); --work-accent: var(--accent); }
+::selection, .skip-link, .content-status, #close-dialog, .flight-controls button, .main-nav .nav-contact, details[open] .summary-icon { background: var(--accent); color: var(--accent-fg); }
+.main-nav .nav-contact:hover { color: var(--pop); }
+.box-button-primary, .is-carousel .project-foot .box-button { --btn-bg: var(--accent); --btn-fg: var(--accent-fg); }
+.edge-button:hover:not(:disabled), .spin-button:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); }
+.status-dot, .scroll-pill i::after, .career-role::before, .work-dots i.is-current { background: var(--pop); }
+.career-role::before, .work-dots i.is-current { background: var(--accent); }
+.ticker-track i, .ticker-track i:nth-of-type(3n + 2), .ticker-track i:nth-of-type(3n) { background: var(--pop); box-shadow: 0 0 0 4px var(--band), 0 0 0 6px var(--pop); }
+.hero { background: var(--cobalt); }
+:root[data-theme="dark"] #hero-heading { color: var(--accent); }
+.project-card h3 a, :root[data-theme="dark"] .project-card h3 a, .work-section.is-carousel .project-card h3 a { background-image: linear-gradient(var(--tint), var(--tint)); }
+:root[data-theme="dark"] .project-card h3 a, :root[data-theme="dark"] .work-section.is-carousel .project-card h3 a { background-image: linear-gradient(rgb(143 160 255 / 35%), rgb(143 160 255 / 35%)); }
+.project-card .project-art, .project-card:nth-child(n) .project-art, #project-detail .project-art { background: var(--panel); }
+.tone-mint, .tone-yellow, .tone-coral, .tone-sky, .tone-lilac, .tone-lime { --tone: var(--tint); }
+:root[data-theme="dark"] .model-section { --model-accent: #8fa0ff; }
+:root:not([data-theme="dark"]) .node-output.is-lit { box-shadow: 4px 4px 0 var(--cobalt); }
+.loss-point circle { fill: var(--panel); }
+.notebook-panel { background: var(--panel); color: var(--panel-fg); }
+.about-focus { color: var(--accent); }
+.score-digits span { color: var(--pop); }
+.contact-section { --blue-bg: var(--band); --blue-fg: var(--band-fg); --blue-muted: #bfc3dc; }
+.contact-arrow { background: var(--pop); color: #0d0f1a; }
+.flight-port.destination circle:not(.arrival-halo) { fill: var(--pop); }
+.arrival-halo { stroke: var(--pop) !important; }
+.pipeline-index { background: #0d0f1a; color: #f4f1e8; }
+.visual-delay { fill: #cfd6ff; }
+.tile-metric { background: #fffaf0; }
+.spiral-tile.tone-1, .spiral-tile.tone-2, .spiral-tile.tone-3, .spiral-tile.tone-5 { background: #fffaf0; }
+/* Impact: three quiet bands, with the number as the only colour. */
+.impact-section .impact-card:nth-child(n), :root[data-theme="dark"] .impact-section .impact-card:nth-child(n) { background: var(--panel); color: var(--panel-fg); }
+.impact-section .impact-card:nth-child(2), :root[data-theme="dark"] .impact-section .impact-card:nth-child(2) { background: var(--bg); }
+.impact-section .impact-card:nth-child(n) .impact-metric { color: var(--accent); }
+.impact-card .box-button, :root[data-theme="dark"] .impact-card .box-button { --btn-bg: var(--accent); --btn-fg: var(--accent-fg); border-color: var(--line); box-shadow: 4px 4px 0 var(--line); }
+.impact-label span, :root[data-theme="dark"] .impact-label span { background: var(--fg); color: var(--bg); }
+.about-focus { color: var(--pop); }
+.impact-section .display, .writing-section .display, .impact-section .eyebrow, .writing-section .eyebrow { text-shadow: none; }
+.notebook-panel .box-button { --btn-bg: var(--accent); --btn-fg: var(--accent-fg); }

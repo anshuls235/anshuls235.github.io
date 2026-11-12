@@ -519,7 +519,17 @@ test('impact signal field draws, keeps moving and holds still when motion is pau
     const before = await read();
     await expect.poll(async () => (await read()).sum).not.toBe(before.sum);
     await expect(page.locator('[data-signal-step]')).toHaveCount(4);
-    await expect(page.locator('[data-signal-step].is-on')).toHaveCount(1);
+    // Scrolling through the pinned stretch forms each word in turn.
+    for (const [share, label] of [[0.14, '01 QUESTION'], [0.63, '03 MODEL'], [1, '04 IMPACT']] as const) {
+      await field.evaluate((node, part) => {
+        const el = node as HTMLElement;
+        const pin = el.querySelector<HTMLElement>('.signal-pin')!;
+        const top = el.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(pin).top);
+        window.scrollTo(0, top + (el.offsetHeight - pin.offsetHeight) * part);
+      }, share);
+      await expect(page.locator('[data-signal-step].is-on')).toHaveText(label);
+      await expect(page.locator('.signal-pin')).toBeInViewport();
+    }
     await page.getByRole('button', {name:'Pause motion'}).click();
     await expect(page.locator('[data-signal-step].is-on')).toHaveText('04 IMPACT');
     const held = await read();

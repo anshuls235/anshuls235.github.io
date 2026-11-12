@@ -1,13 +1,10 @@
-// The impact opener: a field of square dots drifts as noise, then pulls
-// together into one word after another. Drawn in code; purely decorative.
+// The impact opener: a field of square dots that scrolling pulls out of noise
+// into one word after another. Drawn in code; purely decorative.
 const WORDS = ["QUESTION", "DATA", "MODEL", "IMPACT"];
-const HOLD = 2600; // ms a word stays assembled
-const LAST_HOLD = 4200;
-const GATHER = 900; // ms for the pull towards a new word to reach full strength
 // Dot colours for the night and day themes, most common first.
-const NIGHT = ["#fffaf0", "#7cf0b8", "#ffd84a", "#a9b8ff"];
-const DAY = ["#0d0f1a", "#2b45ff", "#ff6b4a", "#e0a800"];
-const SHARES = [0.68, 0.16, 0.1, 0.06];
+const NIGHT = ["#f4f1e8", "#8fa0ff"];
+const DAY = ["#0d0f1a", "#2b45ff"];
+const SHARES = [0.74, 0.26];
 
 export interface SignalControls {
   /** Re-read the site's motion setting. */
@@ -16,20 +13,27 @@ export interface SignalControls {
 }
 
 export function signalScene() {
-  return `<div class="impact-signal" data-signal aria-hidden="true" hidden><canvas></canvas><p class="signal-note mono"><span>How every project runs</span><span class="signal-steps">${WORDS.map((word, i) => `<span data-signal-step><b>0${i + 1}</b> ${word}</span>`).join("")}</span></p></div>`;
+  return `<div class="impact-signal" data-signal aria-hidden="true" hidden><div class="signal-pin"><canvas></canvas><p class="signal-note mono"><span>How every project runs</span><span class="signal-steps">${WORDS.map((word, i) => `<span data-signal-step><b>0${i + 1}</b> ${word}</span>`).join("")}</span></p></div></div>`;
 }
 
+const smooth = (from: number, to: number, value: number) => {
+  const t = Math.max(0, Math.min(1, (value - from) / (to - from)));
+  return t * t * (3 - 2 * t);
+};
+
 export function initSignal(isStill: () => boolean): SignalControls | null {
-  const found = document.querySelector<HTMLElement>("[data-signal]");
+  const outer = document.querySelector<HTMLElement>("[data-signal]");
+  const found = outer?.querySelector<HTMLElement>(".signal-pin");
   const canvas = found?.querySelector("canvas");
   const pen = canvas?.getContext("2d");
-  if (!found || !canvas || !pen) return null;
+  if (!outer || !found || !canvas || !pen) return null;
+  const track = outer;
   const root = found;
   const surface = canvas;
   const ctx = pen;
   const steps = [...root.querySelectorAll<HTMLElement>("[data-signal-step]")];
   const mark = (index: number) => steps.forEach((step, i) => step.classList.toggle("is-on", i === index));
-  root.hidden = false;
+  track.hidden = false;
 
   let width = 0;
   let height = 0;
@@ -39,16 +43,16 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   let y = new Float32Array(0);
   let vx = new Float32Array(0);
   let vy = new Float32Array(0);
-  let tx = new Float32Array(0);
+  let tx = new Float32Array(0); // where each dot sits in the current word
   let ty = new Float32Array(0);
+  let hx = new Float32Array(0); // where it drifts while the field is noise
+  let hy = new Float32Array(0);
   let shapes: Float32Array[] = [];
   let bounds: number[] = []; // where each colour's run of dots ends
-  let word = -1; // -1 while the field is still noise
-  let since = 0;
+  let word = -1;
   let last = 0;
   let frame = 0;
   let visible = false;
-  let seen = false;
   let ready = false;
   let pointerX = -9999;
   let pointerY = -9999;
@@ -61,7 +65,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     const draw = off.getContext("2d", { willReadFrequently: true })!;
     const family = '"Big Shoulders", Impact, "Arial Narrow", sans-serif';
     draw.font = `900 100px ${family}`;
-    const size = Math.min((width * 0.86 * 100) / draw.measureText(text).width, height * 0.66);
+    const size = Math.min((width * 0.86 * 100) / draw.measureText(text).width, height * 0.6);
     draw.font = `900 ${size}px ${family}`;
     draw.textAlign = "center";
     draw.textBaseline = "middle";
@@ -80,6 +84,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   }
 
   function aim(index: number) {
+    word = index;
     const shape = shapes[index];
     const points = shape.length / 2;
     for (let i = 0; i < count; i++) {
@@ -105,17 +110,19 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     vy = new Float32Array(count);
     tx = new Float32Array(count);
     ty = new Float32Array(count);
+    hx = new Float32Array(count);
+    hy = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      x[i] = Math.random() * width;
-      y[i] = Math.random() * height;
+      x[i] = hx[i] = Math.random() * width;
+      y[i] = hy[i] = Math.random() * height;
     }
     let total = 0;
     bounds = SHARES.map((share) => Math.round((total += share) * count));
     bounds[bounds.length - 1] = count;
     ready = true;
+    aim(0);
     if (isStill()) settle();
     else {
-      if (word >= 0) aim(word);
       paint();
       run();
     }
@@ -137,8 +144,7 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     cancelAnimationFrame(frame);
     frame = 0;
     if (!ready) return;
-    word = WORDS.length - 1;
-    aim(word);
+    aim(WORDS.length - 1);
     x.set(tx);
     y.set(ty);
     vx.fill(0);
@@ -147,36 +153,35 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
     paint();
   }
 
-  function show(index: number, now: number) {
-    word = index;
-    since = now;
-    aim(index);
-    // A kick outwards first, so each word forms out of a burst of noise.
-    for (let i = 0; i < count; i++) {
-      vx[i] += (Math.random() - 0.5) * cell * 5;
-      vy[i] += (Math.random() - 0.5) * cell * 5;
-    }
-    mark(index);
+  /** How far the page has scrolled through the pinned stretch, from 0 to 1. */
+  function progress() {
+    const box = track.getBoundingClientRect();
+    const travel = box.height - root.offsetHeight;
+    if (travel < 2) return 1;
+    const top = parseFloat(getComputedStyle(root).top) || 0;
+    return Math.max(0, Math.min(1, (top - box.top) / travel));
   }
 
   function tick(now: number) {
     frame = 0;
     const scale = Math.min(2.5, (now - (last || now)) / 16.7) || 1;
     last = now;
-    if (word < 0) {
-      if (seen) show(0, now);
-    } else if (now - since > (word === WORDS.length - 1 ? LAST_HOLD : HOLD)) show((word + 1) % WORDS.length, now);
-    const pull = word < 0 ? 0 : Math.min(1, (now - since) / GATHER) ** 2 * 0.07;
+    // Each word owns an equal share of the scroll: it gathers, holds, then
+    // breaks back into noise before the next one. The last word stays.
+    const along = progress() * WORDS.length;
+    const index = Math.min(WORDS.length - 1, Math.floor(along));
+    const within = along - index;
+    if (index !== word) aim(index);
+    const leaving = index === WORDS.length - 1 ? 0 : smooth(0.74, 1, within);
+    const loose = Math.max(1 - smooth(0, 0.34, within), leaving);
+    mark(loose < 0.5 ? index : -1);
     const reach = Math.max(70, width * 0.085);
     const drag = Math.pow(0.84, scale);
     for (let i = 0; i < count; i++) {
-      if (word < 0) {
-        vx[i] += (Math.random() - 0.5) * 0.3;
-        vy[i] += (Math.random() - 0.5) * 0.3;
-      } else {
-        vx[i] += (tx[i] - x[i]) * pull * scale;
-        vy[i] += (ty[i] - y[i]) * pull * scale;
-      }
+      const goalX = tx[i] + (hx[i] - tx[i]) * loose;
+      const goalY = ty[i] + (hy[i] - ty[i]) * loose;
+      vx[i] += ((goalX - x[i]) * 0.07 + (Math.random() - 0.5) * 0.5 * loose) * scale;
+      vy[i] += ((goalY - y[i]) * 0.07 + (Math.random() - 0.5) * 0.5 * loose) * scale;
       const dx = x[i] - pointerX;
       const dy = y[i] - pointerY;
       const near = dx * dx + dy * dy;
@@ -190,12 +195,6 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
       vy[i] *= drag;
       x[i] += vx[i] * scale;
       y[i] += vy[i] * scale;
-      if (word < 0) {
-        if (x[i] < 0) x[i] += width;
-        else if (x[i] > width) x[i] -= width;
-        if (y[i] < 0) y[i] += height;
-        else if (y[i] > height) y[i] -= height;
-      }
     }
     paint();
     run();
@@ -208,24 +207,19 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   }
   function sync() {
     if (isStill()) settle();
-    else {
-      // Coming back from a pause, pick the cycle up where it stands.
-      since = performance.now();
-      run();
-    }
+    else run();
   }
 
   const watch = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       visible = entry.isIntersecting;
-      if (entry.intersectionRatio > 0.4) seen = true;
       if (visible) run();
       else {
         cancelAnimationFrame(frame);
         frame = 0;
       }
     });
-  }, { threshold: [0, 0.4] });
+  });
   watch.observe(root);
   let sizeTimer = 0;
   const sizes = new ResizeObserver(() => {
@@ -249,9 +243,8 @@ export function initSignal(isStill: () => boolean): SignalControls | null {
   };
   window.addEventListener("portfolio-theme-change", recolour);
   // The words are set in the display face, so wait for it before sampling.
-  const fonts = document.fonts;
   let alive = true;
-  void Promise.race([fonts.load('900 100px "Big Shoulders"'), new Promise((done) => setTimeout(done, 1500))]).then(() => {
+  void Promise.race([document.fonts.load('900 100px "Big Shoulders"'), new Promise((done) => setTimeout(done, 1500))]).then(() => {
     if (!alive) return;
     build();
     sizes.observe(root);

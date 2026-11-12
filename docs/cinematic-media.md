@@ -17,4 +17,8 @@ Created with Higgsfield / GPT Image 2.6 on 2026-11-11: one 4:3 still per publish
 
 ## Impact signal field
 
-`src/signal.ts` draws the band that opens the impact section: square dots drift as noise, then gather into QUESTION, DATA, MODEL and IMPACT in turn, and scatter around the pointer. It is generated in the browser, with no media files. It is decorative (`aria-hidden`), runs only while on screen, and shows the finished word IMPACT as a still under reduced motion or the global motion toggle. Without JavaScript the band stays hidden.
+`src/signal.ts` draws the band that opens the impact section. With motion on, the band pins under the header and scrolling pulls its square dots out of noise into QUESTION, DATA, MODEL and IMPACT in turn; the dots also scatter around the pointer. It is generated in the browser, with no media files, and takes its two colours from the theme. It is decorative (`aria-hidden`), runs only while on screen, and under reduced motion or the global motion toggle it is a short unpinned band showing the finished word IMPACT. Without JavaScript the band stays hidden.
+
+## Colour
+
+The site uses three colours: paper for most surfaces, ink for type, frames and the dark sections, and cobalt as the only accent (a lighter cobalt on dark surfaces). The older mint, yellow, coral, sky, lilac and lime tokens are no longer used for interface colour; the final block of `styles.css` maps their uses onto this palette. Project covers and the hero and contact artwork keep their own colours.
