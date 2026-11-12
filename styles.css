@@ -2746,9 +2746,9 @@ details[open] .summary-icon {
 
 /* ==========================================================================
    Palette, final: warm paper and true ink, with one hot vermilion that is
-   only ever a fill behind ink text or large display type. Each theme gets
-   one inverted section (the work stage) so the page has a dark and a light
-   beat in both modes, and the contact section closes the page in full colour.
+   only ever a fill behind ink text or large display type. Sections follow
+   the theme, except the work stage (dark in both) and the contact section,
+   which closes the page in full colour.
    ========================================================================== */
 :root {
   --hot: #ff4d1c; --hot-deep: #c2330a;
@@ -2760,7 +2760,7 @@ details[open] .summary-icon {
 }
 :root[data-theme="dark"] {
   --bg: #0b0b0d; --panel: #17171a; --shadow: #3d3d45; --band: #000; --accent: #ff5a2b; --accent-fg: #0d0f1a; --tint: #ff7a52;
-  --work-bg: #f4f1e8; --work-fg: #0d0f1a; --work-muted: #464a5c; --work-accent: var(--hot-deep); --work-rail: rgb(13 15 26 / 14%);
+  --work-bg: var(--bg); --work-accent: var(--accent);
   --signal-bg: transparent;
 }
 :focus-visible { outline-color: var(--hot); }
@@ -2776,11 +2776,12 @@ details[open] .summary-icon {
 .visual-delay { fill: var(--tint); }
 .spiral-tile.tone-0 { color: #0d0f1a; }
 .about-focus { color: var(--hot); }
-/* The work stage keeps its own colours whichever way it is inverted. */
+/* The work stage is dark in both themes and keeps its own colours. */
 .work-section { --fg: var(--work-fg); --line: var(--work-fg); --muted: var(--work-muted); --panel-fg: var(--work-fg); }
 .work-section .eyebrow span { border-color: currentColor; }
-/* Writing sits on ink in the day theme to break up the paper. */
-:root:not([data-theme="dark"]) .writing-section { --blue-bg: #0d0f1a; --blue-fg: #f4f1e8; --blue-muted: #bfc3dc; }
+/* About follows the page: paper by day, black by night. */
+:root:not([data-theme="dark"]) .about-section { background: var(--bg); color: var(--fg); }
+:root:not([data-theme="dark"]) .about-focus { color: var(--hot-deep); }
 /* Contact closes the page in full colour, with ink type. */
 .contact-section { --blue-bg: var(--hot); --blue-fg: #0d0f1a; --blue-muted: #0d0f1a; }
 .contact-section .display, .contact-section .eyebrow { text-shadow: none; }

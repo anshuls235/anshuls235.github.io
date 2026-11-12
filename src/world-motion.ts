@@ -176,8 +176,11 @@ function setupWorkPin() {
   if (!section || !track || !pin || count < 2 || reduced.matches || innerHeight < 520) return;
   section.classList.add("is-pinned");
   track.style.setProperty("--work-steps", String(count));
-  // Pin only where the spiral and the longest set of notes fit on one screen.
-  if (pin.scrollHeight > pin.clientHeight + 2) {
+  // Pin only where the longest set of notes fits on one screen. The spiral's
+  // tiles are positioned outside the layout, so they are left out of the check.
+  const stage = pin.querySelector<HTMLElement>(".work-stage");
+  const notes = pin.querySelector<HTMLElement>(".selected-grid");
+  if (!stage || !notes || notes.scrollHeight > stage.clientHeight + 2) {
     section.classList.remove("is-pinned");
     track.style.removeProperty("--work-steps");
     return;
@@ -214,10 +217,10 @@ function setupReading() {
     return span;
   });
   copy.replaceChildren(...words.flatMap((word, i) => (i ? [" ", word] : [word])));
-  // Half strength keeps the unread words above AA contrast.
+  // This strength keeps the unread words above AA contrast on paper and on black.
   gsap.fromTo(
     words,
-    { opacity: 0.5 },
+    { opacity: 0.62 },
     { opacity: 1, ease: "none", stagger: 0.1, scrollTrigger: { trigger: copy, start: "top 85%", end: "bottom 65%", scrub: true } },
   );
   return () => {

@@ -23,4 +23,4 @@ Created with Higgsfield / GPT Image 2.6 on 2026-11-11: one 4:3 still per publish
 
 ## Colour
 
-The palette is warm paper, ink and one vermilion accent (`--hot`, `#ff4d1c`), used as a fill behind ink text or for large display type; small accent text on paper uses the deeper `--hot-deep`. The work section is inverted against the page in each theme, and the contact section is set on the accent. The older cobalt, mint, yellow, coral, sky, lilac and lime tokens are remapped to this palette at the end of `styles.css`. Project covers and the hero artwork keep their own colours.
+The palette is warm paper, ink and one vermilion accent (`--hot`, `#ff4d1c`), used as a fill behind ink text or for large display type; small accent text on paper uses the deeper `--hot-deep`. Every section follows the theme (paper by day, near-black by night) except three fixed ones: the work section is dark in both themes, the contact section is set on the accent, and the footer is dark. The older cobalt, mint, yellow, coral, sky, lilac and lime tokens are remapped to this palette at the end of `styles.css`. Project covers and the hero artwork keep their own colours.

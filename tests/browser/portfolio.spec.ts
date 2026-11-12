@@ -534,3 +534,16 @@ test('impact dots draw each reported result, follow the tabs and hold still when
   await page.waitForTimeout(400);
   expect(await read()).toEqual(still);
 });
+
+test('work spiral pins and turns with scroll on laptop-height and phone windows', async ({page}) => {
+  for (const [width, height] of [[1366, 650], [1280, 620], [1440, 900], [390, 780]]) {
+    await page.setViewportSize({width, height});
+    await page.goto('./');
+    const section = page.locator('#projects');
+    await expect(section).toHaveClass(/is-pinned/);
+    const top = await page.locator('[data-work-track]').evaluate(el => el.getBoundingClientRect().top + scrollY);
+    await page.evaluate(y => window.scrollTo(0, y), top + height * 1.5);
+    await expect(page.locator('.work-status')).not.toContainText('01 / 13');
+    await expect(page.locator('.work-pin')).toBeInViewport();
+  }
+});
