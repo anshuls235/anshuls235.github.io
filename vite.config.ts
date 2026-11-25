@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { validateSnapshot } from "./src/lib/content";
 import { configuredProject } from "./src/lib/settings";
 import { metadata, renderSite } from "./src/lib/render";
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
   const config = configuredProject(
     env.VITE_SUPABASE_URL,
@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
   return {
     base,
     publicDir: "public",
-    build: { target: "es2022", sourcemap: false, assetsInlineLimit: 0 },
+    build: { target: "es2022", sourcemap: false, assetsInlineLimit: 0, chunkSizeWarningLimit: 700 }, // the 3D finale is a lazy chunk
     plugins: [
       {
         name: "published-portfolio",
@@ -66,7 +66,8 @@ export default defineConfig(({ mode }) => {
                 }).replaceAll("<", "\\u003c")
               : "";
             const hash = createHash("sha256").update(person).digest("base64");
-            const csp = `default-src 'self'; script-src 'self' 'sha256-${hash}'; style-src 'self'; img-src 'self' https:; font-src 'self'; connect-src 'self'${config ? " " + config.url : ""}; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests`;
+            const csp = `default-src 'self'; script-src 'self' 'sha256-${hash}'; style-src 'self'; img-src 'self' https:; font-src 'self'; connect-src 'self'${config ? " " + config.url : ""}; object-src 'none'; base-uri 'self'; form-action 'none'${command === "build" ? "; upgrade-insecure-requests" : ""}`;
+            // The dev server is plain http on loopback, which Safari would otherwise upgrade and fail to load.
             return html
               .replace(
                 "<!--META-->",

@@ -8,6 +8,8 @@ export default defineConfig({
     baseURL: process.env.PORTFOLIO_PREVIEW_URL || "http://127.0.0.1:4173",
     channel: process.env.CI ? undefined : "chrome",
     trace: "retain-on-failure",
+    // CI has no GPU; let Chromium render WebGL in software so the 3D chapter is tested.
+    launchOptions: { args: ["--enable-unsafe-swiftshader"] },
   },
   reporter: "list",
 });

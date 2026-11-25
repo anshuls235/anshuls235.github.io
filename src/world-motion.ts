@@ -1,4 +1,4 @@
-import { initHello, type HelloControls } from "./hello";
+import { initStory, type StoryControls } from "./story-motion";
 import { initImpact } from "./impact";
 import { initSignal, type SignalControls } from "./signal";
 import { initSpiral, type SpiralControls } from "./spiral";
@@ -6,14 +6,12 @@ import { initSpiral, type SpiralControls } from "./spiral";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
-import { initNetwork, type NetworkControls } from "./network";
 
 gsap.registerPlugin(ScrollTrigger);
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 let paused = reduced.matches;
 const still = () => paused || reduced.matches;
 let lenis: Lenis | null = null;
-let network: NetworkControls | null = null;
 let spiral: SpiralControls | null = null;
 let carouselIndex = 0;
 // On roomy screens the work pins and scrolling turns the spiral.
@@ -21,7 +19,7 @@ let workPin: ScrollTrigger | null = null;
 let unpinWork: (() => void) | undefined;
 let heroVisible = true;
 let context: gsap.Context | null = null;
-let hello: HelloControls | null = null;
+let story: StoryControls | null = null;
 let destroyImpact: (() => void) | undefined;
 let signal: SignalControls | null = null;
 
@@ -51,6 +49,7 @@ document.addEventListener("click", (event) => {
   if (!target) return;
   event.preventDefault();
   history.pushState(null, "", hash);
+  if (story?.jump(target)) return;
   lenis.scrollTo(hash === "#home" ? 0 : target, { offset: headerOffset(), duration: 1.2 });
   target.setAttribute("tabindex", target.getAttribute("tabindex") ?? "-1");
   target.focus({ preventScroll: true });
@@ -137,7 +136,7 @@ function paintCarousel(next: number, direction = 1, animate = true, turn = true)
   carouselIndex = Math.max(0, Math.min(list.length - 1, next));
   const position = document.querySelector("[data-project-position]");
   if (position)
-    position.textContent = `${String(carouselIndex + 1).padStart(2, "0")} / ${String(list.length).padStart(2, "0")} — Selected work`;
+    position.textContent = `${String(carouselIndex + 1).padStart(2, "0")} / ${String(list.length).padStart(2, "0")} — ${list[carouselIndex].querySelector(".project-badge .mono")?.textContent ?? "Selected work"}`;
   document.querySelector<HTMLButtonElement>("[data-gallery-prev]")?.toggleAttribute("disabled", carouselIndex === 0);
   document.querySelector<HTMLButtonElement>("[data-gallery-next]")?.toggleAttribute("disabled", carouselIndex >= list.length - 1);
   const incoming = list[carouselIndex];
@@ -148,8 +147,11 @@ function paintCarousel(next: number, direction = 1, animate = true, turn = true)
     card.setAttribute("aria-hidden", String(!current));
   });
   if (turn) spiral?.setTarget(carouselIndex, !animate);
-  gsap.killTweensOf(".project-body > *");
-  gsap.set(".project-body > *", { clearProps: "transform,opacity" });
+  // Only the outgoing and incoming notes are touched: resetting every card's
+  // children made each change read styles for the whole collection.
+  const touched = [list[previous], incoming].filter(Boolean).flatMap((card) => [...card.querySelectorAll(".project-body > *")]);
+  gsap.killTweensOf(touched);
+  gsap.set(touched, { clearProps: "transform,opacity" });
   if (!animate || still() || previous === carouselIndex) return;
   gsap.fromTo(
     incoming.querySelectorAll(".project-body > *"),
@@ -195,53 +197,9 @@ function setupWorkPin() {
     const next = Math.round(turn);
     if (next !== carouselIndex) paintCarousel(next, next > carouselIndex ? 1 : -1, true, false);
   };
-  // While the stage is pinned, one wheel or trackpad gesture moves one project,
-  // so a hard flick cannot sweep past the work. A new gesture at either end
-  // lets the page go.
-  let held = false; // the stage has caught the scroll
-  let leaving = 0; // direction in which the page was let go
-  let lastTime = 0;
-  let lastSize = 0;
-  let holdUntil = 0;
-  const release = () => {
-    held = false;
-    leaving = 0;
-  };
-  const step = (event: WheelEvent) => {
-    if (!workPin || event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    if (scrollY < workPin.start || scrollY > workPin.end) return release();
-    const direction = Math.sign(event.deltaY);
-    const now = event.timeStamp; // when the input happened, not when it was handled
-    const size = Math.abs(event.deltaY);
-    // The fading tail of a flick keeps arriving with shrinking sizes; ignore it.
-    const fresh = now - lastTime > 200 || size > lastSize || (size === lastSize && size >= 50);
-    lastTime = now;
-    lastSize = size;
-    if (leaving === direction) return;
-    leaving = 0;
-    if (!held) {
-      held = true;
-      holdUntil = now + 600;
-      event.preventDefault();
-      event.stopPropagation();
-      return goTo(direction > 0 ? 0 : count - 1, 0.7);
-    }
-    const next = carouselIndex + direction;
-    const ready = fresh && now > holdUntil;
-    if (ready && (next < 0 || next >= count)) {
-      leaving = direction;
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    if (!ready) return;
-    holdUntil = now + 520;
-    goTo(next, 0.7);
-  };
-  window.addEventListener("wheel", step, { passive: false, capture: true });
-  workPin = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: follow, onRefresh: follow, onLeave: release, onLeaveBack: release });
+  // Scrolling turns the spiral continuously, like the journey: every project passes the front.
+  workPin = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: follow, onRefresh: follow });
   return () => {
-    window.removeEventListener("wheel", step, { capture: true });
     workPin?.kill();
     workPin = null;
     section.classList.remove("is-pinned");
@@ -338,7 +296,7 @@ function setupScroll() {
     });
     // Panels and cards ease in as they arrive.
     const reveal = gsap.utils.toArray<HTMLElement>(
-      ".network, .experience-item, .publication-item, .notebook-panel, .credential, .scoreboard, .model-hud",
+      ".publication-item, .notebook-panel, .credential, .scoreboard",
     );
     reveal.forEach((el) => el.setAttribute("data-reveal", ""));
     ScrollTrigger.batch(reveal, {
@@ -404,22 +362,18 @@ function syncMotion() {
     button.innerHTML = `${isStill ? "Play motion" : "Pause motion"} <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="${isStill ? "m6 4 10 6-10 6Z" : "M6 4v12M14 4v12"}" fill="${isStill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="3"/></svg>`;
   });
   syncHeroVideo();
-  network?.setPaused(isStill);
-  hello?.sync();
+  story?.sync();
   signal?.sync();
 }
 
 export function initWorld() {
-  hello?.destroy();
-  hello = initHello(still);
+  story?.destroy();
+  story = initStory({ still, lenis: () => lenis, headerOffset });
   destroyImpact?.();
   destroyImpact = initImpact();
   heroObserver.disconnect();
-  network?.destroy();
   const scene = document.querySelector("[data-hero-scene]");
   if (scene) heroObserver.observe(scene);
-  const networkRoot = document.querySelector<HTMLElement>("[data-network]");
-  network = networkRoot ? initNetwork(networkRoot, still) : null;
   signal?.destroy();
   signal = initSignal(still);
   setupCarousel();
@@ -438,6 +392,19 @@ reduced.addEventListener("change", (event) => {
 document.addEventListener("visibilitychange", syncHeroVideo);
 window.addEventListener("portfolio-theme-change", syncHeroVideo);
 window.addEventListener("load", () => ScrollTrigger.refresh());
+// Pinned chapters measure their scroll ranges from layout. Fonts arriving late, or
+// anything else that changes the page's height, would leave those ranges stale,
+// so re-measure whenever the height settles at a new value.
+void document.fonts?.ready.then(() => ScrollTrigger.refresh());
+let lastPageHeight = 0;
+let heightTimer = 0;
+new ResizeObserver(() => {
+  const height = document.documentElement.scrollHeight;
+  if (Math.abs(height - lastPageHeight) < 2) return;
+  lastPageHeight = height;
+  clearTimeout(heightTimer);
+  heightTimer = window.setTimeout(() => ScrollTrigger.refresh(), 150);
+}).observe(document.body);
 // Whether the work section can pin depends on the viewport, so re-check on resize.
 let resizeTimer = 0;
 let lastWidth = innerWidth;

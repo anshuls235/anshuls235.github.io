@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "exported_at": "2026-11-03T11:40:38.385Z",
+  "exported_at": "2026-11-25T13:47:57.622Z",
   "content": {
     "profile": [
       {
         "id": "0119fa94-e8b5-50e1-ac8f-4c47a95659ac",
         "slug": "anshul-sharma",
         "name": "Anshul Sharma",
-        "title": "Data Science Manager",
+        "title": "Forward Deployed AI Engineer",
         "headline": "Making intelligence\nwork in the real world.",
         "introduction": "I build AI products from business problem to production. My work brings together generative AI, machine learning, and the engineering that makes them useful.",
         "about": "A developer turned data scientist, I work across the full lifecycle of an AI product: understanding the problem, building the data foundations, and taking models into production. My work spans automotive, enterprise knowledge, seller productivity, and cloud infrastructure.",
@@ -19,7 +19,7 @@
         "status": "published",
         "sort_order": 0,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T00:00:00+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       }
     ],
     "projects": [
@@ -537,13 +537,29 @@
     ],
     "experiences": [
       {
+        "id": "3a697e11-d407-41da-bce9-44534ade9f7b",
+        "slug": "sap-forward-deployed-ai-engineer",
+        "company": "SAP",
+        "position": "Forward Deployed AI Engineer",
+        "location": "Dubai, UAE",
+        "start_date": "2026-11-01",
+        "end_date": null,
+        "highlights": [
+          "Working alongside customers in the region to take enterprise AI from first conversation to production."
+        ],
+        "status": "published",
+        "sort_order": 0,
+        "created_at": "2026-11-25T13:47:27.284954+00:00",
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
+      },
+      {
         "id": "a97af70b-9289-517c-92f5-8680bde3a6e7",
         "slug": "al-futtaim-data-science-manager",
         "company": "Al-Futtaim Automotive",
         "position": "Data Science Manager",
         "location": "Dubai, UAE",
         "start_date": "2025-07-01",
-        "end_date": null,
+        "end_date": "2026-11-01",
         "highlights": [
           "Built multilingual AI car search for Automall with LangGraph, FastAPI, and Azure OpenAI.",
           "Architected a WhatsApp chatbot with LangGraph, Infobip, live agent handoff, and SAP C4C integration.",
@@ -551,9 +567,9 @@
           "Developed ECL models for automotive lease portfolios using Databricks and H2O Driverless AI."
         ],
         "status": "published",
-        "sort_order": 0,
+        "sort_order": 1,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T12:38:09.305399+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       },
       {
         "id": "983c2f5d-616e-52b5-a9ae-4d251c260503",
@@ -568,9 +584,9 @@
           "Applied predictive modeling to territory planning and seller insights."
         ],
         "status": "published",
-        "sort_order": 1,
+        "sort_order": 2,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T00:00:00+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       },
       {
         "id": "48fd0285-23a1-5dae-9f7c-a1cddedc14c9",
@@ -585,9 +601,9 @@
           "Modernized seller productivity tools with advanced analytics and dashboards."
         ],
         "status": "published",
-        "sort_order": 2,
+        "sort_order": 3,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T00:00:00+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       },
       {
         "id": "61ee227f-a205-5bef-a507-1a1065de3414",
@@ -602,9 +618,9 @@
           "Deployed a serverless AWS architecture for scalable data pipelines."
         ],
         "status": "published",
-        "sort_order": 3,
+        "sort_order": 4,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T00:00:00+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       },
       {
         "id": "d309e706-2a28-5bfc-80d8-dbee0f2897be",
@@ -619,9 +635,26 @@
           "Resolved complex data issues for global clients."
         ],
         "status": "published",
-        "sort_order": 4,
+        "sort_order": 5,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T00:00:00+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
+      },
+      {
+        "id": "eb726531-9361-4557-a54e-9cdbab524535",
+        "slug": "sap-labs-india-associate-developer-gurugram",
+        "company": "SAP Labs India",
+        "position": "Associate Developer",
+        "location": "Gurugram, India",
+        "start_date": "2016-08-01",
+        "end_date": "2019-03-01",
+        "highlights": [
+          "Enhanced SAP Demand Signal Management for supply-chain analytics with SAP BW/HANA and ABAP.",
+          "Built predictive models and automated ETL pipelines."
+        ],
+        "status": "published",
+        "sort_order": 6,
+        "created_at": "2026-11-25T13:47:27.284954+00:00",
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       },
       {
         "id": "a2a91f6d-d290-531d-b793-2714e161e049",
@@ -630,15 +663,12 @@
         "position": "Associate Developer",
         "location": "Bengaluru, India",
         "start_date": "2015-08-01",
-        "end_date": "2019-03-01",
-        "highlights": [
-          "Enhanced SAP Demand Signal Management for supply-chain analytics with SAP BW/HANA and ABAP.",
-          "Built predictive models and automated ETL pipelines."
-        ],
+        "end_date": "2016-08-01",
+        "highlights": [],
         "status": "published",
-        "sort_order": 5,
+        "sort_order": 7,
         "created_at": "2026-11-01T00:00:00+00:00",
-        "updated_at": "2026-11-01T00:00:00+00:00"
+        "updated_at": "2026-11-25T13:47:27.284954+00:00"
       }
     ],
     "education": [

@@ -1,9 +1,10 @@
-import { impactEngine, impactVisual } from "../impact";
 import { coverImage, hasCover } from "../art";
-import { heroScene, vignette, closingScene, logoMark } from "../world";
+import { heroScene, vignette, logoMark } from "../world";
 import type { Content, Project, Profile } from "./types";
 import { escapeHtml as e, safeUrl } from "./content";
 import { careerChapters } from "./experience";
+import landDots from "../content/map-dots.json";
+import { CITIES, fullCircle, journeyStops, modelTopics, projectPlace, storyProjects, type CityId } from "./story";
 
 const arrowPath = "M5 19 19 5 M7 5h12v12";
 const icon = (path: string) =>
@@ -78,8 +79,9 @@ export function renderProject(
   project: Project,
   index: number,
   total = 1,
+  place = "",
 ) {
-  return `<article class="project-card frame" id="project-${e(project.slug)}" data-index="${index}"><div class="project-body"><div class="project-badge"><span class="mono">Project</span><strong>${pad(index + 1)}</strong><span class="mono">${e(project.category)}</span></div><dl class="project-meta"><div><dt class="mono">Client</dt><dd>${e(project.organization || "Independent exploration")}</dd></div></dl><h3><a href="#work/${e(project.slug)}" data-project="${e(project.slug)}">${e(project.title)}</a></h3><p class="project-summary">${e(project.summary)}</p><ul class="tags" aria-label="Technologies">${project.technologies
+  return `<article class="project-card frame" id="project-${e(project.slug)}" data-index="${index}"><div class="project-body"><div class="project-badge"><span class="mono">${place ? e(place) : "Project"}</span><strong>${pad(index + 1)}</strong><span class="mono">${e(project.category)}</span></div><dl class="project-meta"><div><dt class="mono">Client</dt><dd>${e(project.organization || "Independent exploration")}</dd></div></dl><h3><a href="#work/${e(project.slug)}" data-project="${e(project.slug)}">${e(project.title)}</a></h3><p class="project-summary">${e(project.summary)}</p><ul class="tags" aria-label="Technologies">${project.technologies
     .slice(0, 4)
     .map((t) => `<li>${e(t)}</li>`)
     .join(
@@ -88,10 +90,10 @@ export function renderProject(
 }
 
 /** A tile for the spiral: the project's cover, or a typographic poster without one. */
-function spiralTile(project: Project, index: number, base: string) {
+function spiralTile(project: Project, index: number, base: string, city = "") {
   const metric = headlineMetric(project.summary);
   const top = `<span class="tile-top mono"><span>${pad(index + 1)}</span><span>${e(project.category)}</span></span>`;
-  const attrs = `href="#work/${e(project.slug)}" data-project="${e(project.slug)}" data-spiral-tile="${index}" tabindex="-1" draggable="false"`;
+  const attrs = `href="#work/${e(project.slug)}" data-project="${e(project.slug)}" data-spiral-tile="${index}" data-place="${e(city)}" tabindex="-1" draggable="false"`;
   if (hasCover(project.slug))
     return `<a class="spiral-tile has-cover" ${attrs}>${coverImage(project.slug, base, "(max-width: 980px) 60vw, 40vw")}${top}${metric ? `<strong class="tile-metric">${e(metric)}</strong>` : ""}</a>`;
   const mark = metric || project.technologies[0] || project.category;
@@ -132,87 +134,199 @@ function impactStories(projects: Project[]) {
   });
 }
 
+/** Split-flap characters: each one settles on its letter when the board comes into view. */
+function flaps(text: string, width: number) {
+  return [...text.toUpperCase().padEnd(width, " ")].slice(0, width).map((ch) => `<span class="flap" data-char="${e(ch)}">${ch === " " ? "&nbsp;" : e(ch)}</span>`).join("");
+}
+
+/** Results as an arrivals board: what landed, from which project, as reported. */
 export function renderImpact(projects: Project[]) {
   const stories = impactStories(projects);
   if (!stories.length) return "";
-  return `<section class="impact-section" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>00</span>Applied AI / Measured outcomes</p><h2 class="display" id="impact-heading">${display("Built to make\na difference.")}</h2></div><p class="section-intro">The work matters most when someone uses it. A few reported results from the projects below.</p></div>${impactEngine()}<div class="impact-tabs container" role="group" aria-label="Reported results" data-interactive hidden>${stories.map(({ label }, index) => `<button class="impact-tab" type="button" data-impact-tab="${index}" aria-pressed="${index === 0}"><span class="mono">${pad(index + 1)}</span>${e(label)}</button>`).join("")}</div><div class="impact-stage"><div class="impact-grid">${stories
-    .map(
-      ({ project, label }, index) =>
-        `<article class="impact-card" data-metric="${e(headlineMetric(project.summary))}"><div class="impact-card-inner container"><p class="impact-label mono"><span>${pad(index + 1)}</span>${e(label)}</p><p class="impact-metric" aria-hidden="true">${e(headlineMetric(project.summary))}</p><div class="impact-copy"><h3>${e(project.title)}</h3><p class="impact-result">${e(project.summary)}</p><a class="box-button" href="#work/${e(project.slug)}" data-project="${e(project.slug)}">View project results ${right}<span class="sr-only"> for ${e(project.title)}</span></a></div>${impactVisual(index)}</div></article>`,
-    )
-    .join(
-      "",
-    )}</div></div><p class="impact-scope container">Sales figures show attributed revenue, not causal uplift. Lead scoring reports early pilot opportunities, not sales. Open the project notes for measurement periods, methods and limitations.</p></section>`;
+  const width = Math.max(...stories.map(({ project }) => headlineMetric(project.summary).length), 6);
+  return `<section class="impact-section board-section chapter" id="impact" aria-labelledby="impact-heading"><div class="container impact-heading"><div><p class="eyebrow"><span>04</span>What it changed</p><h2 class="display" id="impact-heading">${display("Arrivals.")}</h2></div><p class="section-intro">Work only matters once someone uses it. Three of the projects you just flew past, and what they reported when they landed.</p></div>
+  <div class="container"><div class="board" data-board>
+    <div class="board-top mono" aria-hidden="true"><span class="board-title">Arrivals · Results</span><span>Dubai <b data-board-clock>--:--</b></span></div>
+    <div class="board-head mono" aria-hidden="true"><span>Flight</span><span>Result</span><span>Project</span><span>Status</span></div>
+    ${stories
+      .map(({ project, label }, i) => {
+        const metric = headlineMetric(project.summary);
+        return `<article class="impact-card board-row" data-metric="${e(metric)}"><span class="board-flight mono">AS ${pad(i + 1)}${pad(i * 3 + 4)}</span><div class="board-result"><span class="board-flaps" aria-hidden="true">${flaps(metric, width)}</span><span class="sr-only">${e(metric)}</span><p class="impact-label mono">${e(label)}</p></div><div class="board-what"><h3><a href="#work/${e(project.slug)}" data-project="${e(project.slug)}">${e(project.title)}</a></h3><p class="impact-result">${e(project.summary)}</p></div><span class="board-status mono"><i aria-hidden="true"></i>Landed</span></article>`;
+      })
+      .join("")}
+  </div></div>
+  <p class="impact-scope container">Sales figures show attributed revenue, not causal uplift. Lead scoring reports early pilot opportunities, not sales. Open the project notes for measurement periods, methods and limitations.</p>${bridge("#notes", "Between the flights, I write things down and keep learning")}</section>`;
 }
 
-export function renderExperience(experiences: Content["experiences"]) {
-  const chapters = careerChapters(experiences);
-  return (
-    chapters
-      .map(
-        (chapter, index) =>
-          `<article class="experience-item frame"><div class="experience-top"><span class="epoch mono">Epoch ${pad(chapters.length - index)}</span><p class="mono experience-date">${date(chapter.start)} — ${chapter.end ? date(chapter.end) : "Latest chapter"}</p></div><div class="career-chapter"><h3>${e(chapter.company)}</h3>${chapter.roles.length > 1 ? '<p class="career-progression mono">Role progression</p>' : ""}<ol class="career-roles">${chapter.roles.map((role) => `<li class="career-role"><div class="career-role-heading"><h4>${e(role.position)}</h4><p class="mono">${date(role.start_date)} — ${role.end_date ? date(role.end_date) : "Latest chapter"}</p></div><p class="career-location">${e(role.location)}</p>${role.highlights.length ? `<details><summary>Explore contributions<span class="sr-only"> as ${e(role.position)} at ${e(chapter.company)}</span><span aria-hidden="true" class="summary-icon">+</span></summary><ul>${role.highlights.map((h) => `<li>${e(h)}</li>`).join("")}</ul></details>` : ""}</li>`).join("")}</ol></div></article>`,
-      )
-      .join("") || '<p class="empty-state">Experience details will be added soon.</p>'
-  );
+/** Map coordinates for the journey: an equirectangular crop of the land, no borders. */
+const MAP = { w: 800, h: 560, lon: landDots.bounds.lon, lat: landDots.bounds.lat };
+function project(lon: number, lat: number) {
+  return {
+    x: ((lon - MAP.lon[0]) / (MAP.lon[1] - MAP.lon[0])) * MAP.w,
+    y: ((MAP.lat[1] - lat) / (MAP.lat[1] - MAP.lat[0])) * MAP.h,
+  };
 }
-
-/** A small "training curve" whose checkpoints are the career chapters. */
-function lossCurve(experiences: Content["experiences"]) {
-  const chapters = careerChapters(experiences).reverse();
-  if (!chapters.length) return "";
-  const w = 420;
-  const h = 220;
-  const points = chapters.map((c, i) => {
-    const x = 54 + (i / Math.max(1, chapters.length - 1)) * (w - 108);
-    const y = 40 + (h - 80) * Math.exp(-i * 1.1) ;
-    return { x, y: h - y + 20, company: c.company };
-  });
-  let d = `M14 ${h - 196}`;
-  points.forEach((p, i) => {
-    const prev = i ? points[i - 1] : { x: 14, y: h - 196 };
-    const mid = (prev.x + p.x) / 2;
-    d += ` C${mid} ${prev.y} ${mid} ${p.y} ${p.x} ${p.y}`;
-  });
-  d += ` C${w - 20} ${points.at(-1)!.y} ${w - 10} ${points.at(-1)!.y + 4} ${w} ${points.at(-1)!.y + 4}`;
-  return `<figure class="loss-chart frame" aria-label="Illustrative career learning curve, not measured model loss"><figcaption class="mono"><span>Training curve</span><span>loss ↓ · experience ↑</span></figcaption><svg viewBox="0 0 ${w} ${h}" fill="none" aria-hidden="true"><g class="loss-grid">${[50, 100, 150, 200].map((y) => `<path d="M0 ${y}H${w}"/>`).join("")}</g><path class="loss-line" data-loss-line d="${d}" pathLength="1"/>${points.map((p, i) => `<g class="loss-point" data-loss-point="${i}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})"><circle r="7"/><text y="${i % 2 ? 26 : -16}" text-anchor="${i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}">${e(p.company.replace(/\s(India|Automotive|Global)$/, ""))}</text></g>`).join("")}</svg><p class="curve-note mono">Career checkpoints · illustrative curve</p></figure>`;
+function year(value: string | null) {
+  return value ? value.slice(0, 4) : "now";
 }
+/** "1 yr", "8 yrs 10 mos": how long a stop lasted. */
+function stay(start: string, end: string | null) {
+  const to = end ? new Date(end) : new Date("2026-11-25");
+  const months = Math.max(1, (to.getUTCFullYear() - new Date(start).getUTCFullYear()) * 12 + to.getUTCMonth() - new Date(start).getUTCMonth());
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return [y ? `${y} yr${y > 1 ? "s" : ""}` : "", m ? `${m} mo${m > 1 ? "s" : ""}` : ""].filter(Boolean).join(" ");
+}
+const TAGLINES: Record<CityId, string> = {
+  bengaluru: "Where it started: shipping code inside enterprise systems.",
+  delhi: "Where the developer became a data scientist.",
+  dubai: "Where the models met the market.",
+};
+const planeIcon = `<svg class="pass-plane" viewBox="-16 -12 36 24" aria-hidden="true"><path d="M-14 -10 18 0 -14 10 -7 0Z"/></svg>`;
 
-const OUTPUTS = ["Shipped products", "Better decisions", "Measured impact"];
-const CATEGORY_TONES = ["mint", "yellow", "coral", "sky", "lilac", "lime"];
-
-export function renderNetwork(skills: Content["skills"]) {
-  const categories = [...new Set(skills.map((s) => s.category))];
-  if (!categories.length)
-    return '<p class="empty-state">Expertise details are being updated.</p>';
-  const groups = categories.map((category) =>
-    skills.filter((s) => s.category === category),
-  );
-  const halves = groups.map((list) => {
-    const cut = Math.ceil(list.length / 2);
-    return [list.slice(0, cut), list.slice(cut)];
+/** The career as a flight: a map whose legs draw as you scroll, and a boarding pass per city. */
+export function renderJourney(experiences: Content["experiences"], base = "/", passenger = "") {
+  const stops = journeyStops(experiences);
+  if (!stops.length) return '<p class="empty-state">Experience details will be added soon.</p>';
+  const circle = fullCircle(stops);
+  const points = stops.map((s) => project(CITIES[s.city].lon, CITIES[s.city].lat));
+  const legs = points.slice(1).map((to, i) => {
+    const from = points[i];
+    // Bow each leg like a great-circle route seen on a flat map.
+    const mx = (from.x + to.x) / 2 - (to.y - from.y) * 0.3;
+    const my = (from.y + to.y) / 2 - (to.x - from.x) * 0.3;
+    return `M${from.x.toFixed(1)} ${from.y.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
   });
-  const tone = (i: number) => CATEGORY_TONES[i % CATEGORY_TONES.length];
-  const hidden = (layer: 0 | 1) =>
-    halves
-      .map(
-        (h, i) =>
-          `<div class="band tone-${tone(i)}" data-band="${i}">${h[layer].map((s) => `<span class="node node-skill" data-cat="${i}">${e(s.name)}</span>`).join("")}</div>`,
-      )
+  const last = points.at(-1)!;
+  if (circle) legs.push(`M${last.x.toFixed(1)} ${last.y.toFixed(1)} c 34 -78 128 -56 104 14 c -18 52 -92 40 -104 -14`);
+  const first = Number(year(stops[0].start));
+  const finalYear = Number(year(circle?.start ?? stops.at(-1)!.start));
+  const span = Math.max(1, finalYear + 1 - first);
+  const at = (date: string) => ((new Date(date).getUTCFullYear() + new Date(date).getUTCMonth() / 12 - first) / span) * 100;
+  const marks = [...stops.map((s) => ({ code: CITIES[s.city].short, date: s.start })), ...(circle ? [{ code: "SAP", date: circle.start }] : [])];
+  const tx = (pct: number) => (20 + (pct / 100) * 760).toFixed(1);
+  const timeline = `<svg class="journey-timeline" viewBox="0 0 800 64" aria-hidden="true"><path class="timeline-track" d="M20 22H780"/><path class="timeline-fill" data-timeline-fill d="M20 22H780" pathLength="1"/>${Array.from({ length: span }, (_, i) => `<g class="timeline-year" transform="translate(${tx((i / span) * 100)} 0)"><path d="M0 16v12"/><text y="50" text-anchor="middle">${first + i}</text></g>`).join("")}${marks.map((m, i) => `<g class="timeline-stop" data-timeline-stop="${i}" data-pct="${at(m.date).toFixed(2)}" data-year="${year(m.date)}" transform="translate(${tx(at(m.date))} 22)"><circle r="7"/><text y="-14" text-anchor="middle">${m.code}</text></g>`).join("")}</svg>`;
+  const map = `<figure class="journey-map" aria-hidden="true"><svg viewBox="0 0 ${MAP.w} ${MAP.h}" fill="none"><image class="map-land" href="${base}assets/journey-land.svg" width="${MAP.w}" height="${MAP.h}" preserveAspectRatio="none"/><text class="map-sea" x="${project(64, 14.5).x}" y="${project(64, 14.5).y}">Arabian Sea</text><text class="map-sea" x="${project(51.6, 27.2).x}" y="${project(51.6, 27.2).y}">Gulf</text><g class="map-legs">${legs.map((d, i) => `<path class="map-leg-ghost" d="${d}"/><path class="map-leg" data-leg="${i}" d="${d}" pathLength="1"/>`).join("")}</g>${stops.map((s, i) => { const left = s.city === "dubai"; return `<g class="map-city" data-city-marker="${i}" transform="translate(${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)})"><circle class="map-halo" r="20"/><circle class="map-pin" r="8"/><g class="map-tag" transform="translate(${left ? -16 : 16} ${s.city === "bengaluru" ? 6 : -10})"><text class="map-code" text-anchor="${left ? "end" : "start"}">${CITIES[s.city].short}</text><text class="map-name" y="18" text-anchor="${left ? "end" : "start"}">${CITIES[s.city].name} · ${year(s.start)}</text></g></g>`; }).join("")}<g class="map-plane" data-journey-plane transform="translate(${points[0].x} ${points[0].y})"><path d="M-14 -10 18 0 -14 10 -7 0Z"/><path class="map-plane-fold" d="M-7 0H18"/></g></svg><figcaption class="map-year"><span class="mono">Year</span><strong data-journey-year>${finalYear}</strong></figcaption></figure>`;
+  // Each role is one itinerary row; its highlights live on the back of the ticket.
+  const role = (r: Content["experiences"][number]) =>
+    r.highlights.length
+      ? `<li class="career-role"><button type="button" class="role-row" data-role-log="log-${e(r.slug)}" aria-controls="log-${e(r.slug)}" aria-expanded="false"><h5>${e(r.position)}</h5><span class="mono role-dates">${date(r.start_date)} — ${r.end_date ? date(r.end_date) : "Now"}</span><span class="role-arrow" aria-hidden="true">${icon("M5 12h14M13 6l6 6-6 6")}</span><span class="sr-only">: flight log</span></button></li>`
+      : `<li class="career-role"><div class="role-row is-static"><h5>${e(r.position)}</h5><span class="mono role-dates">${date(r.start_date)} — ${r.end_date ? date(r.end_date) : "Now"}</span></div></li>`;
+  const logs = (roles: Content["experiences"]) =>
+    roles
+      .filter((r) => r.highlights.length)
+      .map((r) => `<section class="pass-log" id="log-${e(r.slug)}" aria-label="Flight log: ${e(r.position)}, ${e(r.company)}"><p class="mono log-kicker">Flight log · ${e(r.company)}</p><h4>${e(r.position)}</h4><p class="mono log-dates">${date(r.start_date)} — ${r.end_date ? date(r.end_date) : "Now"} · ${e(r.location)}</p><ul class="log-list">${r.highlights.map((h) => `<li>${e(h)}</li>`).join("")}</ul><button type="button" class="log-back" data-log-back>${icon("M19 12H5M11 6l-6 6 6 6")} Back to the pass</button></section>`)
       .join("");
-  return `<div class="network" data-network><canvas class="network-canvas" aria-hidden="true"></canvas><div class="layer layer-input"><p class="layer-label mono" aria-hidden="true">Input layer</p>${categories
-    .map(
-      (c, i) =>
-        `<button type="button" class="node node-input tone-${tone(i)}" data-cat="${i}" aria-pressed="false"><span class="node-dot" aria-hidden="true"></span><span class="node-name">${e(c)}</span><span class="node-count mono" aria-hidden="true">${pad(groups[i].length)}</span><span class="sr-only"> — highlight ${groups[i].length} skills in the network</span></button>`,
-    )
-    .join(
-      "",
-    )}</div><div class="layer layer-hidden" aria-hidden="true"><p class="layer-label mono">Hidden layer 1</p>${hidden(0)}</div><div class="layer layer-hidden" aria-hidden="true"><p class="layer-label mono">Hidden layer 2</p>${hidden(1)}</div><div class="layer layer-output" aria-hidden="true"><p class="layer-label mono">Output</p>${OUTPUTS.map((o) => `<span class="node node-output">${o}</span>`).join("")}</div></div><div class="sr-only">${categories
-    .map(
-      (c, i) =>
-        `<h3>${e(c)}</h3><ul class="skill-list">${groups[i].map((s) => `<li>${e(s.name)}</li>`).join("")}</ul>`,
-    )
-    .join("")}</div>`;
+  // A real boarding pass: the ticket, a perforated stub, a security pattern and a passport stamp.
+  const pass = (i: number, from: [string, string], to: [string, string], start: string, end: string | null, title: string, line: string, chapters: string, gate: string, stamp: string, extra = "") => {
+    const flight = `AS ${year(start)}`;
+    const seat = `${pad(i + 1)}${"ACDF"[i % 4]}`;
+    return `<li class="journey-stop${extra}" data-stop="${i}"><article class="boarding-pass"><div class="pass-ticket"><header class="pass-band"><span class="pass-airline">${logoMark()}<span>AS<b>AIR</b></span></span><span class="mono">Boarding pass · Career class</span></header><div class="pass-body"><div class="pass-route"><div><span class="mono">From</span><strong>${from[0]}</strong><span>${from[1]}</span></div><div class="pass-path" aria-hidden="true"><i></i>${planeIcon}<span class="mono">${stay(start, end)}</span></div><div class="pass-to"><span class="mono">To</span><strong>${to[0]}</strong><span>${to[1]}</span></div></div><dl class="pass-meta"><div><dt class="mono">Passenger</dt><dd>${e(passenger)}</dd></div><div><dt class="mono">Flight</dt><dd>${flight}</dd></div><div><dt class="mono">Gate</dt><dd>${gate}</dd></div><div><dt class="mono">Boarded</dt><dd>${date(start)}</dd></div><div><dt class="mono">${end ? "Until" : "Status"}</dt><dd>${end ? date(end) : "Now"}</dd></div><div><dt class="mono">Seat</dt><dd>${seat}</dd></div></dl><div class="pass-title"><h3>${title}</h3><p class="pass-line">${line}</p><span class="pass-stamp" aria-hidden="true"><b>${stamp}</b><i>${year(start)}</i></span></div>${chapters}</div></div><aside class="pass-stub" aria-hidden="true"><span class="mono">${flight}</span><strong>${from[0]}</strong><span class="pass-stub-arrow">↓</span><strong>${to[0]}</strong><span class="mono">Seat ${seat}</span><span class="pass-code"></span></aside></article></li>`;
+  };
+  const passes = stops.map((s, i) => {
+    const chapters = s.chapters.filter((c) => !(circle && c === circle && i === stops.length - 1));
+    const next = stops[i + 1];
+    const to: [string, string] = next ? [CITIES[next.city].short, CITIES[next.city].name] : circle ? [e(circle.company.split(" ")[0]), date(circle.start)] : ["—", "Next"];
+    const end = next ? next.start : circle ? circle.start : s.end;
+    return pass(i, [CITIES[s.city].short, CITIES[s.city].name], to, s.start, end, e(CITIES[s.city].name), TAGLINES[s.city], chapters.map((c) => `<div class="pass-chapter"><h4>${e(c.company)}</h4><ol class="career-roles">${c.roles.map(role).join("")}</ol></div>`).join("") + logs(chapters.flatMap((c) => c.roles)), e(chapters[0]?.company.split(" ")[0] ?? "—"), e(CITIES[s.city].name));
+  });
+  if (circle) {
+    const root = e(circle.company.split(" ")[0]);
+    passes.push(pass(stops.length, [root, `${CITIES[stops[0].city].name} · ${year(stops[0].start)}`], [root, `${CITIES[stops.at(-1)!.city].name} · ${year(circle.start)}`], circle.start, null, `Back to ${e(circle.company)}.`, `The company where I wrote my first production code, ${year(stops[0].start)} in ${CITIES[stops[0].city].name}, is where I now take AI to customers in the field.`, `<div class="pass-chapter"><h4>${e(circle.company)} · ${e(CITIES[stops.at(-1)!.city].name)}</h4><ol class="career-roles">${circle.roles.map(role).join("")}</ol></div>${logs(circle.roles)}`, root, "Returned", " is-circle"));
+  }
+  return `<div class="journey-visual" data-first-year="${first}" data-final-year="${finalYear}">${map}${timeline}</div><ol class="journey-stops" data-steps="${passes.length}">${passes.join("")}</ol>`;
+}
+
+/** The chapter list that the flight rail and the screen transitions share. */
+export const CHAPTERS = [
+  ["home", "Hello"],
+  ["experience", "Journey"],
+  ["skills", "Model"],
+  ["projects", "Work"],
+  ["impact", "Impact"],
+  ["notes", "Notes"],
+  ["contact", "Let’s talk"],
+] as const;
+
+function flightRail(hasImpact: boolean) {
+  const chapters = CHAPTERS.filter(([id]) => hasImpact || id !== "impact");
+  return `<nav class="flight-rail" aria-label="Story chapters" data-rail data-interactive hidden><ol>${chapters.map(([id, label], i) => `<li><a href="#${id}" data-rail-stop="${id}"><span class="rail-dot" aria-hidden="true"></span><span class="rail-label mono"><span>${pad(i)}</span>${label}</span></a></li>`).join("")}</ol><span class="rail-plane" data-rail-plane aria-hidden="true"><svg viewBox="-16 -12 36 24" width="26" height="18"><path d="M-14 -10 18 0 -14 10 -7 0Z"/></svg></span></nav>`;
+}
+
+/** The bridge at the end of each chapter, which hands the story to the next. */
+function bridge(href: string, text: string) {
+  return `<a class="bridge container" href="${href}"><span class="bridge-line" aria-hidden="true"></span><span class="bridge-text">${text}</span><span class="bridge-arrow" aria-hidden="true">${icon("M5 5 19 19 M7 19h12V7")}</span></a>`;
+}
+
+/** The finale: a real city in 3D, the plane, and the conversation. */
+function renderSky(p: Profile, base: string, social: string) {
+  const cities = (["bengaluru", "delhi", "dubai"] as CityId[]).map((id) => `<button type="button" data-city="${id}" aria-pressed="${id === "dubai"}"><span class="mono">${CITIES[id].short}</span>${e(CITIES[id].name)}</button>`).join("");
+  const stat = (name: string, label: string, unit: string) => `<div><span class="mono">${label}</span><strong data-hud="${name}">0</strong><span class="mono">${unit}</span></div>`;
+  const result = (name: string, label: string) => `<div><dt class="mono">${label}</dt><dd data-over="${name}">0</dd></div>`;
+  return `<div class="sky" data-sky data-city="dubai" data-sky-mode="attract">
+    <canvas data-sky-canvas aria-label="A paper plane gliding over a city" role="img"></canvas>
+    <div class="sky-poster" aria-hidden="true"></div>
+    <div class="sky-shade" aria-hidden="true"></div>
+    <p class="sky-loading mono" aria-hidden="true">Loading the city…</p>
+    <div class="sky-cities" role="group" aria-label="Choose a city to fly over" data-interactive hidden>${cities}</div>
+    <div class="sky-speedlines" aria-hidden="true"></div>
+    <div class="sky-clock" aria-hidden="true"><span class="mono">Time</span><strong data-hud="time">75</strong><span class="sky-meter" data-sky-meter><i></i></span><span class="mono sky-meter-label">Boost</span><span class="sky-bonus mono" data-sky-bonus></span></div>
+    <div class="sky-hud" aria-hidden="true">${stat("score", "Score", "")}${stat("combo", "Combo", "")}${stat("rings", "Rings", "")}${stat("speed", "Speed", "km/h")}${stat("alt", "Height", "m")}${stat("vario", "Climb", "m/s")}<p class="sky-chip sky-lift mono">Rising air</p><p class="sky-chip sky-stall mono">Too slow — dive</p></div>
+    <p class="sky-count" data-sky-count aria-hidden="true" hidden></p>
+    <div class="sky-pointer" data-sky-pointer aria-hidden="true" hidden><span class="sky-pointer-arrow"></span><span class="sky-pointer-ring"></span><span class="mono" data-sky-pointer-distance></span></div>
+    <div class="sky-controls" data-interactive hidden><p class="mono sky-help"><span class="kbd">↑↓</span> climb / dive <span class="kbd">←→</span> turn <span class="kbd">Space</span> boost <span class="kbd">R</span> restart · or aim with the mouse · Grab orbs: <b class="orb-boost">boost</b> <b class="orb-lift">updraft</b> <b class="orb-time">time</b></p><button type="button" class="box-button sky-boost-button" data-sky-boost>Hold to boost</button><button type="button" class="box-button" data-sky-sound aria-pressed="true">Sound on</button><button type="button" class="box-button" data-sky-assist aria-pressed="true">Assist on</button><button type="button" class="box-button box-button-primary" data-sky-exit>Land &amp; talk</button></div>
+    <section class="sky-over" data-sky-over aria-label="Flight over" hidden><p class="mono" data-over="cause">Landed</p><h3>Flight over</h3><dl>${result("score", "Score")}${result("rings", "Rings")}${result("distance", "Distance")}${result("time", "Time aloft")}${result("best", "Best here")}</dl><div class="sky-over-actions"><button type="button" class="box-button box-button-primary" data-sky-relaunch>Fly again</button><button type="button" class="box-button" data-sky-exit>Land &amp; talk</button></div></section>
+    <p class="sky-credit mono">Buildings, roads &amp; water: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors<span class="sr-only"> (opens in a new tab)</span></a></p>
+    <p class="sr-only" data-sky-status role="status" aria-live="polite"></p>
+    <div class="contact-card container">
+      <p class="eyebrow"><span>06</span>Last stop · ${e(p.location)}</p>
+      <div class="contact-heading"><h2 class="display" id="contact-heading">${display("Great things\nstart with hello.")}</h2></div>
+      <p class="contact-lede">That paper plane left the top of the page as a hello. It flew the whole journey, and it has landed here, over Dubai Marina. Send one back.</p>
+      <div class="contact-prompts"><p class="mono">Pick a conversation starter</p><div>${[["I have an AI idea", "AI IDEA?"], ["Let’s collaborate", "LET’S BUILD"], ["Just saying hello", "HEY THERE"]].map(([subject, say]) => conversationStarter(p.email, subject, say)).join("")}</div></div>
+      <div class="contact-bottom">${link(`mailto:${p.email}`, e(p.email), base, "contact-email", 'data-event="contact_action"')}<div class="social-links">${social}</div></div>
+      <div class="sky-invite" data-interactive hidden><button type="button" class="box-button box-button-primary" data-sky-play>Take the controls ${icon("M5 12h14M13 6l6 6-6 6")}</button><p class="mono">Beat the clock through rings over real Bengaluru, Delhi and Dubai. Real lift, drag and thermals.</p></div>
+    </div>
+  </div>`;
+}
+
+/** A short name for a project, from its slug: "automall-ai-search" → "Automall AI search". */
+export function shortName(slug: string) {
+  const words: Record<string, string> = { ai: "AI", ml: "ML", mcp: "MCP", covid19: "COVID-19" };
+  return slug
+    .split("-")
+    .map((w, i) => words[w] ?? (i ? w : w[0].toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
+/** Expertise as a knowledge orb: topics as hubs, skills around them, and arcs between skills that shipped together. */
+export function renderOrb(content: Content) {
+  const topics = modelTopics(content);
+  if (!topics.length) return '<p class="empty-state">Expertise details are being updated.</p>';
+  const nodes: { id: number; label: string; topic: number; hub: boolean; projects: string[] }[] = [];
+  topics.forEach((t, i) => {
+    nodes.push({ id: nodes.length, label: t.name, topic: i, hub: true, projects: t.projects.map((p) => p.slug) });
+    t.skills.forEach((skill) => nodes.push({ id: nodes.length, label: skill.name, topic: i, hub: false, projects: skill.projects }));
+  });
+  // Skills that shipped in the same project are linked.
+  const links = new Map<string, [number, number]>();
+  const skills = nodes.filter((n) => !n.hub);
+  for (const project of content.projects) {
+    const used = skills.filter((n) => n.projects.includes(project.slug)).map((n) => n.id);
+    for (let i = 0; i < used.length; i++) for (let j = i + 1; j < used.length; j++) links.set(`${used[i]}-${used[j]}`, [used[i], used[j]]);
+  }
+  const projects = Object.fromEntries(storyProjects(content).map((p) => [p.slug, { name: shortName(p.slug), place: projectPlace(p, content).label }]));
+  const graph = { topics: topics.map((t) => t.name), nodes, links: [...links.values()], projects };
+  const totalSkills = skills.length;
+  const shipped = skills.filter((n) => n.projects.length).length;
+  return `<div class="container orb-grid">
+    <div class="orb-copy">${sectionHead("02", "What the journey trained", "The model\nbehind the work.", "skills-heading")}
+      <p class="section-intro">${topics.length} topics, ${totalSkills} skills, and the arcs between skills that shipped together. Turn the globe, then pick anything to see the work behind it.</p>
+      <div class="orb-topics" role="group" aria-label="Topics">${topics.map((t, i) => `<button type="button" data-orb-topic="${nodes.find((n) => n.hub && n.topic === i)!.id}" aria-pressed="false"><span class="mono">${pad(i + 1)}</span>${e(t.name)}<b class="mono">${t.skills.length}</b></button>`).join("")}</div>
+      <div class="orb-detail" data-orb-detail aria-live="polite"><p class="mono">${shipped} of ${totalSkills} skills appear in published work. Filled dots shipped; hollow ones are in the toolkit.</p></div>
+    </div>
+    <div class="orb-stage" data-orb data-graph="${e(JSON.stringify(graph))}"><canvas aria-hidden="true"></canvas><p class="orb-hint mono" aria-hidden="true">Drag to turn · click a node</p></div>
+  </div>
+  <div class="sr-only">${topics.map((t) => `<h3>${e(t.name)}</h3><ul>${t.skills.map((s) => `<li>${e(s.name)}${s.projects.length ? `: used in ${s.projects.map((slug) => e(shortName(slug))).join(", ")}` : ""}</li>`).join("")}</ul>`).join("")}</div>`;
 }
 
 function stat(value: number | string, label: string) {
@@ -235,14 +349,17 @@ export function renderSite(content: Content, base = "/") {
       ),
     )
     .join("");
-  // The spiral follows the published order of the projects.
-  const showcase = content.projects;
+  // The spiral follows the career: the work in the order it happened.
+  const showcase = storyProjects(content);
+  const places = showcase.map((x) => projectPlace(x, content));
   const chapters = careerChapters(content.experiences);
+  const stops = journeyStops(content.experiences);
   const firstYear = content.experiences
     .map((x) => Number(x.start_date.slice(0, 4)))
     .sort()[0];
   const years = firstYear ? new Date().getUTCFullYear() - firstYear : 0;
   const tickerItems = [
+    ...stops.map((s) => `${CITIES[s.city].short} ${year(s.start)}`),
     ...impactStories(content.projects).map(
       ({ project, label }) => `${headlineMetric(project.summary)} · ${label}`,
     ),
@@ -252,8 +369,13 @@ export function renderSite(content: Content, base = "/") {
     .map((t) => `<span>${e(t)}</span><i></i>`)
     .join("");
   const hello = p.name.split(" ")[0];
+  const impact = renderImpact(content.projects);
+  const medium = content.social_links.find((s) => s.network === "Medium")?.url ?? null;
+  const kaggle = content.social_links.find((s) => s.network === "Kaggle")?.url ?? null;
+  const firstCity = stops[0] ? CITIES[stops[0].city].name : "";
+  const lastCity = stops.at(-1) ? CITIES[stops.at(-1)!.city].name : "";
 
-  return `<main id="main">
+  return `${flightRail(Boolean(impact))}<main id="main" class="story">
   <section class="hero" id="home" aria-labelledby="hero-heading">
     ${heroScene(base)}
     <div class="hero-inner container">
@@ -265,38 +387,51 @@ export function renderSite(content: Content, base = "/") {
           <p class="hero-description">${e(p.introduction)}</p>
           <div class="hero-actions"><a class="box-button box-button-primary" href="#projects">Explore my work ${down}</a>${link(p.resume_url, `Download CV ${arrow}`, base, "box-button", 'data-event="cv_download" download')}</div>
         </div>
+        <span class="hero-plane" data-hero-plane aria-hidden="true"><svg viewBox="-16 -12 36 24" width="54" height="36"><path d="M-14 -10 18 0 -14 10 -7 0Z"/><path class="fold" d="M-7 0H18"/></svg></span>
       </div>
     </div>
-    <div class="hero-foot container"><p class="mono hero-role">${e(p.title)} · Builder at heart</p><a class="scroll-pill mono" href="#impact" aria-label="Scroll to reported impact"><i aria-hidden="true"></i>Scroll</a><button class="world-motion mono" data-world-motion type="button" aria-pressed="false">Pause motion <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 4v12M14 4v12" stroke="currentColor" stroke-width="3"/></svg></button></div>
+    <div class="hero-foot container"><p class="mono hero-role">${e(p.title)} · ${e(p.location)}</p><a class="scroll-pill mono" href="#experience" aria-label="Follow the journey"><i aria-hidden="true"></i>Follow the plane</a><button class="world-motion mono" data-world-motion type="button" aria-pressed="false">Pause motion <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 4v12M14 4v12" stroke="currentColor" stroke-width="3"/></svg></button></div>
   </section>
   <div class="ticker" aria-hidden="true"><div class="ticker-track">${ticker}${ticker}${ticker}</div></div>
-  ${renderImpact(content.projects)}
-  <section class="work-section selected-section" id="projects" aria-labelledby="work-heading">
-    <div class="container work-top"><div><p class="eyebrow"><span>01</span>Selected work</p><h2 class="display display-thin" id="work-heading">${display("Work")}</h2></div><div class="work-intro"><p class="section-intro">From a first question to a working system. Every project rides the spiral: turn it to find one, open it to read the notes.</p></div></div>
+  <section class="journey-section chapter" id="experience" aria-labelledby="experience-heading">
+    <div class="journey-track" data-journey><div class="journey-pin">
+      <div class="container journey-grid"><div class="journey-head">${sectionHead("01", "The journey", "Three cities.\nOne flight path.", "experience-heading")}<p class="section-intro">${firstCity && lastCity ? `${e(firstCity)} to ${e(lastCity)}` : "A career"}, ${years} years, one direction: from writing enterprise code to putting AI in front of the people who use it.</p></div>${renderJourney(content.experiences, base, p.name)}<p class="journey-hint mono" data-interactive hidden>Scroll to fly the route</p></div>
+    </div></div>
+    ${bridge("#skills", "Every stop trained something. Here is the model it built")}
+  </section>
+  <section class="model-section orb-section chapter" id="skills" aria-labelledby="skills-heading">
+    ${renderOrb(content)}
+    ${bridge("#projects", "A model is only as good as what it ships. Here is the work, in the order it happened")}
+  </section>
+  <section class="work-section selected-section chapter" id="projects" aria-labelledby="work-heading">
+    <div class="container work-top"><div><p class="eyebrow"><span>03</span>What I built along the way</p><h2 class="display display-thin" id="work-heading">${display("Work")}</h2></div><div class="work-intro"><p class="section-intro">In the order it happened, from side projects in ${e(CITIES.delhi.name)} to agents in ${e(lastCity || CITIES.dubai.name)}. Scroll to fly through it; open any project to read the notes.</p></div></div>
     <div class="work-track" data-work-track><div class="work-pin">
     <div class="work-stage container">
-      <div class="spiral-stage" data-spiral aria-hidden="true"><div class="spiral-rig">${showcase.map((x, i) => spiralTile(x, i, base)).join("")}</div></div>
+      <div class="spiral-stage" data-spiral aria-hidden="true"><div class="spiral-rig">${showcase.map((x, i) => spiralTile(x, i, base, places[i].city)).join("")}</div></div>
       <div class="selected-grid" data-carousel>${
-        showcase.map((x, i) => renderProject(x, i, showcase.length)).join("") ||
+        showcase.map((x, i) => renderProject(x, i, showcase.length, places[i].label)).join("") ||
         '<p class="empty-state frame">Selected work is being updated. Please check back soon.</p>'
       }</div>
     </div>
     <div class="container work-status" data-interactive hidden><p class="mono" data-project-position aria-live="polite">01 / ${pad(showcase.length)} — Selected work</p><p class="mono gallery-hint">Drag the spiral or use the arrows</p><div class="spin-buttons"><button class="spin-button" type="button" data-gallery-prev aria-label="Previous project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button><button class="spin-button" type="button" data-gallery-next aria-label="Next project"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button></div></div>
     </div></div>
     <noscript><div class="container work-plain"><p class="notice">Expanded case studies need JavaScript. These project links work without it.</p><p>${content.project_links.map((l) => link(l.url, `${e(l.label)} ${arrow}`, base, "text-link")).join(" · ")}</p></div></noscript>
+    ${bridge(impact ? "#impact" : "#notes", impact ? "So what did it change? The numbers, as reported" : "Between the flights, I write things down and keep learning")}
   </section>
-  <section class="model-section" id="skills" aria-labelledby="skills-heading">
-    <div class="container">
-      <div class="model-heading">${sectionHead("02", "Expertise, as a neural network", "The model\nbehind the work.", "skills-heading")}<div class="model-side"><p class="section-intro">Every project runs through the same network. Pick an input to watch a forward pass light up the stack that powers it.</p><div class="model-hud mono" aria-hidden="true"><div><span>Epoch</span><strong data-epoch>001</strong></div><div><span>Loss</span><strong data-loss>0.693</strong></div><svg viewBox="0 0 120 36" preserveAspectRatio="none"><path data-loss-spark d="M0 4L120 4"/></svg></div></div></div>
-      ${renderNetwork(content.skills)}
-      <p class="sr-only" data-network-status role="status"></p><p class="network-readout mono" data-readout aria-hidden="true">${content.skills.length} skills · ${new Set(content.skills.map((s) => s.category)).size} input layers · ready for a forward pass</p>
+  ${impact}
+  <section class="notes-section layover-section chapter" id="notes" aria-labelledby="writing-heading">
+    <div class="container layover-head">${sectionHead("05", "Between flights", "Postcards,\npassport, journal.", "writing-heading", link(medium, `All writing ${arrow}`, base, "box-button box-button-light", 'data-event="social_click" data-platform="medium"'))}<p class="section-intro">What I write down, where I learned, and who I am when the laptop closes.</p><aside class="luggage-tag notebook-panel"><span class="tag-hole" aria-hidden="true"></span><p class="mono">Checked bag · KGL</p><h3>Curiosity has a notebook.</h3><p>Data-science notebooks and experiments, packed and shared on Kaggle.</p>${link(kaggle, `Explore Kaggle ${arrow}`, base, "box-button", 'data-event="social_click" data-platform="kaggle"')}</aside></div>
+    <div class="container postcards" id="writing">${content.publications.map((a, i) => `<article class="postcard"><div class="postcard-message"><p class="mono">Note ${pad(i + 1)} · ${e(a.platform)}</p><h3>${link(a.url, `${e(a.title)} ${arrow}`, base, "", 'data-event="social_click" data-platform="medium"')}</h3><p>${e(a.summary)}</p></div><div class="postcard-side" aria-hidden="true"><span class="postage"><b>${e(a.platform.slice(0, 2).toUpperCase())}</b><i>${a.published_on ? new Date(a.published_on).getUTCFullYear() : "Now"}</i></span><span class="postmark">${e(CITIES[i % 2 ? "delhi" : "dubai"].short)} · ${a.published_on ? new Date(a.published_on).getUTCFullYear() : "new"}</span><span class="address">To: anyone curious<br>about AI &amp; data</span></div></article>`).join("") || '<p class="empty-state">New writing will appear here.</p>'}</div>
+    <div class="container layover-grid">
+      <article class="passport education-section" id="education" aria-labelledby="education-heading">
+        <div class="passport-page passport-id"><p class="mono">Passport · Foundations</p><img src="${base}assets/portrait-small.webp" alt="" width="120" height="150" loading="lazy" decoding="async"><dl><div><dt class="mono">Name</dt><dd>${e(p.name)}</dd></div>${content.education[0]?.end_year ? `<div><dt class="mono">Graduated</dt><dd>${content.education[0].end_year}</dd></div>` : ""}<div><dt class="mono">Based in</dt><dd>${e(p.location)}</dd></div></dl><p class="passport-mrz mono" aria-hidden="true">P&lt;${e(p.name.toUpperCase().replace(/\s+/g, "<"))}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</p></div>
+        <div class="passport-page passport-visas"><h3 id="education-heading">Always a student.</h3>${content.education.map((x, i) => `<div class="visa visa-${i % 3}"><p class="mono">${x.start_year} — ${x.end_year ?? "Present"}</p><h4>${e(x.degree)}</h4><p>${e(x.institution)}</p>${link(x.url, `Institution ${arrow}`, base, "text-link")}</div>`).join("")}${content.certifications.map((x, i) => `<div class="visa visa-${(i + 1) % 3}"><p class="mono">${x.issued_on ? new Date(x.issued_on).getUTCFullYear() : "Certification"}</p><h4>${e(x.title)}</h4><p>${e(x.issuer)}</p>${link(x.url, `View credential ${arrow}`, base, "text-link")}</div>`).join("")}</div>
+      </article>
+      <article class="journal about-section" id="about" aria-labelledby="about-heading"><p class="mono journal-date">Journal · ${new Date().getUTCFullYear()}</p><h3 id="about-heading">Engineering meets curiosity.</h3><p class="about-copy" data-read>${e(p.about)}</p><p class="mono about-focus">${e(p.current_focus)}</p><div class="stickers scoreboard" data-scoreboard>${stat(years, "Years shipping")}${stat(stops.length, "Cities")}${stat(chapters.length, "Career epochs")}${stat(content.projects.length, "Projects")}</div></article>
     </div>
+    ${bridge("#contact", `Which brings the plane to its last stop: ${e(lastCity || "home")}`)}
   </section>
-  <section class="experience-section section" id="experience" aria-labelledby="experience-heading"><div class="container experience-layout"><div class="experience-side">${sectionHead("03", "Experience", "Trained on\nreal problems.", "experience-heading")}<p class="section-intro">Working where data, engineering and business decisions meet — one epoch at a time.</p>${lossCurve(content.experiences)}${link(p.resume_url, `Download full CV ${arrow}`, base, "box-button", 'data-event="cv_download" download')}</div><div class="experience-list">${renderExperience(content.experiences)}</div></div></section>
-  <section class="writing-section section" id="writing" aria-labelledby="writing-heading"><div class="container">${sectionHead("04", "Notes & explorations", "Learning,\nin public.", "writing-heading", link(content.social_links.find((s) => s.network === "Medium")?.url ?? null, `All writing ${arrow}`, base, "box-button box-button-light", 'data-event="social_click" data-platform="medium"'))}<div class="writing-layout">${content.publications.map((a, i) => `<article class="publication-item frame"><div class="frame-bar mono"><span>Note ${pad(i + 1)}</span><span>${e(a.platform)}${a.published_on ? ` · ${new Date(a.published_on).getUTCFullYear()}` : ""}</span></div><div class="publication-body"><h3>${link(a.url, `${e(a.title)} ${arrow}`, base, "", 'data-event="social_click" data-platform="medium"')}</h3><p>${e(a.summary)}</p></div></article>`).join("") || '<p class="empty-state">New writing will appear here.</p>'}<aside class="notebook-panel frame"><span class="notebook-symbol" aria-hidden="true"></span><p class="eyebrow">Data, openly explored</p><h3>Curiosity has a notebook.</h3><p>Explore my data-science notebooks and experiments on Kaggle.</p>${link(content.social_links.find((s) => s.network === "Kaggle")?.url ?? null, `Explore Kaggle ${arrow}`, base, "box-button", 'data-event="social_click" data-platform="kaggle"')}</aside></div></div></section>
-  <section class="education-section section" id="education" aria-labelledby="education-heading"><div class="container">${sectionHead("05", "Foundations", "Always\na student.", "education-heading")}<div class="education-grid">${content.education.map((x) => `<article class="frame credential"><p class="mono">${x.start_year} — ${x.end_year ?? "Present"}</p><h3>${e(x.degree)}</h3><p>${e(x.institution)}</p>${link(x.url, `Institution ${arrow}`, base, "text-link")}</article>`).join("")}${content.certifications.map((x) => `<article class="frame credential"><p class="mono">${x.issued_on ? new Date(x.issued_on).getUTCFullYear() : "Certification"}</p><h3>${e(x.title)}</h3><p>${e(x.issuer)}</p>${link(x.url, `View credential ${arrow}`, base, "text-link")}</article>`).join("")}</div></div></section>
-  <section class="about-section section" id="about" aria-labelledby="about-heading"><div class="container about-layout"><div><p class="eyebrow"><span>06</span>Beyond the models</p><h2 class="display" id="about-heading">${display("Engineering\nmeets curiosity.")}</h2></div><div><p class="about-copy" data-read>${e(p.about)}</p><p class="mono about-focus">${e(p.current_focus)}</p></div></div><div class="container scoreboard frame" data-scoreboard>${stat(years, "Years shipping")}${stat(chapters.length, "Career epochs")}${stat(content.projects.length, "Projects")}${stat(content.skills.length, "Skills in the model")}</div></section>
-  <section class="contact-section section" id="contact" aria-labelledby="contact-heading"><div class="container"><p class="eyebrow"><span>07</span>Have an interesting problem?</p><div class="contact-heading"><h2 class="display" id="contact-heading">${display("Great things\nstart with hello.")}</h2>${link(`mailto:${p.email}`, `${arrow}<span class="sr-only">Email ${e(p.name)}</span>`, base, "contact-arrow", 'data-event="contact_action"')}</div>${closingScene()}<div class="contact-prompts"><p class="mono">Pick a conversation starter</p><div>${[["I have an AI idea", "AI IDEA?"], ["Let’s collaborate", "LET’S BUILD"], ["Just saying hello", "HEY THERE"]].map(([subject, say]) => conversationStarter(p.email, subject, say)).join("")}</div></div><div class="contact-bottom">${link(`mailto:${p.email}`, e(p.email), base, "contact-email", 'data-event="contact_action"')}<div class="social-links">${social}</div></div></div></section>
+  <section class="contact-section chapter" id="contact" aria-labelledby="contact-heading">${renderSky(p, base, social)}</section>
   </main><footer class="site-footer"><div class="container footer-inner"><a class="footer-mark" href="#home" aria-label="Back to the top">${logoMark()}</a><p>© ${new Date().getUTCFullYear()} ${e(p.name)}</p><div><a href="${base}privacy.html">Privacy & analytics</a><a href="#home">Back to top ↑</a></div></div></footer>`;
 }
 

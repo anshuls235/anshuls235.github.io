@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import type { Snapshot } from "../../src/lib/types";
+import { modelTopics, storyProjects } from "../../src/lib/story";
 const fallback = JSON.parse(
   readFileSync("src/content/fallback.json", "utf8"),
 ) as Snapshot;
@@ -40,6 +41,7 @@ test("desktop project, deep link, CV and theme flows", async ({
     expectedTitle,
   );
   await page.getByRole("link", { name: /Explore my work/ }).click();
+  await expect(page.locator('html')).not.toHaveClass(/is-screen-jump/); // let the chapter jump land
   await page
     .getByRole("link", { name: /A more natural way to find a car/ })
     .first()
@@ -232,6 +234,7 @@ test("configured analytics respects DNT and never delays a link", async ({
   await page.route("https://example.supabase.co/rest/v1/**", (r) => r.abort());
   await page.goto(previewUrl);
   await page.getByRole("link", { name: /Explore my work/ }).click();
+  await expect(page.locator('html')).not.toHaveClass(/is-screen-jump/); // let the chapter jump land
   expect(requests).toBe(0);
   await context.close();
 });
@@ -262,12 +265,13 @@ test('illustrated hero: film plays, pauses and respects reduced motion', async (
 });
 
 test('work spiral turns with buttons, keyboard, drag and tile clicks', async ({page}) => {
-  const featured = fallback.content.projects; // the spiral keeps the published order
+  const featured = storyProjects(fallback.content); // the spiral follows the career
   const total = String(fallback.content.projects.length).padStart(2, '0');
   for (const width of [1440, 390]) {
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
     await page.getByRole('link',{name:/Explore my work/}).click();
+    await expect(page.locator('html')).not.toHaveClass(/is-screen-jump/); // let the chapter jump land
     await expect(page.locator('#projects')).toHaveClass(/is-carousel/);
     await expect(page.locator('.project-card.is-current h3')).toContainText(featured[0].title);
     await expect(page.locator('[data-gallery-prev]')).toBeDisabled();
@@ -302,31 +306,32 @@ test('work spiral turns with buttons, keyboard, drag and tile clicks', async ({p
   }
 });
 
-test('skills network runs a forward pass and stays accessible', async ({page}) => {
-  const categories = [...new Set(fallback.content.skills.map(s => s.category))];
+test('the model is a knowledge orb: topics light up their skills, and skills open the work behind them', async ({page}) => {
+  const topics = modelTopics(fallback.content);
   for (const width of [1440, 390]) {
-    await page.setViewportSize({width,height:1000});
+    await page.setViewportSize({width,height:900});
     await page.goto('./');
     await page.locator('#skills').scrollIntoViewIfNeeded();
-    for (const skill of fallback.content.skills) await expect(page.locator('#skills .skill-list li', {hasText: skill.name}).first()).toBeAttached();
-    const button = page.locator(`#skills .node-input[data-cat="1"]`);
-    await button.click();
-    await expect(button).toHaveAttribute('aria-pressed','true');
-    await expect(page.locator('[data-network-status]')).toContainText(categories[1]);
-    const expected = fallback.content.skills.filter(s => s.category === categories[1]).length;
-    await expect.poll(() => page.locator('.node-skill.is-lit').count(), {timeout: 8000}).toBe(expected);
-    await expect.poll(() => page.locator('.node-output.is-lit').count(), {timeout: 8000}).toBe(3);
-    await button.click();
-    await expect(button).toHaveAttribute('aria-pressed','false');
-    await page.screenshot({path:`test-results/network-${width}.png`});
+    await expect(page.locator('[data-orb] canvas')).toBeVisible();
+    // Every skill is in the page for assistive technology, and one screen holds the chapter on desktop.
+    for (const skill of fallback.content.skills) await expect(page.locator('#skills .sr-only li', {hasText: skill.name}).first()).toBeAttached();
+    const buttons = page.locator('[data-orb-topic]');
+    await expect(buttons).toHaveCount(topics.length);
+    await buttons.first().click();
+    await expect(buttons.first()).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-orb-detail] h3')).toHaveText(topics[0].name);
+    await expect(page.locator('[data-orb-detail] a[data-project]')).toHaveCount(topics[0].projects.length);
+    if (width === 1440) {
+      const box = (await page.locator('.orb-grid').boundingBox())!;
+      expect(box.height).toBeLessThanOrEqual(900);
+    }
+    await page.locator('[data-orb-detail] a[data-project]').first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.screenshot({path:`test-results/orb-${width}.png`});
     const audit = await new AxeBuilder({page}).include('#skills').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
     expect(audit.violations).toEqual([]);
   }
-  await page.emulateMedia({reducedMotion:'reduce'});
-  await page.goto('./');
-  await page.locator('#skills').scrollIntoViewIfNeeded();
-  await page.locator('#skills .node-input[data-cat="0"]').click();
-  await expect(page.locator('.node-output.is-lit')).toHaveCount(3);
 });
 
 test('reduced motion keeps the illustrated poster and never downloads the film', async ({page}) => {
@@ -368,7 +373,7 @@ test('contact links and responsive section geometry', async ({page}) => {
     await page.setViewportSize({width,height:740});
     await page.goto('./');
     await expect(page.locator('.contact-email')).toHaveAttribute('href', /^mailto:/);
-    for (const selector of ['.impact-card-inner', '.loss-chart', '.experience-item', '.contact-prompts']) {
+    for (const selector of ['.impact-card-inner', '.journey-map', '.boarding-pass', '.contact-prompts', '.sky-cities']) {
       for (const item of await page.locator(selector).all()) {
         const box = (await item.boundingBox())!;
         expect(box.x).toBeGreaterThanOrEqual(0);
@@ -379,8 +384,9 @@ test('contact links and responsive section geometry', async ({page}) => {
     await expect(page.locator('.project-card.is-current')).toBeVisible();
     await expect(page.locator('.spiral-tile.is-front')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-    await page.locator('#experience').scrollIntoViewIfNeeded();
-    await expect(page.locator('.experience-side')).toHaveCSS('position','static');
+    // With reduced motion the journey is a plain list: every pass shows, nothing pins.
+    await expect(page.locator('#experience')).not.toHaveClass(/is-pinned/);
+    await expect(page.locator('.journey-stop').last()).toBeVisible();
   }
 });
 
@@ -395,21 +401,39 @@ test('published impact, expanded work and grouped career chapters on desktop and
     await expect(page.locator('#impact')).toContainText('AED 1.33M');
     await expect(page.locator('#impact')).toContainText('45%');
     await expect(page.locator('#impact')).toContainText('not causal uplift');
-    await page.getByRole('button',{name:/Conversation-attributed revenue/}).click();
     await page.locator('.impact-card').nth(1).getByRole('link').click();
     await expect(page.getByRole('dialog')).toContainText('Attribution is by lead match, not proof of causation.');
     await page.keyboard.press('Escape');
     await page.locator('#experience').scrollIntoViewIfNeeded();
-    await expect(page.locator('.experience-item')).toHaveCount(4);
-    await expect(page.locator('#experience').getByRole('heading',{level:3,name:'Gartner',exact:true})).toHaveCount(1);
-    await expect(page.locator('#experience').getByRole('heading',{level:3,name:'SAP Labs India',exact:true})).toHaveCount(1);
-    await expect(page.locator('.career-role')).toHaveCount(6);
-    const gartner=page.locator('.experience-item').filter({has:page.getByRole('heading',{name:'Gartner',exact:true})});
-    await expect(gartner.locator('.experience-date')).toHaveText('Jul 2022 — Jun 2025');
+    // Bengaluru, Delhi NCR, Dubai, and the return to SAP.
+    await expect(page.locator('.journey-stop')).toHaveCount(4);
+    // Pinned, the city title steps aside for the route; it stays in the markup.
+    await expect(page.locator('#experience .pass-title h3', {hasText: /^Delhi NCR$/})).toHaveCount(1);
+    // Passes off the pinned screen are hidden, so count the markup rather than the accessibility tree.
+    await expect(page.locator('#experience h4', {hasText: /^Gartner$/})).toHaveCount(1);
+    await expect(page.locator('#experience h4', {hasText: /^SAP Labs India$/})).toHaveCount(2);
+    await expect(page.locator('#experience .career-role')).toHaveCount(fallback.content.experiences.length);
+    const gartner=page.locator('.pass-chapter').filter({has:page.getByRole('heading',{name:'Gartner',exact:true})});
+    await expect(gartner).toContainText('Jul 2022');
+    await expect(gartner).toContainText('Jun 2025');
     await expect(gartner).toContainText('Senior Data Scientist');
     await expect(gartner).toContainText('Data Scientist');
-    await gartner.locator('summary').first().click();
-    await expect(gartner.locator('details[open]')).toContainText('territory planning');
+    // Bring Delhi's pass forward on the pinned map before opening it.
+    await page.locator('.journey-stop[data-stop="1"]').evaluate(el => {
+      const track = document.querySelector<HTMLElement>('[data-journey]')!;
+      const pinned = document.querySelector('#experience')!.classList.contains('is-pinned');
+      const top = track.getBoundingClientRect().top + scrollY;
+      window.scrollTo(0, pinned ? top + (track.offsetHeight - innerHeight) * 0.3 : el.getBoundingClientRect().top + scrollY - 100);
+    });
+    await expect(gartner).toBeVisible();
+    // Roles read oldest first, the way the flight runs; territory planning came with the senior role.
+    // A role's highlights are on the back of the ticket.
+    await gartner.locator('.role-row').last().click();
+    const log = page.locator('.boarding-pass.show-log .pass-log.is-open');
+    await expect(log).toContainText('territory planning');
+    await expect(log).toBeInViewport();
+    await log.getByRole('button', {name: /Back to the pass/}).click();
+    await expect(page.locator('.boarding-pass.show-log')).toHaveCount(0);
     await page.screenshot({path:`test-results/career-${width}.png`});
     await page.getByRole('button',{name:'Switch to dark theme'}).click();
     await page.screenshot({path:`test-results/career-dark-${width}.png`});
@@ -428,111 +452,90 @@ test('published impact, expanded work and grouped career chapters on desktop and
   }
 });
 
-test('contact dots say hello, spell out a starter on hover and hold still when motion is paused', async ({page}) => {
-  // A cheap fingerprint of the canvas: how many sampled pixels are lit, and where.
-  const read = () => page.locator('[data-hello] canvas').evaluate(el => {
-    const canvas = el as HTMLCanvasElement;
-    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
-    let lit = 0, sum = 0;
-    for (let i = 3; i < data.length; i += 4 * 7) if (data[i] > 0) { lit++; sum = (sum + i) % 1000003; }
-    return {lit, sum};
-  });
-  const films:string[]=[];
-  page.on('request',r=>{if(/assets\/films\//.test(r.url()))films.push(r.url());});
+test('the plane lands in a 3D city that visitors can fly, then hand back to the conversation', async ({page}) => {
+  // Real cities in a software renderer, plus a 3-second launch count, take a while in CI.
+  test.setTimeout(90000);
   for (const width of [390, 1440]) {
-    await page.setViewportSize({width, height:1000});
+    await page.setViewportSize({width, height:900});
     await page.goto('./');
-    const field = page.locator('[data-hello]');
-    await field.scrollIntoViewIfNeeded();
-    await expect(field).toBeVisible();
-    await expect(field).toHaveAttribute('aria-hidden', 'true');
-    await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
+    const sky = page.locator('[data-sky]');
+    await sky.scrollIntoViewIfNeeded();
+    await expect(sky).toHaveClass(/is-ready|is-unsupported/, {timeout: 30000});
+    if (await sky.evaluate(el => el.classList.contains('is-unsupported'))) {
+      // Without WebGL the conversation still works over a painted sky.
+      await expect(page.locator('.contact-email')).toBeVisible();
+      await expect(page.locator('.contact-prompts a')).toHaveCount(3);
+      continue;
+    }
+    await expect(page.locator('.sky-credit')).toContainText('OpenStreetMap');
     const starters = page.locator('.contact-prompts a');
     await expect(starters).toHaveCount(3);
     await expect(starters.first()).toHaveAttribute('href', /^mailto:.*\?subject=I%20have%20an%20AI%20idea$/);
-    await page.getByRole('button', {name:'Pause motion'}).click();
-    const held = await read();
-    expect(held.lit).toBeGreaterThan(200);
+    await page.getByRole('button', {name:/Bengaluru/}).click();
+    await expect(page.getByRole('button', {name:/Bengaluru/})).toHaveAttribute('aria-pressed', 'true');
+    await expect(sky).toHaveAttribute('data-city', 'bengaluru');
+    await expect(sky).not.toHaveClass(/is-loading/, {timeout: 30000});
+    await page.getByRole('button', {name:/Take the controls/}).click();
+    await expect(page.locator('html')).toHaveClass(/is-flying/);
+    await expect(page.locator('.sky-hud')).toBeVisible();
+    await expect(page.locator('[data-sky-status]')).toContainText('You have the controls');
+    await page.keyboard.down('ArrowLeft');
     await page.waitForTimeout(400);
-    expect(await read()).toEqual(held);
-    // Pointing at a starter redraws the dots as that starter, and leaving restores the greeting.
-    await starters.first().hover();
-    const said = await read();
-    expect(said.sum).not.toBe(held.sum);
-    await page.locator('.contact-email').hover();
-    expect(await read()).toEqual(held);
-    await page.locator('#contact').screenshot({path:`test-results/hello-${width}.png`});
+    await page.keyboard.up('ArrowLeft');
+    await expect.poll(async () => Number(await page.locator('[data-hud="score"]').textContent()), {timeout: 20000}).toBeGreaterThan(0);
+    // Holding Space fires the booster.
+    await page.keyboard.down(' ');
+    await expect(sky).toHaveClass(/is-boosting/);
+    await page.keyboard.up(' ');
+    // The game is a game: no captions pop up over the flight.
+    await expect(page.locator('.sky-toast')).toHaveCount(0);
+    await page.screenshot({path:`test-results/sky-${width}.png`});
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).not.toHaveClass(/is-flying/);
+    await expect(page.locator('.contact-email')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
-  expect(films).toEqual([]);
 });
 
-test('expertise follows both themes without losing the selected network', async ({page}) => {
+test('the model follows both themes and stays accessible', async ({page}) => {
+  test.setTimeout(60000);
   await page.emulateMedia({reducedMotion:'reduce'});
   for (const width of [390,1440]) {
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
     await page.locator('#skills').scrollIntoViewIfNeeded();
-    const input = page.locator('#skills .node-input').first();
-    await input.click();
     for (const theme of ['light','dark','light']) {
       if (await page.locator('html').getAttribute('data-theme') !== theme) await page.locator('.theme-toggle').click();
       await expect(page.locator('#skills')).toHaveCSS('background-color', theme === 'light' ? 'rgb(244, 241, 232)' : 'rgb(11, 11, 13)');
-      await expect(input).toHaveAttribute('aria-pressed','true');
-      await expect(page.locator('.node-output.is-lit')).toHaveCount(3);
       const audit=await new AxeBuilder({page}).include('#skills').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
       expect(audit.violations).toEqual([]);
-      await page.locator('#skills').screenshot({path:`test-results/expertise-${theme}-${width}.png`});
+      await page.locator('.orb-grid').screenshot({path:`test-results/expertise-${theme}-${width}.png`});
     }
   }
 });
 
-test('impact dots draw each reported result, follow the tabs and hold still when motion is paused', async ({page}) => {
-  // A cheap fingerprint of the canvas: how many sampled pixels are lit, and where.
-  const read = () => page.locator('[data-signal] canvas').evaluate(el => {
-    const canvas = el as HTMLCanvasElement;
-    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
-    let lit = 0, sum = 0;
-    for (let i = 3; i < data.length; i += 4 * 7) if (data[i] > 0) { lit++; sum = (sum + i) % 1000003; }
-    return {lit, sum};
-  });
+test('results arrive on a split-flap board, settle on the reported figures and open their notes', async ({page}) => {
   const stories = ['automall-ai-search', 'automall-conversational-ai', 'real-time-lead-scoring'].map(slug => fallback.content.projects.find(p => p.slug === slug)!);
+  const flapsOf = (i: number) => page.locator('.board-row').nth(i).locator('.flap').evaluateAll(els => els.map(e => e.textContent!.replace(/\u00a0/g, ' ')).join('').trim());
   for (const width of [390, 1440]) {
     await page.setViewportSize({width, height:900});
     await page.goto('./');
-    const field = page.locator('[data-signal]');
-    await field.scrollIntoViewIfNeeded();
-    await expect(field).toBeVisible();
-    await expect(field).toHaveAttribute('aria-hidden', 'true');
-    await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
-    const before = await read();
-    await expect.poll(async () => (await read()).sum).not.toBe(before.sum);
-    // Picking a result shows its project and stops the automatic turn.
-    const tabs = page.locator('[data-impact-tab]');
-    await expect(tabs).toHaveCount(3);
-    await tabs.nth(2).click();
-    await expect(tabs.nth(2)).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.impact-card.is-current h3')).toHaveText(stories[2].title);
-    await expect(page.locator('.impact-card:not(.is-current)').first()).toBeHidden();
-    await page.waitForTimeout(6000);
-    await expect(tabs.nth(2)).toHaveAttribute('aria-pressed', 'true');
-    await page.getByRole('button', {name:'Pause motion'}).click();
-    const held = await read();
-    expect(held.lit).toBeGreaterThan(200);
-    await page.waitForTimeout(400);
-    expect(await read()).toEqual(held);
-    await tabs.nth(0).click();
-    await expect(page.locator('.impact-card.is-current h3')).toHaveText(stories[0].title);
-    expect((await read()).sum).not.toBe(held.sum);
+    await page.locator('[data-board]').scrollIntoViewIfNeeded();
+    await expect(page.locator('.board-row')).toHaveCount(3);
+    await expect(page.locator('[data-board-clock]')).toHaveText(/^\d{2}:\d{2}$/);
+    // The flaps clatter, then settle on exactly the published figure.
+    await expect.poll(() => flapsOf(0), {timeout: 8000}).toBe('AED 1.99M');
+    await expect.poll(() => flapsOf(2), {timeout: 8000}).toBe('45%');
+    await expect(page.locator('.board-row').nth(1)).toContainText(stories[1].summary);
+    await page.locator('.board-row').nth(1).getByRole('link').click();
+    await expect(page.getByRole('dialog')).toContainText(stories[1].title);
+    await page.keyboard.press('Escape');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   }
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.goto('./');
-  await page.locator('[data-signal]').scrollIntoViewIfNeeded();
-  await expect.poll(async () => (await read()).lit).toBeGreaterThan(200);
-  const still = await read();
-  await page.waitForTimeout(400);
-  expect(await read()).toEqual(still);
+  await page.locator('[data-board]').scrollIntoViewIfNeeded();
+  expect(await flapsOf(0)).toBe('AED 1.99M');
 });
 
 test('work spiral pins and turns with scroll on laptop-height and phone windows', async ({page}) => {
@@ -548,40 +551,20 @@ test('work spiral pins and turns with scroll on laptop-height and phone windows'
   }
 });
 
-test('one wheel gesture moves the pinned work stage by exactly one project', async ({page}) => {
+test('scrolling through the pinned work visits every project in order', async ({page}) => {
   test.setTimeout(60000);
-  const position = page.locator('[data-project-position]');
-  // A trackpad flick: a short rise, then a long fading run of wheel events,
-  // sent from inside the page so their spacing matches a real device.
-  const flick = async (direction: number) => {
-    await page.evaluate(direction => new Promise<void>(done => {
-      const sizes: number[] = [];
-      let size = 20;
-      while (size < 160) { sizes.push(size); size *= 1.6; }
-      while (size > 1) { sizes.push(Math.round(size)); size *= 0.93; }
-      const send = () => {
-        const next = sizes.shift();
-        if (next === undefined) return done();
-        document.querySelector('.work-pin')!.dispatchEvent(new WheelEvent('wheel', {deltaY: direction * next, bubbles: true, cancelable: true}));
-        setTimeout(send, 12);
-      };
-      send();
-    }), direction);
-    await page.waitForTimeout(500);
-  };
-  for (const [width, height] of [[1100, 600], [1440, 900]]) {
+  const total = fallback.content.projects.length;
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
     await page.setViewportSize({width, height});
     await page.goto('./');
-    const top = await page.locator('[data-work-track]').evaluate(el => el.getBoundingClientRect().top + scrollY);
-    await page.evaluate(y => window.scrollTo(0, y + 10), top);
-    await flick(1);
-    await expect(position).toContainText('01 / 13');
-    for (const label of ['02', '03', '04']) {
-      await flick(1);
-      await expect(position).toContainText(`${label} / 13`);
+    await expect(page.locator('#projects')).toHaveClass(/is-pinned/);
+    const seen = new Set<string>();
+    for (let k = 0; k <= 40; k++) {
+      await page.locator('[data-work-track]').evaluate((el, f) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY + ((el as HTMLElement).offsetHeight - innerHeight) * f), k / 40);
+      await page.waitForTimeout(120);
+      seen.add(((await page.locator('[data-project-position]').textContent()) ?? '').slice(0, 2));
       await expect(page.locator('.work-pin')).toBeInViewport();
     }
-    await flick(-1);
-    await expect(position).toContainText('03 / 13');
+    expect(seen.size).toBe(total);
   }
 });

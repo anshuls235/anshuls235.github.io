@@ -38,6 +38,14 @@ The owner project’s public URL and publishable key are deliberately checked in
 
 No database password, PAT, SMTP credential or admin key is required to build or read this site. The database password was generated inside Supabase's project-creation UI and not copied into the repository. Reset it through Supabase and save it in your password manager before using a direct database connection.
 
+## The story and the 3D finale
+
+The page is one story: a paper plane flies the career from Bengaluru to Delhi NCR to Dubai (`src/lib/story.ts`, `src/story-motion.ts`) and lands in a glider game over the real cities (`src/sky/`). The glider is flown by real forces (`src/sky/glider.ts`: cannon-es for the rigid body, thin-airfoil lift, drag, stall, stability derivatives, wind, leaning thermals and ridge lift), covered by `tests/glider.test.ts` and `tests/sky.test.ts`.
+
+- `npm run map:build` regenerates the journey map's landmass from Natural Earth (public domain) into `public/assets/journey-land.svg`. Land only, no political borders.
+- `npm run cities:build -- <folder>` converts Overpass extracts (`<city>.json`, `out geom`) into `public/assets/sky/<city>.json`. Buildings, roads and water are © OpenStreetMap contributors (ODbL); the game shows that credit.
+- Facade textures in `public/assets/sky/*.webp` were generated with Codex image generation for this site.
+
 ## Documentation
 
 - [Content sources and conflict resolution](docs/CONTENT-SOURCES.md)

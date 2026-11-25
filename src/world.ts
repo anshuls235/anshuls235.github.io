@@ -1,5 +1,3 @@
-import { helloScene } from "./hello";
-// Presentation-only illustrations. Portfolio data and Supabase stay independent.
 // Presentation-only illustrations. Portfolio data and Supabase stay independent.
 const LOGO_PATHS = `<g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="none" stroke="#0d0f1a" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 50 18 14l10 36M12.8 37h10.4"/><path d="M54 14H41a9 9 0 0 0 0 18h4a9 9 0 0 1 0 18H28"/></g><g transform="translate(32 32) scale(.84) translate(-31 -32)" fill="#fffaf0" stroke="#0d0f1a" stroke-width="2.4"><circle class="logo-node" cx="18" cy="14" r="5.6"/><circle class="logo-node" cx="28" cy="50" r="5.6"/><circle class="logo-node" cx="54" cy="14" r="5.6"/></g>`;
 /** The "AS" monogram drawn as a tiny neural graph: A and S share a node. */
@@ -10,9 +8,6 @@ const set = (base: string, name: string, widths: number[]) => widths.map(w => `$
 export function heroScene(base: string) {
  const widths = [960, 1600, 2560, 3840];
  return `<div class="hero-scene" data-hero-scene aria-hidden="true"><img class="scene-art scene-day" src="${base}assets/scenes/hero-day-1600.webp" srcset="${set(base, "hero-day", widths)}" sizes="100vw" width="3840" height="2160" alt="" fetchpriority="high"><img class="scene-art scene-night" src="${base}assets/scenes/hero-night-1600.webp" srcset="${set(base, "hero-night", widths)}" sizes="100vw" width="3840" height="2160" alt="" loading="lazy"><video class="hero-film" data-hero-video data-day="${base}assets/scenes/hero-day-1080.mp4" data-day-hd="${base}assets/scenes/hero-day-1440.mp4" data-night="${base}assets/scenes/hero-night-1080.mp4" data-night-hd="${base}assets/scenes/hero-night-1440.mp4" muted loop playsinline preload="none"></video></div>`;
-}
-export function closingScene() {
- return helloScene();
 }
 export function vignette(kind:string,index:number) {
  const common=`<svg class="world-vignette" viewBox="0 0 640 390" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g stroke="#202941" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">`;

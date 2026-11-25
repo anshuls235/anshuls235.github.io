@@ -18,7 +18,7 @@ const config = {
 test("reviewed snapshot is published, linked, and complete", () => {
   assert.equal(snapshot.content.profile.length, 1);
   assert.equal(snapshot.content.projects.length, 13);
-  assert.equal(snapshot.content.experiences.length, 6);
+  assert.equal(snapshot.content.experiences.length, 8);
   assert.ok(
     snapshot.content.project_links.every((l) =>
       snapshot.content.projects.some((p) => p.id === l.project_id),
@@ -134,13 +134,13 @@ test("career chapters preserve every role, date and company return", async () =>
   const { careerChapters } = await import("../src/lib/experience");
   const roles = snapshot.content.experiences;
   const chapters = careerChapters(roles);
-  assert.equal(chapters.length, 4);
-  assert.deepEqual(chapters.map(c => c.roles.length), [1, 2, 1, 2]);
+  assert.equal(chapters.length, 5);
+  assert.deepEqual(chapters.map(c => c.roles.length), [1, 1, 2, 1, 3]);
   const gartner = chapters.find(c => c.company === "Gartner")!;
   assert.equal(gartner.start, "2022-07-01");
   assert.equal(gartner.end, "2025-06-01");
   assert.deepEqual(chapters.flatMap(c => c.roles), roles);
-  const returned = careerChapters([roles[1], roles[3], roles[2]]);
+  const returned = careerChapters([roles[2], roles[4], roles[3]]);
   assert.equal(returned.length, 3);
   assert.equal(careerChapters([]).length, 0);
 });
@@ -157,4 +157,22 @@ test("reported impact uses published summaries and keeps evidence accessible", (
   const content = structuredClone(snapshot.content);
   content.projects = [];
   assert.ok(!renderSite(content).includes('id="impact"'));
+});
+
+test("the story flies Bengaluru → Delhi NCR → Dubai and comes full circle", async () => {
+  const { journeyStops, fullCircle, storyProjects } = await import("../src/lib/story");
+  const stops = journeyStops(snapshot.content.experiences);
+  assert.deepEqual(stops.map((s) => s.city), ["bengaluru", "delhi", "dubai"]);
+  assert.equal(fullCircle(stops)?.company, "SAP");
+  // Every role appears in exactly one stop.
+  assert.equal(stops.flatMap((s) => s.chapters.flatMap((c) => c.roles)).length, snapshot.content.experiences.length);
+  const order = storyProjects(snapshot.content);
+  assert.equal(order.length, snapshot.content.projects.length);
+  const firstDubai = order.findIndex((p) => p.organization === "Al-Futtaim Automotive");
+  assert.ok(order.slice(firstDubai).every((p) => p.organization === "Al-Futtaim Automotive"), "Dubai work comes last");
+  const dated = order.filter((p) => p.start_date).map((p) => p.start_date!);
+  assert.deepEqual(dated, [...dated].sort(), "dated work is in date order");
+  const html = renderSite(snapshot.content);
+  for (const id of ["experience", "notes", "contact"]) assert.ok(html.includes(`id="${id}"`));
+  assert.match(html, /data-sky/);
 });

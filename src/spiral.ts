@@ -19,7 +19,16 @@ export function initSpiral(
   const tiles = [...stage.querySelectorAll<HTMLAnchorElement>("[data-spiral-tile]")];
   if (!found || !tiles.length) return null;
   const rig = found;
-  const covers = tiles.map((tile) => tile.querySelector<HTMLElement>("img"));
+  // Far tiles darken through a shade layer (cheap to animate), never a filter on the image.
+  const shades = tiles.map((tile) => {
+    const shade = document.createElement("i");
+    shade.className = "tile-shade";
+    shade.setAttribute("aria-hidden", "true");
+    tile.append(shade);
+    return shade;
+  });
+  const stack = tiles.map(() => -1);
+  const fades = tiles.map(() => -1);
   const last = tiles.length - 1;
   let target = 0;
   let position = 0;
@@ -46,11 +55,19 @@ export function initSpiral(
       const near = LENS / (LENS + (1 - Math.cos(angle)) * radius);
       const scale = near * (1 + 0.16 * Math.max(0, 1 - distance));
       tile.style.visibility = "visible";
-      tile.style.zIndex = String(Math.round(near * 1000));
-      tile.style.opacity = String(Math.min(1, (REACH - distance) / 1.5));
+      // Stacking changes only when a tile actually passes another: re-stacking repaints.
+      const rank = 100 - Math.round(distance * 4);
+      if (rank !== stack[i]) {
+        stack[i] = rank;
+        tile.style.zIndex = String(rank);
+      }
+      const fade = Math.round(Math.min(1, (REACH - distance) / 1.5) * 50) / 50;
+      if (fade !== fades[i]) {
+        fades[i] = fade;
+        tile.style.opacity = String(fade);
+      }
       // Covers dim as they recede; their labels drop away rather than fade.
-      const dim = depth > 0.995 ? "none" : `brightness(${(0.5 + 0.5 * depth).toFixed(3)})`;
-      (covers[i] ?? tile).style.filter = dim;
+      shades[i].style.opacity = depth > 0.995 ? "0" : (0.5 * (1 - depth)).toFixed(3);
       tile.classList.toggle("is-far", distance > 1.5);
       tile.style.transform = `translate(${(Math.sin(angle) * radius * near).toFixed(1)}px, ${(offset * rise * near).toFixed(1)}px) scale(${scale.toFixed(3)}) perspective(${LENS}px) rotateY(${(Math.sin(angle) * 38).toFixed(2)}deg)`;
       tile.classList.toggle("is-front", distance < 0.5);
@@ -155,6 +172,7 @@ export function initSpiral(
     destroy() {
       cancelAnimationFrame(frame);
       sizes.disconnect();
+      shades.forEach((shade) => shade.remove());
     },
   };
 }
