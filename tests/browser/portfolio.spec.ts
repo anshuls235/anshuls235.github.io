@@ -429,8 +429,13 @@ test('published impact, expanded work and grouped career chapters on desktop and
     });
     await expect(gartner).toBeVisible();
     // Roles read oldest first, the way the flight runs; territory planning came with the senior role.
+    // Smooth scrolling may still be gliding to the stop; let it land first, or the
+    // journey moves on to the next city (which rightly closes any open log).
+    let settledAt = -1;
+    await expect.poll(async () => { const y = await page.evaluate(() => scrollY); const still = y === settledAt; settledAt = y; return still; }, {intervals: [300]}).toBe(true);
     // A role's highlights are on the back of the ticket.
     await gartner.locator('.role-row').last().click();
+    await expect(page.locator('.boarding-pass.is-turning')).toHaveCount(0);
     const log = page.locator('.boarding-pass.show-log .pass-log.is-open');
     await expect(log).toContainText('territory planning');
     await expect(log).toBeInViewport();
