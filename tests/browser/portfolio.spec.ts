@@ -391,6 +391,8 @@ test('contact links and responsive section geometry', async ({page}) => {
 });
 
 test('published impact, expanded work and grouped career chapters on desktop and mobile', async ({page}) => {
+  // Two widths, the dialog, both themes, an audit and a ticket flip: slower CI machines need room.
+  test.setTimeout(60000);
   for (const width of [1440,390]) {
     await page.setViewportSize({width,height:1000});
     await page.goto('./');
