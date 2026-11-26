@@ -474,8 +474,18 @@ function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
     const px = new Uint32Array(img.data.buffer);
     for (let i = 0; i < mask.length; i++) px[i] = mask[i] ? 0xff000000 : 0xffffffff;
     g.putImageData(img, 0, 0);
-    alphaMap = keep(new THREE.CanvasTexture(c));
-    alphaMap.minFilter = THREE.LinearFilter;
+    // Upscaled and blurred: the coast becomes a soft gradient the land fades along,
+    // instead of a hard 10 m staircase that sparkles in the distance.
+    const soft = document.createElement("canvas");
+    soft.width = cols * 2;
+    soft.height = rows * 2;
+    const sg = soft.getContext("2d")!;
+    sg.filter = "blur(1.5px)";
+    sg.imageSmoothingEnabled = true;
+    sg.drawImage(c, 0, 0, soft.width, soft.height);
+    alphaMap = keep(new THREE.CanvasTexture(soft));
+    alphaMap.generateMipmaps = true;
+    alphaMap.minFilter = THREE.LinearMipmapLinearFilter;
     alphaMap.magFilter = THREE.LinearFilter;
   }
 
@@ -484,10 +494,13 @@ function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
       new THREE.MeshStandardMaterial({
         color: night ? look.groundNight : look.groundDay,
         alphaMap,
-        alphaTest: alphaMap ? 0.5 : 0,
-        alphaToCoverage: !!alphaMap,
         roughness: 0.98,
         metalness: 0,
+        // Blended, but kept in the opaque pass (so it draws in order, after the sea
+        // and before the tiles): custom blending is applied even when not "transparent".
+        blending: THREE.CustomBlending,
+        blendSrc: THREE.SrcAlphaFactor,
+        blendDst: THREE.OneMinusSrcAlphaFactor,
       }),
       atmo,
       "base-ground",
@@ -895,14 +908,14 @@ export async function buildWorld(
     return sky;
   };
   const daySky = makeSky(20000);
-  // Drawn after the city: its costly shader runs only where sky is actually seen.
-  daySky.renderOrder = 5;
+  // The sky is drawn first and writes no depth; the ground layers paint over it.
+  daySky.renderOrder = -10;
   daySky.visible = !night;
   group.add(daySky);
   keep(daySky.geometry);
   keep(daySky.material);
   const dusk = keep(createNightSky(moonDir));
-  dusk.group.children.forEach((c) => (c.renderOrder = 5));
+  dusk.group.children.forEach((c) => (c.renderOrder = -10));
   dusk.group.visible = night;
   group.add(dusk.group);
 
@@ -957,15 +970,16 @@ export async function buildWorld(
   const waterMat = keep(createWaterMaterial(atmo, new THREE.Color(night ? look.waterNight : look.water), sunHdr, painted.ripples));
 
   const tileSize = city.index.tileSize || TILE_SIZE;
-  const sharedTilePlane = keep(new THREE.PlaneGeometry(tileSize + 1.5, tileSize + 1.5));
+  const sharedTilePlane = keep(new THREE.PlaneGeometry(tileSize, tileSize));
   sharedTilePlane.rotateX(-Math.PI / 2);
 
   // The ground is three layers within half a metre of each other: sea, the whole
   // city's base, then each tile's painted map. Depth cannot tell them apart far
-  // away (that is the flicker), so they are painted in order instead, each over
-  // the last, before anything else is drawn.
-  // The sea writes depth (so the sky, drawn last, never paints over it) but is
-  // drawn first; the ground layers above it ignore depth and simply paint over.
+  // away, so they are simply painted in order over the sky: sea and base write
+  // no depth; only the tile ground (the top layer) writes it, with a normal test.
+  // (No "always pass" depth tricks: phone GPUs that render in tiles and skip
+  // hidden surfaces get those wrong, in flashing square blocks.)
+  waterMat.depthWrite = false;
   const seaPlane = new THREE.Mesh(keep(new THREE.PlaneGeometry(60000, 60000)), waterMat);
   seaPlane.rotation.x = -Math.PI / 2;
   seaPlane.renderOrder = -3;
@@ -975,8 +989,10 @@ export async function buildWorld(
   baseGround.group.traverse((o) => {
     o.renderOrder = -2;
     const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-    if (m) m.depthFunc = THREE.AlwaysDepth;
+    if (m) m.depthWrite = false;
   });
+  // A group's own render order sorts everything inside it first; keep it neutral.
+  baseGround.group.renderOrder = 0;
   group.add(baseGround.group);
   const treeProto = keep(createTreePrototypes(id, atmo));
   treeProto.setNight(night);
@@ -1175,7 +1191,6 @@ export async function buildWorld(
             emissive: 0xffffff,
             emissiveMap: nTex,
             emissiveIntensity: night ? 1.8 : 0,
-            depthFunc: THREE.AlwaysDepth,
           }),
           atmo,
           groundKey,
