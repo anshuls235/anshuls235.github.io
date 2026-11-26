@@ -435,6 +435,7 @@ function buildLandmarks(landmarks: CityLandmark[], atmo: Atmosphere) {
               }`,
             );
         },
+        true,
       ),
     );
 
@@ -491,16 +492,20 @@ function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
 
   const baseMat = keep(
     withAtmosphere(
-      new THREE.MeshStandardMaterial({
+      // Matte (Lambert): ground has no sheen; a rough "standard" surface still
+      // brightens toward white at grazing angles to a low sun.
+      new THREE.MeshLambertMaterial({
         color: night ? look.groundNight : look.groundDay,
         alphaMap,
-        roughness: 0.98,
-        metalness: 0,
         // Blended, but kept in the opaque pass (so it draws in order, after the sea
         // and before the tiles): custom blending is applied even when not "transparent".
         blending: THREE.CustomBlending,
         blendSrc: THREE.SrcAlphaFactor,
         blendDst: THREE.OneMinusSrcAlphaFactor,
+        // Blend colour only: the canvas's own alpha must stay 1, or the page's
+        // cream background shows through the soft coastline as white streaks.
+        blendSrcAlpha: THREE.ZeroFactor,
+        blendDstAlpha: THREE.OneFactor,
       }),
       atmo,
       "base-ground",
@@ -512,9 +517,8 @@ function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
 
   const surroundMat = keep(
     withAtmosphere(
-      new THREE.MeshStandardMaterial({
+      new THREE.MeshLambertMaterial({
         color: night ? look.groundNight : look.groundDay,
-        roughness: 1,
         side: THREE.DoubleSide,
       }),
       atmo,
@@ -768,7 +772,7 @@ function createClouds(city: City, atmo: Atmosphere, atlas: THREE.Texture) {
         #include <colorspace_fragment>
       }`,
   });
-  mat.fragmentShader = mat.fragmentShader.replace("ATMOS", ATMOS_GLSL);
+  mat.fragmentShader = mat.fragmentShader.replace("ATMOS", "#define NO_EDGE\n" + ATMOS_GLSL);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
@@ -788,7 +792,7 @@ interface ActiveTile {
   lod: TileLod;
   group: THREE.Group;
   disposables: { dispose(): void }[];
-  groundMat?: THREE.MeshStandardMaterial;
+  groundMat?: THREE.MeshLambertMaterial;
 }
 
 export interface BuiltWorld {
@@ -1168,7 +1172,7 @@ export async function buildWorld(
     const g = new THREE.Group();
     const tileDisposables: { dispose(): void }[] = [];
     const track = <T extends { dispose(): void }>(d: T) => (tileDisposables.push(d), d);
-    let groundMat: THREE.MeshStandardMaterial | undefined;
+    let groundMat: THREE.MeshLambertMaterial | undefined;
 
     if (data.groundBitmap) {
       const gTex = track(new THREE.CanvasTexture(data.groundBitmap));
@@ -1183,10 +1187,8 @@ export async function buildWorld(
       }
       groundMat = track(
         withAtmosphere(
-          new THREE.MeshStandardMaterial({
+          new THREE.MeshLambertMaterial({
             map: gTex,
-            roughness: 0.95,
-            metalness: 0,
             color: night ? 0x22252f : 0xffffff,
             emissive: 0xffffff,
             emissiveMap: nTex,
@@ -1318,6 +1320,12 @@ export async function buildWorld(
   let lastStreamX = Infinity;
   let lastStreamZ = Infinity;
   const ringRadius = () => (quality === 0 ? 1 : quality === 1 ? 3 : 4);
+  // Everything streamed is fully hazed out before the edge of the loaded ring.
+  const setEdge = () => {
+    const end = (ringRadius() - 0.5) * tileSize;
+    atmo.uEdge.value.set(end * 0.5, end);
+  };
+  setEdge();
 
   function desiredTiles(x: number, z: number) {
     const cx = Math.floor(x / tileSize);
@@ -1427,6 +1435,7 @@ export async function buildWorld(
     setQuality(nextQ: number) {
       if (nextQ !== quality) lastStreamX = Infinity;
       quality = nextQ;
+      setEdge();
     },
     ensureAround,
     updateStream,

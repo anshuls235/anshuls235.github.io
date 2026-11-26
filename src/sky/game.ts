@@ -156,7 +156,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
 
   const scene = new THREE.Scene();
   if (debug) Object.assign(window, { skyRenderer: renderer, skyScene: scene });
-  const camera = new THREE.PerspectiveCamera(62, 1, 3, 26000);
+  // A 4 m near plane: four times the depth precision of 1 m, so distant surfaces never fight.
+  const camera = new THREE.PerspectiveCamera(62, 1, 4, 26000);
   const plane = paperPlane();
   scene.add(plane);
   const q = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector);
@@ -886,12 +887,11 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       fastWindows = avg < 1 / 58 ? fastWindows + 1 : 0;
       let next = renderScale;
       if (slowWindows >= 2) {
-        next = Math.max(0.75, renderScale * 0.85);
+        next = Math.max(0.75, renderScale * 0.88);
         slowWindows = 0;
-      } else if (fastWindows >= 5) {
-        next = Math.min(1, renderScale * 1.12);
-        fastWindows = 0;
       }
+      // Never sharpens mid-flight: a visible jump in sharpness reads as a flicker.
+      // The resolution chosen while loading stands unless frames are really slow.
       paceTime = paceFrames = 0;
       if (Math.abs(next - renderScale) > 0.01) {
         renderScale = next;

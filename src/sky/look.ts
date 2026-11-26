@@ -16,6 +16,9 @@ export interface Atmosphere {
   uTime: { value: number };
   /** How much of the sky's light fills shadows (reflections stay at full strength). */
   uFill: { value: number };
+  /** Horizontal distance (m) over which streamed content dissolves into the haze,
+   *  so tiles arriving at the edge of the loaded area are never seen popping in. */
+  uEdge: { value: THREE.Vector2 };
 }
 
 export function createAtmosphere(): Atmosphere {
@@ -28,6 +31,7 @@ export function createAtmosphere(): Atmosphere {
     uNight: { value: 0 },
     uTime: { value: 0 },
     uFill: { value: 0.35 },
+    uEdge: { value: new THREE.Vector2(2000, 3500) },
   };
 }
 
@@ -38,6 +42,7 @@ uniform float uFogDensity;
 uniform float uFogFalloff;
 uniform vec3 uSunDir;
 uniform vec3 uSunGlow;
+uniform vec2 uEdge;
 vec3 skyToward(vec3 rd) {
   vec3 d = normalize(vec3(rd.x, max(rd.y, 0.0) * 0.6 + 0.015, rd.z));
   return textureCube(uSkyCube, d).rgb;
@@ -53,6 +58,9 @@ vec3 applyAtmos(vec3 col, vec3 wpos) {
   float fog = 1.0 - exp(-max(amount, 0.0));
   float toward = pow(max(dot(rd, uSunDir), 0.0), 6.0);
   vec3 haze = skyToward(rd) + uSunGlow * toward * 0.35;
+  #ifndef NO_EDGE
+    fog = max(fog, smoothstep(uEdge.x, uEdge.y, length(dv.xz)));
+  #endif
   return mix(col, haze, fog);
 }
 `;
@@ -63,7 +71,7 @@ type Shader = THREE.WebGLProgramParametersWithUniforms;
  * Adds the atmosphere to a built-in material, applied before tone mapping so
  * the haze matches the (HDR) sky exactly. `extra` can patch the shader further.
  */
-export function withAtmosphere<T extends THREE.Material>(material: T, atmo: Atmosphere, key: string, extra?: (shader: Shader) => void): T {
+export function withAtmosphere<T extends THREE.Material>(material: T, atmo: Atmosphere, key: string, extra?: (shader: Shader) => void, noEdge = false): T {
   (material as unknown as { fog: boolean }).fog = false;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, atmo);
@@ -79,7 +87,7 @@ export function withAtmosphere<T extends THREE.Material>(material: T, atmo: Atmo
         vAtmoPos = (modelMatrix * atmoW).xyz;`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nvarying vec3 vAtmoPos;\nuniform float uFill;\n${ATMOS_GLSL}`)
+      .replace("#include <common>", `#include <common>\n${noEdge ? "#define NO_EDGE\n" : ""}varying vec3 vAtmoPos;\nuniform float uFill;\n${ATMOS_GLSL}`)
       .replace("#include <lights_fragment_maps>", "#include <lights_fragment_maps>\n#if defined( RE_IndirectDiffuse ) && defined( USE_ENVMAP )\n  iblIrradiance *= uFill;\n#endif")
       .replace("#include <tonemapping_fragment>", "gl_FragColor.rgb = applyAtmos(gl_FragColor.rgb, vAtmoPos);\n#include <tonemapping_fragment>");
     extra?.(shader);

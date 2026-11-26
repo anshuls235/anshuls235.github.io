@@ -391,7 +391,8 @@ function orientedBox(ring: Float32Array): Float32Array {
 function buildingBuffers(tile: DecodedTile, cityId: CityId, lod: TileLod): BuildingBuffers | undefined {
   const sink = new BuildingSink();
   // Far tiles keep the skyline: only towers, as oriented boxes.
-  const minHeight = lod === 2 ? 22 : lod === 1 ? 6 : 0;
+  // Mid tiles keep all but tiny sheds; far tiles keep everything taller than ~4 floors.
+  const minHeight = lod === 2 ? 12 : lod === 1 ? 3 : 0;
   for (const b of tile.buildings) {
     const h = b.height;
     if (h < minHeight || b.ring.length < 6) continue;
@@ -403,7 +404,7 @@ function buildingBuffers(tile: DecodedTile, cityId: CityId, lod: TileLod): Build
     const ring = lod === 2 ? orientedBox(b.ring) : b.ring;
     sink.prism(ring, 0, h, wall, roof, style, h, seed);
     // Towers get a plant room on the roof.
-    if (lod === 0 && b.roofType === 1 && h > 55) {
+    if (lod < 2 && b.roofType === 1 && h > 55) {
       const [bx0, bz0, bx1, bz1] = b.bbox;
       const bw = bx1 - bx0, bd = bz1 - bz0;
       if (bw > 16 && bd > 16) {
@@ -658,7 +659,7 @@ export function buildTileGeometry(
   }
 
   // Elevated metro viaducts (Dubai Red Line / Namma Metro / Delhi Metro!)
-  if (lod === 0 && tile.rails.length) {
+  if (lod < 2 && tile.rails.length) {
     const railPos: number[] = [];
     const railCol: number[] = [];
     for (const rail of tile.rails) {
@@ -700,7 +701,8 @@ export function buildTileGeometry(
   // ---------- Buildings: one buffer for every LOD, drawn by one facade shader ----------
   const bld = buildingBuffers(tile, cityId, lod);
   if (bld) out.buildings = bld;
-  if (lod > 0) return out;
+  // Trees on near and mid tiles alike, so they never pop in as a tile sharpens.
+  if (lod > 1) return out;
 
   // ---------- Trees (lush Garden City canopy in Bengaluru, Lutyens avenues in Delhi, palms in Dubai) ----------
   const rand = seeded(tile.tx * 73856093 ^ tile.tz * 19349663 ^ cityId.length * 83492791);
