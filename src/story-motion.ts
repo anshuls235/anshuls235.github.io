@@ -149,9 +149,29 @@ export function initStory({ still, lenis, headerOffset }: Options): StoryControl
   function setupJourney() {
     const section = journey?.closest<HTMLElement>("section");
     if (!journey || !section) return;
-    const pinnable = !still() && innerWidth >= 900 && innerHeight >= 560 && passes.length > 1;
+    // Phones pin too, in a stacked layout: a cropped map over one pass at a time.
+    const compact = innerWidth < 900;
+    const pinnable = !still() && innerHeight >= (compact ? 500 : 560) && passes.length > 1;
     section.classList.toggle("is-pinned", pinnable);
     journey.style.setProperty("--journey-steps", String(passes.length));
+    const svg = journey.querySelector<SVGSVGElement>(".journey-map svg");
+    if (svg && pinnable && compact) {
+      // Trim the empty sea above and below the route so the map stays short.
+      const full = svg.getAttribute("viewBox") ?? "";
+      const [, , w, h] = full.split(/\s+/).map(Number);
+      // Measure on screen (cities sit inside transforms), then map back to SVG units.
+      const frame = svg.getBoundingClientRect();
+      const boxes = [...svg.querySelectorAll<SVGGraphicsElement>(".map-legs, .map-city")].map((g) => g.getBoundingClientRect());
+      if (w && h && frame.height && boxes.length) {
+        // The drawing is centred and scaled to fit ("meet") inside the element.
+        const scale = Math.min(frame.width / w, frame.height / h);
+        const y = (screenY: number) => (screenY - frame.top - (frame.height - h * scale) / 2) / scale;
+        const top = Math.max(0, y(Math.min(...boxes.map((b) => b.top))) - 24);
+        const bottom = Math.min(h, y(Math.max(...boxes.map((b) => b.bottom))) + 24);
+        svg.setAttribute("viewBox", `0 ${top.toFixed(0)} ${w} ${(bottom - top).toFixed(0)}`);
+        cleanups.push(() => svg.setAttribute("viewBox", full));
+      }
+    }
     if (!pinnable) {
       flyJourney(1);
       passes.forEach((p) => p.classList.remove("is-current", "is-past"));

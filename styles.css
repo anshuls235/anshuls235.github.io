@@ -3740,3 +3740,46 @@ html, body { background: var(--desk); }
 :root:not([data-theme="dark"]) .orb-stage { background: radial-gradient(120% 90% at 25% 15%, #ffffff 0%, #e4eeff 40%, #c7d8f6 100%); box-shadow: inset 0 0 0 1px rgb(42 63 138 / 18%), 0 30px 60px rgb(42 63 138 / 18%); }
 :root:not([data-theme="dark"]) .orb-stage::after { background: radial-gradient(50% 35% at 85% 0%, rgb(255 210 140 / 45%), transparent 70%); }
 :root:not([data-theme="dark"]) .orb-hint { color: rgb(18 20 31 / 70%); }
+
+/* ---------- Phones: the journey pins too, stacked ---------- */
+/* A short map with the year clock on top, one boarding pass at a time below. */
+@media (max-width: 899px) {
+  .journey-section.is-pinned .journey-track { height: calc(100vh + var(--journey-steps, 1) * 70vh); }
+  @supports (height: 100svh) { .journey-section.is-pinned .journey-track { height: calc(100svh + var(--journey-steps, 1) * 70svh); } }
+  .journey-section.is-pinned .journey-pin { padding: calc(var(--header-h) + 6px) 0 12px; }
+  .journey-section.is-pinned .journey-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); row-gap: 10px; }
+  .journey-section.is-pinned .journey-head { grid-column: 1; grid-row: 1; }
+  .journey-section.is-pinned .journey-head .section-heading { margin: 0; }
+  .journey-section.is-pinned .journey-head .eyebrow { display: none; }
+  .journey-section.is-pinned .journey-head .display { margin: 0; font-size: clamp(26px, 8vw, 40px); line-height: 0.95; }
+  .journey-section.is-pinned .journey-head .display br { display: none; }
+  .journey-section.is-pinned .journey-head .section-intro { display: none; }
+  .journey-section.is-pinned .journey-visual { grid-column: 1; grid-row: 2; gap: 14px; }
+  .journey-section.is-pinned .journey-map { aspect-ratio: auto; height: clamp(150px, 26svh, 240px); }
+  .journey-section.is-pinned .map-year { left: 12px; bottom: 8px; }
+  .journey-section.is-pinned .map-year strong { font-size: clamp(36px, 11vw, 54px); }
+  .journey-section.is-pinned .journey-timeline { max-height: 40px; }
+  .journey-section.is-pinned .journey-stops { grid-column: 1; grid-row: 3; align-self: stretch; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .journey-section.is-pinned .journey-stop { display: flex; flex-direction: column; min-height: 0; transform: translateX(56px) rotate(2deg); }
+  .journey-section.is-pinned .journey-stop.is-past { transform: translateX(-56px) rotate(-2deg); }
+  .journey-section.is-pinned .journey-stop.is-current { transform: none; }
+  .journey-section.is-pinned .journey-hint { display: none; }
+  /* The pass keeps the ticket's face; the tear-off stub folds away. */
+  .journey-section.is-pinned .boarding-pass { flex: 0 1 auto; min-height: 0; max-height: 100%; grid-template-rows: minmax(0, 1fr); }
+  .journey-section.is-pinned .pass-stub { display: none; }
+  .journey-section.is-pinned .pass-ticket { display: flex; flex-direction: column; min-height: 0; border-radius: 14px; }
+  .journey-section.is-pinned .pass-band { padding: 6px 14px; }
+  .journey-section.is-pinned .pass-airline { font-size: 18px; }
+  .journey-section.is-pinned .pass-airline svg { width: 22px; height: 22px; }
+  .journey-section.is-pinned .pass-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: auto; padding: 8px 14px 12px; }
+  .journey-section.is-pinned .boarding-pass .pass-route strong { font-size: clamp(36px, 11vw, 48px); }
+  .journey-section.is-pinned .boarding-pass .pass-route span:last-child { font-size: 11px; }
+  .journey-section.is-pinned .boarding-pass .pass-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 10px; margin: 6px 0 4px; padding-bottom: 6px; }
+  .journey-section.is-pinned .boarding-pass .pass-meta { display: none; }
+  .journey-section.is-pinned .boarding-pass .pass-route { margin-bottom: 4px; }
+  .journey-section.is-pinned .boarding-pass .pass-meta dd { font-size: 13px; }
+  .journey-section.is-pinned .boarding-pass .pass-chapter h4 { font-size: 16px; }
+  .journey-section.is-pinned .boarding-pass h5 { font-size: 13px; }
+  .journey-section.is-pinned .role-row { padding-block: 5px; gap: 8px; }
+  .journey-section.is-pinned .role-row .role-dates { font-size: 9.5px; }
+}
