@@ -3785,3 +3785,10 @@ html, body { background: var(--desk); }
   /* On the back of the ticket, the way back stays in reach however long the log runs. */
   .journey-section.is-pinned .log-back { position: sticky; bottom: 4px; z-index: 1; margin-top: 10px; }
 }
+
+/* Postcards collected on a flight, and the ones already in the passport. */
+.sky-stamps { margin: -6px 0 16px; font-size: 10px; line-height: 1.6; color: #464a5c; }
+.sky-stamps:empty { display: none; }
+.sky-stamps b { color: #c2330a; font-weight: 700; }
+.sky-bonus[data-kind="postcard"] { background: #ffd25a; box-shadow: 4px 4px 0 #0d0f1a; }
+.sky-bonus[data-kind="postcard"].is-shown { animation-duration: 2.4s; }

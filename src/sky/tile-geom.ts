@@ -2,22 +2,9 @@
 // Runs inside the Web Worker: builds merged building walls/roofs, instanced tree spots,
 // elevated metro viaducts, and paints a crisp 512x512 OffscreenCanvas ground + night-light map
 // per tile (eliminating road/park/water Z-fighting and cutting draw calls & triangles by >60%).
-import type { CityId, DecodedTile, TileBuilding } from "./tileformat";
+import type { CityId, DecodedTile } from "./tileformat";
 
 export type TileLod = 0 | 1 | 2;
-
-export interface WallBuffers {
-  pos: Float32Array;
-  nrm: Float32Array;
-  uv: Float32Array;
-  color: Float32Array; // RGB tint * base AO
-}
-
-export interface SimpleMeshBuffers {
-  pos: Float32Array;
-  nrm: Float32Array;
-  color: Float32Array;
-}
 
 export interface FlatColorBuffers {
   pos: Float32Array;
@@ -32,13 +19,23 @@ export interface SeaMaskInfo {
   mask: Uint8Array;
 }
 
+/** Every building in a tile, walls and roofs together, for the one facade shader. */
+export interface BuildingBuffers {
+  pos: Float32Array;
+  nrm: Float32Array;
+  /** Metres: along the wall and up it (walls), or world x/z (roofs). */
+  uv: Float32Array;
+  /** Linear RGB of the wall or roof. */
+  color: Float32Array;
+  /** Style (0 glass tower, 1 residential, 2 office, 3 mid-rise), height, seed. */
+  info: Float32Array;
+}
+
 export interface BuiltTileData {
   tx: number;
   tz: number;
   lod: TileLod;
-  wallsByStyle?: (WallBuffers | null)[];
-  roofs?: SimpleMeshBuffers;
-  midBuildings?: SimpleMeshBuffers;
+  buildings?: BuildingBuffers;
   /** Elevated metro viaducts only (surface roads/rails/parks are baked into groundBitmap!) */
   rails?: FlatColorBuffers;
   /** Crisp 512x512 ground texture (with kerbs, intersections, parks, building drop-shadows, water cutout) */
@@ -54,99 +51,47 @@ export interface BuiltTileData {
   trees?: Float32Array;
 }
 
-const FACADE_SCALE: [number, number][] = [
-  [16, 14], // glass-tower
-  [14, 3.6], // residential-tower
-  [14, 4.0], // office-glass
-  [12, 3.4], // indian-midrise
-];
-
-// City-authentic wall & roof palettes so Dubai, Bengaluru, and Delhi feel immediately distinct!
-const WALL_PALETTES: Record<CityId, [number, number, number][]> = {
+// City palettes in sRGB, turned linear for the GPU. Glass towers take their wall
+// colour as the frame and tint; the shader adds the glass and its reflections.
+const hex = (h: number): [number, number, number] => {
+  const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return [lin(((h >> 16) & 255) / 255), lin(((h >> 8) & 255) / 255), lin((h & 255) / 255)];
+};
+const WALLS: Record<CityId, number[][]> = {
+  // [glass tower, residential tower, office, mid-rise] × 8 tints
   dubai: [
-    [0.96, 0.99, 1.04], // cool silver-ice glass
-    [1.02, 0.98, 0.92], // warm champagne limestone
-    [0.88, 0.95, 1.03], // gulf sapphire curtain wall
-    [1.0, 0.96, 0.90], // pearl sand
-    [0.92, 0.96, 1.0], // platinum tower
-    [1.03, 0.95, 0.86], // desert travertine
-    [0.86, 0.93, 0.99], // aqua glass
-    [0.98, 0.97, 0.95], // crisp white modern
+    [0x9aa8b2, 0xc8ccc8, 0x6f7c86, 0xb9a88a, 0xd6d9d6, 0x5e6a74, 0xa8b4ba, 0x8c7a62],
+    [0xe2d6bd, 0xd8c6a4, 0xece4d2, 0xcdb894, 0xe8dcc4, 0xd2c2a6, 0xf0eadc, 0xc9b28c],
+    [0xb4bcc0, 0x8e9aa2, 0xd0d2cc, 0xa6a08e, 0x7c8890, 0xc4c8c4, 0x9aa4a8, 0xb8ae98],
+    [0xe0cfac, 0xd6c29c, 0xe8dcc2, 0xcbb48e, 0xdcc8a4, 0xefe4cc, 0xd2bc96, 0xe4d6b8],
   ],
   bengaluru: [
-    [1.04, 0.96, 0.86], // warm Mysore cream stucco
-    [1.05, 0.84, 0.72], // terracotta-coral residential
-    [0.92, 0.97, 1.02], // MG Road / Koramangala IT glass
-    [1.04, 0.91, 0.76], // sandstone ochre
-    [0.96, 0.98, 0.92], // garden-city lime wash
-    [1.02, 0.80, 0.68], // warm brick-red midrise
-    [0.89, 0.95, 0.99], // tech-park curtain wall
-    [1.0, 0.94, 0.84], // warm ivory
+    [0x8fa3ad, 0x7c8e98, 0xa8b4b6, 0x6e7e88, 0x9cacb0, 0x86969c, 0xb4bcba, 0x748690],
+    [0xe6dcc4, 0xd99a7e, 0xe4c58c, 0xc9d1c2, 0xeee6d6, 0xd7b49a, 0xbfcbd0, 0xe2cfa8],
+    [0xa9b5b9, 0x8d9ba3, 0xc7ccc6, 0x9aa69f, 0xb7bdb5, 0x7f8f98, 0xd0d2ca, 0x98a4a8],
+    [0xe8dcc0, 0xc9775a, 0xd6a75b, 0xd9d7b8, 0xd99a8c, 0x9fb8c4, 0xece8e0, 0xb8a27a],
   ],
   delhi: [
-    [1.05, 0.83, 0.68], // Bharatpur red-ochre sandstone
-    [1.04, 0.97, 0.88], // Lutyens white-cream stucco
-    [1.02, 0.89, 0.74], // Dholpur buff sandstone
-    [0.92, 0.96, 1.01], // Connaught / Nehru Place modern glass
-    [1.06, 0.78, 0.64], // Old Delhi terracotta brick
-    [1.02, 0.95, 0.84], // Chanakya ivory
-    [0.96, 0.88, 0.78], // warm stone
-    [0.90, 0.94, 0.98], // metro-corridor office
+    [0x95a5ad, 0x80909a, 0xaab3b5, 0x737f88, 0xa0abae, 0x8a989e, 0xb6bbb8, 0x788790],
+    [0xeadfc8, 0xd8b98c, 0xe6d2b2, 0xcdbfa6, 0xf0e8d8, 0xc9a684, 0xdccdb2, 0xe4d8c2],
+    [0xa9a59c, 0xbab4a6, 0x8f949a, 0xcfc8b8, 0x9ea2a2, 0xc4bcaa, 0xb2ada0, 0xd6d0c2],
+    [0xb5654a, 0xd8b98c, 0xeadfc8, 0xa5513e, 0xc98f62, 0xece6da, 0xbf7a58, 0xd9c4a0],
   ],
 };
-
-const ROOF_PALETTES: Record<CityId, [number, number, number][]> = {
-  dubai: [
-    [0.68, 0.67, 0.64],
-    [0.56, 0.60, 0.65],
-    [0.74, 0.70, 0.63],
-    [0.52, 0.55, 0.59],
-    [0.66, 0.63, 0.58],
-    [0.58, 0.62, 0.66],
-    [0.72, 0.68, 0.62],
-    [0.54, 0.56, 0.58],
-  ],
-  bengaluru: [
-    [0.68, 0.42, 0.32], // Mangalore / terracotta red tile roof!
-    [0.64, 0.58, 0.50], // warm weathered concrete
-    [0.72, 0.48, 0.36], // burnt sienna roof
-    [0.52, 0.55, 0.58], // CBD office slab
-    [0.70, 0.62, 0.50], // ochre lime terrace
-    [0.62, 0.39, 0.31], // deep brick terrace
-    [0.58, 0.60, 0.58], // cool grey slab
-    [0.68, 0.56, 0.44], // sandstone terrace
-  ],
-  delhi: [
-    [0.70, 0.48, 0.36], // sandstone red terrace
-    [0.74, 0.68, 0.58], // Lutyens cream roof
-    [0.64, 0.56, 0.47], // buff stone terrace
-    [0.54, 0.56, 0.59], // commercial slab
-    [0.68, 0.43, 0.34], // Mughal brick roof
-    [0.72, 0.64, 0.52], // Dholpur buff
-    [0.58, 0.55, 0.50], // weathered concrete
-    [0.66, 0.54, 0.42], // ochre terrace
-  ],
+const ROOFS: Record<CityId, number[]> = {
+  dubai: [0xc8bca4, 0xb7b0a2, 0xd6ccb8, 0xa8a49c, 0xbfb6a2, 0x9e9a92, 0xcfc6b2, 0xb0a894],
+  bengaluru: [0xa55a43, 0x9a958c, 0xb86a4c, 0x8b8a86, 0xa89c84, 0x934e3c, 0x9c9a94, 0xb49a7a],
+  delhi: [0xa9a194, 0xb08a6c, 0x9a958c, 0xbdae94, 0x8f8b84, 0xa8705a, 0xb4aa98, 0x9e9284],
 };
-
-const STYLE_BASE_COLOR: Record<CityId, [number, number, number][]> = {
-  dubai: [
-    [0.56, 0.68, 0.78], // sleek Gulf glass tower
-    [0.84, 0.80, 0.73], // limestone residential tower
-    [0.52, 0.63, 0.72], // office glass
-    [0.80, 0.75, 0.66], // sand midrise
-  ],
-  bengaluru: [
-    [0.50, 0.62, 0.70],
-    [0.82, 0.72, 0.62],
-    [0.52, 0.61, 0.68],
-    [0.78, 0.64, 0.52],
-  ],
-  delhi: [
-    [0.52, 0.62, 0.70],
-    [0.82, 0.74, 0.64],
-    [0.54, 0.62, 0.68],
-    [0.78, 0.62, 0.50],
-  ],
+const WALL_LIN: Record<CityId, [number, number, number][][]> = {
+  dubai: WALLS.dubai.map((row) => row.map(hex)),
+  bengaluru: WALLS.bengaluru.map((row) => row.map(hex)),
+  delhi: WALLS.delhi.map((row) => row.map(hex)),
+};
+const ROOF_LIN: Record<CityId, [number, number, number][]> = {
+  dubai: ROOFS.dubai.map(hex),
+  bengaluru: ROOFS.bengaluru.map(hex),
+  delhi: ROOFS.delhi.map(hex),
 };
 
 const TERRAIN_STYLE: Record<CityId, { ground: string; grainDark: string; grainLight: string; parkA: string; parkB: string; sand: string }> = {
@@ -323,46 +268,137 @@ function pointInRingF32(x: number, z: number, ring: Float32Array): boolean {
   return inside;
 }
 
-function pushBoxBuilding(
-  b: TileBuilding,
-  cityId: CityId,
-  pos: number[],
-  nrm: number[],
-  col: number[],
-) {
-  const [x0, z0, x1, z1] = b.bbox;
-  const h = b.height;
-  const baseList = STYLE_BASE_COLOR[cityId];
-  const base = baseList[b.style & 3] ?? baseList[1];
-  const tint = WALL_PALETTES[cityId][b.tint & 7];
-  const br = Math.min(1, base[0] * tint[0]);
-  const bg = Math.min(1, base[1] * tint[1]);
-  const bb = Math.min(1, base[2] * tint[2]);
-  const ao = 0.45;
-  const faces: [number, number, number, number, number, number][] = [
-    [x0, z0, x1, z0, 0, -1],
-    [x1, z0, x1, z1, 1, 0],
-    [x1, z1, x0, z1, 0, 1],
-    [x0, z1, x0, z0, -1, 0],
-  ];
-  for (const [ax, az, bx, bz, nx, nz] of faces) {
-    pos.push(ax, 0, az, bx, 0, bz, bx, h, bz, ax, 0, az, bx, h, bz, ax, h, az);
-    for (let k = 0; k < 6; k++) nrm.push(nx, 0, nz);
-    col.push(
-      br * ao, bg * ao, bb * ao,
-      br * ao, bg * ao, bb * ao,
-      br, bg, bb,
-      br * ao, bg * ao, bb * ao,
-      br, bg, bb,
-      br, bg, bb,
-    );
+/** Streams of vertex data for the facade shader. */
+class BuildingSink {
+  pos: number[] = [];
+  nrm: number[] = [];
+  uv: number[] = [];
+  col: number[] = [];
+  info: number[] = [];
+  wall(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, u0: number, c: [number, number, number], style: number, h: number, seed: number) {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const nx = (z1 - z0) / len;
+    const nz = -(x1 - x0) / len;
+    const u1 = u0 + len;
+    this.pos.push(x0, y0, z0, x1, y0, z1, x1, y1, z1, x0, y0, z0, x1, y1, z1, x0, y1, z0);
+    this.uv.push(u0, y0, u1, y0, u1, y1, u0, y0, u1, y1, u0, y1);
+    for (let k = 0; k < 6; k++) {
+      this.nrm.push(nx, 0, nz);
+      this.col.push(c[0], c[1], c[2]);
+      this.info.push(style, h, seed);
+    }
+    return len;
   }
-  const rc = ROOF_PALETTES[cityId][b.tint & 7];
-  pos.push(x0, h, z0, x0, h, z1, x1, h, z1, x0, h, z0, x1, h, z1, x1, h, z0);
-  for (let k = 0; k < 6; k++) {
-    nrm.push(0, 1, 0);
-    col.push(rc[0], rc[1], rc[2]);
+  roof(ring: Float32Array, y: number, c: [number, number, number], style: number, h: number, seed: number) {
+    const tris = triangulateFlat(ring);
+    for (let i = 0; i < tris.length; i += 3) {
+      for (const k of [tris[i], tris[i + 2], tris[i + 1]]) {
+        const x = ring[k * 2];
+        const z = ring[k * 2 + 1];
+        this.pos.push(x, y, z);
+        this.uv.push(x, z);
+        this.nrm.push(0, 1, 0);
+        this.col.push(c[0], c[1], c[2]);
+        this.info.push(style, h, seed);
+      }
+    }
   }
+  prism(ring: Float32Array, y0: number, y1: number, wall: [number, number, number], roof: [number, number, number], style: number, h: number, seed: number) {
+    const n = ring.length >> 1;
+    let along = 0;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const x0 = ring[i * 2], z0 = ring[i * 2 + 1];
+      const x1 = ring[j * 2], z1 = ring[j * 2 + 1];
+      if (Math.hypot(x1 - x0, z1 - z0) < 0.05) continue;
+      along += this.wall(x0, z0, x1, z1, y0, y1, along, wall, style, h, seed);
+    }
+    this.roof(ring, y1, roof, style, h, seed);
+  }
+  build(): BuildingBuffers | undefined {
+    if (!this.pos.length) return undefined;
+    return {
+      pos: new Float32Array(this.pos),
+      nrm: new Float32Array(this.nrm),
+      uv: new Float32Array(this.uv),
+      color: new Float32Array(this.col),
+      info: new Float32Array(this.info),
+    };
+  }
+}
+
+/** The footprint's best-fit rectangle, oriented along its longest edge, as a ring. */
+function orientedBox(ring: Float32Array): Float32Array {
+  const n = ring.length >> 1;
+  let best = 0;
+  let ux = 1;
+  let uz = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const dx = ring[j * 2] - ring[i * 2];
+    const dz = ring[j * 2 + 1] - ring[i * 2 + 1];
+    const l = Math.hypot(dx, dz);
+    if (l > best) {
+      best = l;
+      ux = dx / l;
+      uz = dz / l;
+    }
+  }
+  let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const x = ring[i * 2], z = ring[i * 2 + 1];
+    const a = x * ux + z * uz;
+    const b = -x * uz + z * ux;
+    a0 = Math.min(a0, a); a1 = Math.max(a1, a);
+    b0 = Math.min(b0, b); b1 = Math.max(b1, b);
+  }
+  const at = (a: number, b: number) => [a * ux - b * uz, a * uz + b * ux];
+  // Same winding as the source footprints (counter-clockwise in x/z).
+  const pts = [at(a0, b0), at(a1, b0), at(a1, b1), at(a0, b1)];
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += ring[i * 2] * ring[j * 2 + 1] - ring[j * 2] * ring[i * 2 + 1];
+  }
+  if (area < 0) pts.reverse();
+  return new Float32Array(pts.flat());
+}
+
+function buildingBuffers(tile: DecodedTile, cityId: CityId, lod: TileLod): BuildingBuffers | undefined {
+  const sink = new BuildingSink();
+  // Far tiles keep the skyline: only towers, as oriented boxes.
+  const minHeight = lod === 2 ? 22 : lod === 1 ? 6 : 0;
+  for (const b of tile.buildings) {
+    const h = b.height;
+    if (h < minHeight || b.ring.length < 6) continue;
+    const style = b.style & 3;
+    const tint = b.tint & 7;
+    const seed = ((b.bbox[0] * 12.9898 + b.bbox[1] * 78.233) % 1 + 1) % 1;
+    const wall = WALL_LIN[cityId][style][tint];
+    const roof = style === 0 || style === 2 ? WALL_LIN[cityId][2][(tint + 3) & 7] : ROOF_LIN[cityId][tint];
+    const ring = lod === 2 ? orientedBox(b.ring) : b.ring;
+    sink.prism(ring, 0, h, wall, roof, style, h, seed);
+    // Towers get a plant room on the roof.
+    if (lod === 0 && b.roofType === 1 && h > 55) {
+      const [bx0, bz0, bx1, bz1] = b.bbox;
+      const bw = bx1 - bx0, bd = bz1 - bz0;
+      if (bw > 16 && bd > 16) {
+        const cx = (bx0 + bx1) * 0.5, cz = (bz0 + bz1) * 0.5;
+        const pw = Math.min(bw * 0.26, 11), pd = Math.min(bd * 0.26, 11);
+        const ph = Math.min(7, h * 0.05);
+        const box = new Float32Array([cx - pw, cz - pd, cx + pw, cz - pd, cx + pw, cz + pd, cx - pw, cz + pd]);
+        let area = 0;
+        const n = b.ring.length >> 1;
+        for (let i = 0; i < n; i++) {
+          const j = (i + 1) % n;
+          area += b.ring[i * 2] * b.ring[j * 2 + 1] - b.ring[j * 2] * b.ring[i * 2 + 1];
+        }
+        const pr = area < 0 ? new Float32Array([cx - pw, cz + pd, cx + pw, cz + pd, cx + pw, cz - pd, cx - pw, cz - pd]) : box;
+        sink.prism(pr, h, h + ph, roof, roof, 4, h + ph, seed);
+      }
+    }
+  }
+  return sink.build();
 }
 
 /**
@@ -380,7 +416,8 @@ function paintTileGroundBitmaps(
 ): { groundBitmap: ImageBitmap; nightBitmap: ImageBitmap } | null {
   if (typeof OffscreenCanvas === "undefined" || quality === 0) return null;
 
-  const size = lod === 0 && quality >= 2 ? 512 : 256;
+  // Near tiles sharp, far tiles cheap; every tile gets ground so the city has no bare seams.
+  const size = lod === 0 ? (quality >= 2 ? 1024 : 512) : lod === 1 ? 256 : 128;
   const canvas = new OffscreenCanvas(size, size);
   const g = canvas.getContext("2d")!;
   const palette = TERRAIN_STYLE[cityId];
@@ -452,10 +489,12 @@ function paintTileGroundBitmaps(
   g.setLineDash([]);
 
   // Baked directional drop-shadow + contact AO under every building (replaces GPU-heavy shadow maps!)
+  // Footprints in roof colours: under extruded buildings they are hidden; where a
+  // far tile leaves small buildings flat, they still read as rooftops from the air.
   for (const b of tile.buildings) {
-    const sh = Math.min(18, b.height * 0.22);
-    fillRing(b.ring, "rgba(18, 20, 28, 0.34)", sh * 0.75, sh * 0.45);
-    fillRing(b.ring, "rgba(15, 16, 22, 0.42)", 0, 0);
+    const c = ROOFS[cityId][b.tint & 7];
+    fillRing(b.ring, "rgba(20, 18, 16, 0.22)", 1.2, 1.2);
+    fillRing(b.ring, `rgb(${(c >> 16) & 255}, ${(c >> 8) & 255}, ${c & 255})`, 0, 0);
   }
 
   // Cut out inland water (rivers, canals, lagoons, reflecting pools) so 3D water shines through!
@@ -547,34 +586,13 @@ export function buildTileGeometry(
   quality = 2,
 ): BuiltTileData {
   const out: BuiltTileData = { tx: tile.tx, tz: tile.tz, lod };
-  const wallTints = WALL_PALETTES[cityId];
-  const roofColors = ROOF_PALETTES[cityId];
-
-  // ---------- LOD 2 (Far): merged silhouettes of taller buildings (>= 15 m) ----------
-  if (lod === 2) {
-    const pos: number[] = [];
-    const nrm: number[] = [];
-    const col: number[] = [];
-    for (const b of tile.buildings) {
-      if (b.height < 15) continue;
-      pushBoxBuilding(b, cityId, pos, nrm, col);
-    }
-    if (pos.length) {
-      out.midBuildings = {
-        pos: new Float32Array(pos),
-        nrm: new Float32Array(nrm),
-        color: new Float32Array(col),
-      };
-    }
-    return out;
-  }
 
   // ---------- Ground & Roads: OffscreenCanvas bitmap in browser, vector fallback in Node tests / SwiftShader ----------
   const bitmaps = paintTileGroundBitmaps(tile, cityId, tileSize, lod, sea, quality);
   if (bitmaps) {
     out.groundBitmap = bitmaps.groundBitmap;
     out.nightBitmap = bitmaps.nightBitmap;
-  } else {
+  } else if (lod < 2) {
     // Node unit-test fallback (when OffscreenCanvas is absent)
     const rPos: number[] = [];
     const rCol: number[] = [];
@@ -599,158 +617,10 @@ export function buildTileGeometry(
     if (railPos.length) out.rails = { pos: new Float32Array(railPos), color: new Float32Array(railCol) };
   }
 
-  // ---------- LOD 1 (Mid): flat-coloured boxes with base AO ----------
-  if (lod === 1) {
-    const pos: number[] = [];
-    const nrm: number[] = [];
-    const col: number[] = [];
-    for (const b of tile.buildings) {
-      pushBoxBuilding(b, cityId, pos, nrm, col);
-    }
-    if (pos.length) {
-      out.midBuildings = {
-        pos: new Float32Array(pos),
-        nrm: new Float32Array(nrm),
-        color: new Float32Array(col),
-      };
-    }
-    return out;
-  }
-
-  // ---------- LOD 0 (Near): full extruded footprints grouped by the 4 real photographic facades ----------
-  const buckets = Array.from({ length: 4 }, () => ({
-    pos: [] as number[],
-    nrm: [] as number[],
-    uv: [] as number[],
-    col: [] as number[],
-  }));
-
-  const roofPos: number[] = [];
-  const roofNrm: number[] = [];
-  const roofCol: number[] = [];
-
-  for (const b of tile.buildings) {
-    const h = b.height;
-    const style = b.style & 3;
-    const [fw, fh] = FACADE_SCALE[style];
-    const w = buckets[style];
-    const tint = wallTints[b.tint & 7];
-    const aoBottom = 0.46;
-    const aoH = Math.min(h, 14);
-    const aoTop = aoH < h ? 1.0 : aoBottom + (1 - aoBottom) * (h / 14);
-
-    const ring = b.ring;
-    const n = ring.length >> 1;
-    let along = 0;
-
-    for (let i = 0; i < n; i++) {
-      const x0 = ring[i * 2], z0 = ring[i * 2 + 1];
-      const ni = (i + 1) % n;
-      const x1 = ring[ni * 2], z1 = ring[ni * 2 + 1];
-      const len = Math.hypot(x1 - x0, z1 - z0);
-      if (len < 0.05) continue;
-      const nx = (z1 - z0) / len;
-      const nz = -(x1 - x0) / len;
-      const u0 = along / fw;
-      const u1 = (along + len) / fw;
-      const v1 = h / fh;
-
-      if (h > 18) {
-        const vm = aoH / fh;
-        w.pos.push(x0, 0, z0, x1, 0, z1, x1, aoH, z1, x0, 0, z0, x1, aoH, z1, x0, aoH, z0);
-        w.uv.push(u0, 0, u1, 0, u1, vm, u0, 0, u1, vm, u0, vm);
-        for (let k = 0; k < 6; k++) w.nrm.push(nx, 0, nz);
-        w.col.push(
-          tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
-          tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
-          tint[0], tint[1], tint[2],
-          tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
-          tint[0], tint[1], tint[2],
-          tint[0], tint[1], tint[2],
-        );
-        w.pos.push(x0, aoH, z0, x1, aoH, z1, x1, h, z1, x0, aoH, z0, x1, h, z1, x0, h, z0);
-        w.uv.push(u0, vm, u1, vm, u1, v1, u0, vm, u1, v1, u0, v1);
-        for (let k = 0; k < 6; k++) {
-          w.nrm.push(nx, 0, nz);
-          w.col.push(tint[0], tint[1], tint[2]);
-        }
-      } else {
-        w.pos.push(x0, 0, z0, x1, 0, z1, x1, h, z1, x0, 0, z0, x1, h, z1, x0, h, z0);
-        w.uv.push(u0, 0, u1, 0, u1, v1, u0, 0, u1, v1, u0, v1);
-        for (let k = 0; k < 6; k++) w.nrm.push(nx, 0, nz);
-        w.col.push(
-          tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
-          tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
-          tint[0] * aoTop, tint[1] * aoTop, tint[2] * aoTop,
-          tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
-          tint[0] * aoTop, tint[1] * aoTop, tint[2] * aoTop,
-          tint[0] * aoTop, tint[1] * aoTop, tint[2] * aoTop,
-        );
-      }
-      along += len;
-    }
-
-    const tris = triangulateFlat(ring);
-    const rc = roofColors[b.tint & 7];
-    for (let i = 0; i < tris.length; i += 3) {
-      const a = tris[i], c = tris[i + 1], d = tris[i + 2];
-      roofPos.push(ring[a * 2], h, ring[a * 2 + 1], ring[d * 2], h, ring[d * 2 + 1], ring[c * 2], h, ring[c * 2 + 1]);
-      for (let k = 0; k < 3; k++) {
-        roofNrm.push(0, 1, 0);
-        roofCol.push(rc[0], rc[1], rc[2]);
-      }
-    }
-
-    if (b.roofType === 1 && h > 55) {
-      const [bx0, bz0, bx1, bz1] = b.bbox;
-      const bw = bx1 - bx0, bd = bz1 - bz0;
-      if (bw > 16 && bd > 16) {
-        const cx = (bx0 + bx1) * 0.5, cz = (bz0 + bz1) * 0.5;
-        const pw = Math.min(bw * 0.28, 12), pd = Math.min(bd * 0.28, 12);
-        const ph = Math.min(8, h * 0.05);
-        const px0 = cx - pw, px1 = cx + pw, pz0 = cz - pd, pz1 = cz + pd;
-        const pr = rc[0] * 0.85, pg = rc[1] * 0.85, pb = rc[2] * 0.85;
-        const pFaces: [number, number, number, number, number, number][] = [
-          [px0, pz0, px1, pz0, 0, -1],
-          [px1, pz0, px1, pz1, 1, 0],
-          [px1, pz1, px0, pz1, 0, 1],
-          [px0, pz1, px0, pz0, -1, 0],
-        ];
-        for (const [fx0, fz0, fx1, fz1, fnx, fnz] of pFaces) {
-          roofPos.push(fx0, h, fz0, fx1, h, fz1, fx1, h + ph, fz1, fx0, h, fz0, fx1, h + ph, fz1, fx0, h + ph, fz0);
-          for (let k = 0; k < 6; k++) {
-            roofNrm.push(fnx, 0, fnz);
-            roofCol.push(pr, pg, pb);
-          }
-        }
-        roofPos.push(px0, h + ph, pz0, px0, h + ph, pz1, px1, h + ph, pz1, px0, h + ph, pz0, px1, h + ph, pz1, px1, h + ph, pz0);
-        for (let k = 0; k < 6; k++) {
-          roofNrm.push(0, 1, 0);
-          roofCol.push(rc[0] * 0.92, rc[1] * 0.92, rc[2] * 0.92);
-        }
-      }
-    }
-  }
-
-  const wallsByStyle = buckets.map((w) =>
-    w.pos.length
-      ? {
-          pos: new Float32Array(w.pos),
-          nrm: new Float32Array(w.nrm),
-          uv: new Float32Array(w.uv),
-          color: new Float32Array(w.col),
-        }
-      : null,
-  );
-  if (wallsByStyle.some(Boolean)) out.wallsByStyle = wallsByStyle;
-
-  if (roofPos.length) {
-    out.roofs = {
-      pos: new Float32Array(roofPos),
-      nrm: new Float32Array(roofNrm),
-      color: new Float32Array(roofCol),
-    };
-  }
+  // ---------- Buildings: one buffer for every LOD, drawn by one facade shader ----------
+  const bld = buildingBuffers(tile, cityId, lod);
+  if (bld) out.buildings = bld;
+  if (lod > 0) return out;
 
   // ---------- Trees (lush Garden City canopy in Bengaluru, Lutyens avenues in Delhi, palms in Dubai) ----------
   const rand = seeded(tile.tx * 73856093 ^ tile.tz * 19349663 ^ cityId.length * 83492791);

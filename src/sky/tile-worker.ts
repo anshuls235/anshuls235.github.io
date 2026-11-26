@@ -30,13 +30,7 @@ const seaByCity = new Map<CityId, SeaMaskInfo | null>();
 
 function collectTransferables(d: BuiltTileData): Transferable[] {
   const list: Transferable[] = [];
-  if (d.wallsByStyle) {
-    for (const w of d.wallsByStyle) {
-      if (w) list.push(w.pos.buffer, w.nrm.buffer, w.uv.buffer, w.color.buffer);
-    }
-  }
-  if (d.roofs) list.push(d.roofs.pos.buffer, d.roofs.nrm.buffer, d.roofs.color.buffer);
-  if (d.midBuildings) list.push(d.midBuildings.pos.buffer, d.midBuildings.nrm.buffer, d.midBuildings.color.buffer);
+  if (d.buildings) list.push(d.buildings.pos.buffer, d.buildings.nrm.buffer, d.buildings.uv.buffer, d.buildings.color.buffer, d.buildings.info.buffer);
   if (d.rails) list.push(d.rails.pos.buffer, d.rails.color.buffer);
   if (d.groundBitmap) list.push(d.groundBitmap);
   if (d.nightBitmap) list.push(d.nightBitmap);

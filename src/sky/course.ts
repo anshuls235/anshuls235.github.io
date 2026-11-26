@@ -54,6 +54,8 @@ export function nextGate(
   from: { x: number; y: number; z: number; heading: number },
   rand: () => number,
   difficulty = 0,
+  /** A landmark the course should drift toward, so a flight becomes a tour. */
+  lure: { x: number; z: number } | null = null,
 ): Gate[] {
   const diff = Math.max(0, Math.min(1, difficulty));
   const [hx, hz] = city.data.half;
@@ -75,7 +77,8 @@ export function nextGate(
     const nearby = city.roofAt(x, z, 90);
     const towerBonus = (Math.min(nearby, y - CLEAR) / Math.max(1, y)) * (1 + diff * 0.6);
     const turnBias = (0.15 - diff * 0.25) * Math.abs(turn);
-    const score = towerBonus + rand() * 0.3 - turnBias;
+    const toward = lure ? Math.cos(Math.atan2(lure.x - from.x, -(lure.z - from.z)) - heading) : 0;
+    const score = towerBonus + rand() * 0.3 - turnBias + Math.max(0, toward) * 0.45;
     if (!best || score > best.score) {
       best = {
         gate: {

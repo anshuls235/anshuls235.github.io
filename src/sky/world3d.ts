@@ -7,223 +7,40 @@
 // - Flowering Gulmohar/Jacaranda canopy in Bengaluru, instanced superyachts in Dubai, 1-draw-call clouds.
 import * as THREE from "three";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
+import { ATMOS_GLSL, captureSky, createAtmosphere, createBuildingMaterial, createWaterMaterial, withAtmosphere, type Atmosphere } from "./look";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { thermalCore } from "./glider";
+import { launchPoint } from "./pilot";
 import type { City, CityId, CityLandmark } from "./citydata";
 import { decodeTile, TILE_SIZE } from "./tileformat";
 import { buildTileGeometry, type BuiltTileData, type TileLod } from "./tile-geom";
 import type { WorkerMessageIn, WorkerResponse } from "./tile-worker";
 
-const FACADES = [
-  { file: "glass-tower", rough: 0.2, metal: 0.34, floors: 4 },
-  { file: "residential-tower", rough: 0.78, metal: 0.04, floors: 1 },
-  { file: "office-glass", rough: 0.32, metal: 0.24, floors: 1 },
-  { file: "indian-midrise", rough: 0.88, metal: 0.0, floors: 1 },
-] as const;
-
+// Sun, haze and water per city: a low golden sun so towers throw long shadows
+// and glass catches the light.
 const LOOK: Record<
   CityId,
   {
-    daySun: [number, number];
+    sun: [number, number]; // elevation, azimuth (degrees)
     groundDay: number;
     groundNight: number;
-    fogDay: number;
-    fogNight: number;
-    fogDensityDay: number;
-    fogDensityNight: number;
-    waterDay: number;
+    fog: number; // haze density at sea level, per metre
+    falloff: number; // haze thins with height, per metre
+    water: number;
     waterNight: number;
     turbidity: number;
     rayleigh: number;
+    mie: number;
   }
 > = {
-  dubai: {
-    daySun: [18, 275],
-    groundDay: 0xdec9a2,
-    groundNight: 0x1a1d2c,
-    fogDay: 0xdbe4ea,
-    fogNight: 0x141b36,
-    fogDensityDay: 0.00013, // Clear Gulf air so Burj Al Arab & Burj Khalifa are visible from Marina!
-    fogDensityNight: 0.00018,
-    waterDay: 0x0d6f82, // Rich turquoise-emerald Arabian Gulf
-    waterNight: 0x081832,
-    turbidity: 2.8,
-    rayleigh: 1.2,
-  },
-  bengaluru: {
-    daySun: [24, 245],
-    groundDay: 0x9e947c,
-    groundNight: 0x171c28,
-    fogDay: 0xcbe0eb,
-    fogNight: 0x131a32,
-    fogDensityDay: 0.00024,
-    fogDensityNight: 0.00028,
-    waterDay: 0x1a5c54,
-    waterNight: 0x091928,
-    turbidity: 2.4,
-    rayleigh: 1.15,
-  },
-  delhi: {
-    daySun: [17, 232],
-    groundDay: 0xb8a585,
-    groundNight: 0x1c1a28,
-    fogDay: 0xe2d6be,
-    fogNight: 0x181b34,
-    fogDensityDay: 0.00025,
-    fogDensityNight: 0.00028,
-    waterDay: 0x1f5550,
-    waterNight: 0x0a1728,
-    turbidity: 4.6,
-    rayleigh: 1.45,
-  },
+  dubai: { sun: [14, 250], groundDay: 0xcdb58c, groundNight: 0x1a1d2c, fog: 0.00007, falloff: 0.0009, water: 0x0b5566, waterNight: 0x050c1a, turbidity: 3.2, rayleigh: 1.5, mie: 0.005 },
+  bengaluru: { sun: [17, 235], groundDay: 0x8f8a72, groundNight: 0x171c28, fog: 0.00008, falloff: 0.0011, water: 0x2c4f48, waterNight: 0x060d18, turbidity: 2.6, rayleigh: 1.9, mie: 0.004 },
+  delhi: { sun: [13, 228], groundDay: 0xb09e7e, groundNight: 0x1c1a28, fog: 0.00011, falloff: 0.0010, water: 0x3a5550, waterNight: 0x07101a, turbidity: 4.5, rayleigh: 1.3, mie: 0.006 },
 };
 
 function seeded(seed: number) {
   let s = (Math.abs(seed) % 2147483646) || 1;
   return () => ((s = (s * 16807) % 2147483647) / 2147483647);
-}
-
-let facadePromise: Promise<THREE.Texture[]> | null = null;
-export function loadFacades(base: string, anisotropy: number): Promise<THREE.Texture[]> {
-  if (facadePromise) return facadePromise;
-  const loader = new THREE.TextureLoader();
-  facadePromise = Promise.all(
-    FACADES.map(async (f) => {
-      const tex = await loader.loadAsync(`${base}assets/sky/${f.file}.webp`);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.anisotropy = Math.min(8, anisotropy);
-      return tex;
-    }),
-  );
-  facadePromise.catch(() => {
-    facadePromise = null;
-  });
-  return facadePromise;
-}
-
-let rippleTex: THREE.CanvasTexture | null = null;
-function waterNormals(): THREE.CanvasTexture {
-  if (rippleTex) return rippleTex;
-  const n = 256;
-  const h = new Float32Array(n * n);
-  const rand = seeded(5);
-  for (let o = 0; o < 4; o++) {
-    const f = 2 ** (o + 1);
-    const phase = Array.from({ length: 5 }, () => [rand() * 6.28, rand() * 6.28, Math.round(1 + rand() * 3), Math.round(rand() * 3)]);
-    for (let y = 0; y < n; y++) {
-      for (let x = 0; x < n; x++) {
-        for (const [p, q, kx, ky] of phase) {
-          h[y * n + x] += (Math.sin(((x * kx * f) / n) * 6.283 + p) * Math.cos(((y * (ky + 1) * f) / n) * 6.283 + q)) / f;
-        }
-      }
-    }
-  }
-  const c = document.createElement("canvas");
-  c.width = c.height = n;
-  const g = c.getContext("2d")!;
-  const img = g.createImageData(n, n);
-  for (let y = 0; y < n; y++) {
-    for (let x = 0; x < n; x++) {
-      const dx = h[y * n + ((x + 1) % n)] - h[y * n + ((x + n - 1) % n)];
-      const dy = h[((y + 1) % n) * n + x] - h[((y + n - 1) % n) * n + x];
-      const i = (y * n + x) * 4;
-      img.data[i] = 128 + dx * 75;
-      img.data[i + 1] = 128 + dy * 75;
-      img.data[i + 2] = 255;
-      img.data[i + 3] = 255;
-    }
-  }
-  g.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(110, 110);
-  rippleTex = t;
-  return t;
-}
-
-function createWallMaterials(facades: THREE.Texture[], env: THREE.Texture | null, uNight: { value: number }) {
-  return FACADES.map((f, idx) => {
-    const mat = new THREE.MeshStandardMaterial({
-      map: facades[idx],
-      vertexColors: true,
-      roughness: f.rough,
-      metalness: f.metal,
-      envMap: env,
-      envMapIntensity: 0.85,
-    });
-    const floors = f.floors;
-    const lit = idx === 3 ? 0.36 : 0.46;
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uNight = uNight;
-      shader.uniforms.uFloors = { value: floors };
-      shader.uniforms.uLit = { value: lit };
-      shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform float uNight;\nuniform float uFloors;\nuniform float uLit;")
-        .replace(
-          "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
-          if (uNight > 0.01) {
-            vec2 grid = vMapUv * vec2(2.0, uFloors);
-            vec2 cell = floor(grid);
-            float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-            vec3 texel = texture2D(map, vMapUv).rgb;
-            float glass = smoothstep(0.58, 0.20, dot(texel, vec3(0.299, 0.587, 0.114)));
-            float on = step(h, uLit) * glass;
-            float farFade = smoothstep(0.22, 0.75, length(fwidth(grid)));
-            on = mix(on, uLit * 0.5, farFade);
-            vec3 warm = mix(vec3(1.0, 0.70, 0.36), vec3(0.86, 0.94, 1.0), step(0.78, fract(h * 11.3)));
-            totalEmissiveRadiance += (warm * on * (0.95 + fract(h * 7.1) * 0.55) + texel * 0.06) * uNight;
-          }`,
-        );
-    };
-    mat.customProgramCacheKey = () => `sky-wall-v4-${idx}`;
-    return mat;
-  });
-}
-
-function createMidMaterial(env: THREE.Texture | null, uNight: { value: number }) {
-  const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.64,
-    metalness: 0.18,
-    envMap: env,
-    envMapIntensity: 0.65,
-  });
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uNight = uNight;
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vWorldPos;\nvarying vec3 vWorldNrm;")
-      .replace(
-        "#include <begin_vertex>",
-        "#include <begin_vertex>\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWorldNrm = normalize(mat3(modelMatrix) * objectNormal);",
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nuniform float uNight;\nvarying vec3 vWorldPos;\nvarying vec3 vWorldNrm;")
-      .replace(
-        "#include <color_fragment>",
-        `#include <color_fragment>
-        if (abs(vWorldNrm.y) < 0.5) {
-          float floorBand = 0.84 + 0.16 * step(0.30, fract(vWorldPos.y * 0.27));
-          float bayBand = 0.90 + 0.10 * step(0.20, fract((vWorldPos.x + vWorldPos.z) * 0.16));
-          diffuseColor.rgb *= floorBand * bayBand;
-        }`,
-      )
-      .replace(
-        "#include <emissivemap_fragment>",
-        `#include <emissivemap_fragment>
-        if (uNight > 0.01 && abs(vWorldNrm.y) < 0.5) {
-          float flr = floor(vWorldPos.y * 0.27);
-          float bay = floor((vWorldPos.x + vWorldPos.z) * 0.14);
-          float h = fract(sin(dot(vec2(bay, flr), vec2(12.9898, 78.233))) * 43758.5453);
-          float lit = step(h, 0.38) * smoothstep(2.0, 12.0, vWorldPos.y);
-          vec3 glow = mix(vec3(1.0, 0.70, 0.35), vec3(0.92, 0.90, 0.80), fract(h * 9.0));
-          totalEmissiveRadiance += glow * lit * 0.75 * uNight;
-        }`,
-      );
-  };
-  mat.customProgramCacheKey = () => "sky-mid-buildings-v4";
-  return mat;
 }
 
 function createNightSky(azimuth: number) {
@@ -312,7 +129,8 @@ function coloredPart(geo: THREE.BufferGeometry, hex: number): THREE.BufferGeomet
  * Builds bespoke, multi-coloured 3D architectural sculptures for all 21 landmarks across
  * Dubai, Bengaluru, and Delhi so each city is unmistakably recognizable on sight!
  */
-function buildLandmarks(landmarks: CityLandmark[], env: THREE.Texture | null, uNight: { value: number }) {
+function buildLandmarks(landmarks: CityLandmark[], atmo: Atmosphere) {
+  const uNight = atmo.uNight;
   const group = new THREE.Group();
   const disposables: { dispose(): void }[] = [];
   const beacons: THREE.Sprite[] = [];
@@ -560,33 +378,29 @@ function buildLandmarks(landmarks: CityLandmark[], env: THREE.Texture | null, uN
     const supertall = lm.kind === "burj" || lm.kind === "sail" || lm.kind === "wheel";
     const glassy = lm.kind === "burj" || lm.kind === "spire" || lm.kind === "twist" || lm.kind === "torus";
     const mat = keep(
-      new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: glassy ? 0.22 : 0.68,
-        metalness: glassy ? 0.48 : 0.08,
-        envMap: env,
-        envMapIntensity: glassy ? 1.05 : 0.45,
-        fog: !supertall, // Let Burj Khalifa, Burj Al Arab & Ain Dubai gleam clearly across the entire Dubai horizon!
-      }),
+      withAtmosphere(
+        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: glassy ? 0.16 : 0.7, metalness: glassy ? 0.75 : 0.04 }),
+        atmo,
+        `landmark-${glassy ? "glass" : "stone"}-${supertall ? 1 : 0}`,
+        (shader) => {
+          shader.uniforms.uNight = uNight;
+          shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "#include <common>\nvarying vec3 vLmPos;")
+            .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLmPos = position;");
+          shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", "#include <common>\nuniform float uNight;\nvarying vec3 vLmPos;")
+            .replace(
+              "#include <emissivemap_fragment>",
+              `#include <emissivemap_fragment>
+              if (uNight > 0.01) {
+                float band = smoothstep(0.50, 0.92, sin(vLmPos.y * 0.45));
+                vec3 accent = ${glassy ? "vec3(0.80, 0.90, 1.0)" : "vec3(1.0, 0.78, 0.45)"};
+                totalEmissiveRadiance += accent * (0.34 + band * 0.52) * uNight;
+              }`,
+            );
+        },
+      ),
     );
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uNight = uNight;
-      shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nvarying vec3 vLmPos;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLmPos = position;");
-      shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform float uNight;\nvarying vec3 vLmPos;")
-        .replace(
-          "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
-          if (uNight > 0.01) {
-            float band = smoothstep(0.50, 0.92, sin(vLmPos.y * 0.45));
-            vec3 accent = ${glassy ? "vec3(0.80, 0.90, 1.0)" : "vec3(1.0, 0.78, 0.45)"};
-            totalEmissiveRadiance += accent * (0.34 + band * 0.52) * uNight;
-          }`,
-        );
-    };
-    mat.customProgramCacheKey = () => `sky-landmark-v4-${lm.kind}`;
 
     const mesh = new THREE.Mesh(merged, mat);
     mesh.position.set(lm.x, 0, lm.z);
@@ -606,7 +420,7 @@ function buildLandmarks(landmarks: CityLandmark[], env: THREE.Texture | null, uN
 }
 
 /** Fallback distant land skirt outside the streamed tile ring so the horizon is seamless. */
-function createBaseGround(city: City, night: boolean) {
+function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
   const look = LOOK[city.data.id];
   const [hx, hz] = city.data.half;
   const disposables: { dispose(): void }[] = [];
@@ -634,24 +448,32 @@ function createBaseGround(city: City, night: boolean) {
   }
 
   const baseMat = keep(
-    new THREE.MeshStandardMaterial({
-      color: night ? look.groundNight : look.groundDay,
-      alphaMap,
-      alphaTest: alphaMap ? 0.5 : 0,
-      roughness: 0.98,
-      metalness: 0,
-    }),
+    withAtmosphere(
+      new THREE.MeshStandardMaterial({
+        color: night ? look.groundNight : look.groundDay,
+        alphaMap,
+        alphaTest: alphaMap ? 0.5 : 0,
+        roughness: 0.98,
+        metalness: 0,
+      }),
+      atmo,
+      "base-ground",
+    ),
   );
   const basePlane = new THREE.Mesh(keep(new THREE.PlaneGeometry(hx * 2, hz * 2)), baseMat);
   basePlane.rotation.x = -Math.PI / 2;
   basePlane.position.y = 0.2;
 
   const surroundMat = keep(
-    new THREE.MeshStandardMaterial({
-      color: night ? look.groundNight : look.groundDay,
-      roughness: 1,
-      side: THREE.DoubleSide,
-    }),
+    withAtmosphere(
+      new THREE.MeshStandardMaterial({
+        color: night ? look.groundNight : look.groundDay,
+        roughness: 1,
+        side: THREE.DoubleSide,
+      }),
+      atmo,
+      "surround-ground",
+    ),
   );
   const far = 16000;
   const step = 500;
@@ -698,7 +520,7 @@ function createBaseGround(city: City, night: boolean) {
 }
 
 /** Shared low-poly trees: palms in Dubai, flowering Gulmohar/Jacaranda + rain-trees in Bengaluru, lush avenues in Delhi. */
-function createTreePrototypes(cityId: CityId) {
+function createTreePrototypes(cityId: CityId, atmo: Atmosphere) {
   const palm = cityId === "dubai";
   let crown: THREE.BufferGeometry;
   let trunk: THREE.BufferGeometry;
@@ -722,8 +544,8 @@ function createTreePrototypes(cityId: CityId) {
     crown = mergeGeometries(blobs)!;
     blobs.forEach((b) => b.dispose());
   }
-  const crownMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, flatShading: true });
-  const trunkMat = new THREE.MeshStandardMaterial({ color: palm ? 0x8a6f4e : 0x5a4636, roughness: 1 });
+  const crownMat = withAtmosphere(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, flatShading: true }), atmo, "tree-crown");
+  const trunkMat = withAtmosphere(new THREE.MeshStandardMaterial({ color: palm ? 0x8a6f4e : 0x5a4636, roughness: 1 }), atmo, "tree-trunk");
 
   // Bengaluru features signature Gulmohar (fiery orange-crimson) & Jacaranda (violet) blossoms!
   const palette = palm
@@ -752,12 +574,12 @@ function createTreePrototypes(cityId: CityId) {
 }
 
 /** Instanced luxury yachts in Dubai's Marina & Gulf waters (65 yachts in 1 single draw call!). */
-function createDubaiYachts(city: City, env: THREE.Texture | null) {
+function createDubaiYachts(city: City, atmo: Atmosphere) {
   const hull = mergeGeometries([
     new THREE.BoxGeometry(5.5, 2.2, 20).translate(0, 1.1, 0).toNonIndexed(),
     new THREE.BoxGeometry(4.2, 2.4, 8.5).translate(0, 3.2, -1.5).toNonIndexed(),
   ])!;
-  const mat = new THREE.MeshStandardMaterial({ color: 0xfafaf6, roughness: 0.3, metalness: 0.15, envMap: env });
+  const mat = withAtmosphere(new THREE.MeshStandardMaterial({ color: 0xfafaf6, roughness: 0.3, metalness: 0.15 }), atmo, "yachts");
   const spots: [number, number, number, number][] = [];
   const rand = seeded(77);
   const [hx, hz] = city.data.half;
@@ -795,34 +617,115 @@ function createDubaiYachts(city: City, env: THREE.Texture | null) {
 }
 
 /** Single-draw-call cumulus clouds capping thermals (replaces 80 individual Sprites with 1 Points!). */
-function createThermalClouds(city: City, night: boolean) {
-  const pts: number[] = [];
-  const rand = seeded(city.data.id.length * 101);
+let cloudAtlas: Promise<THREE.Texture> | null = null;
+/**
+ * Four photographed-looking cumulus in a 2×2 atlas (generated once, cut from
+ * black): alpha is the cloud, the grey is how lit each part is.
+ */
+function cloudTexture(base: string) {
+  cloudAtlas ??= new THREE.TextureLoader().loadAsync(`${base}assets/sky/clouds.webp`).then((t) => {
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.anisotropy = 4;
+    return t;
+  });
+  cloudAtlas.catch(() => (cloudAtlas = null));
+  return cloudAtlas;
+}
+
+/**
+ * Cumulus over every thermal (so clouds tell a pilot where the lift is) and a
+ * scattered layer across the city: camera-facing quads in one draw call, lit
+ * from the sun's side and fading into the haze.
+ */
+function createClouds(city: City, atmo: Atmosphere, atlas: THREE.Texture) {
+  const rand = seeded(city.data.id.length * 131 + 7);
+  const items: [number, number, number, number, number][] = []; // x, y, z, size, variant
   for (const t of city.thermals) {
-    const top = Math.min(t.top + 50, 1200);
+    // The cloud base sits well above the thermal's top, so it caps the lift without walling it in.
+    const top = Math.min(t.top + 160, 1200);
     const core = thermalCore(t, top, city.breeze);
-    for (let i = 0; i < 5; i++) {
-      pts.push(core.x + (rand() - 0.5) * 190, top + (i < 2 ? 0 : 22 + rand() * 35), core.z + (rand() - 0.5) * 150);
-    }
+    for (let i = 0; i < 2; i++) items.push([core.x + (rand() - 0.5) * 180, top + rand() * 60, core.z + (rand() - 0.5) * 180, 300 + rand() * 220, Math.floor(rand() * 4)]);
   }
+  const [hx, hz] = city.data.half;
+  for (let i = 0; i < 70; i++) {
+    items.push([(rand() - 0.5) * (hx * 2 + 9000), 700 + rand() * 600, (rand() - 0.5) * (hz * 2 + 9000), 380 + rand() * 520, Math.floor(rand() * 4)]);
+  }
+  const n = items.length;
+  const centre = new Float32Array(n * 4 * 3);
+  const corner = new Float32Array(n * 4 * 2);
+  const meta = new Float32Array(n * 4 * 2);
+  const index: number[] = [];
+  items.forEach(([x, y, z, size, v], i) => {
+    for (let k = 0; k < 4; k++) {
+      const o = i * 4 + k;
+      centre.set([x, y, z], o * 3);
+      corner.set([k === 0 || k === 3 ? -1 : 1, k < 2 ? -1 : 1], o * 2);
+      meta.set([size, v], o * 2);
+    }
+    const b = i * 4;
+    index.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  });
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-  const mat = new THREE.PointsMaterial({
-    map: softCircleTexture(),
-    color: night ? 0x3b406b : 0xfbf9f4,
-    size: 165,
-    sizeAttenuation: true,
+  geo.setAttribute("position", new THREE.BufferAttribute(centre, 3));
+  geo.setAttribute("corner", new THREE.BufferAttribute(corner, 2));
+  geo.setAttribute("meta", new THREE.BufferAttribute(meta, 2));
+  geo.setIndex(index);
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 40000);
+  const uniforms = { ...atmo, uAtlas: { value: atlas }, uLight: { value: new THREE.Color(1, 0.93, 0.84) }, uShade: { value: new THREE.Color(0.42, 0.47, 0.58) } };
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
     transparent: true,
     depthWrite: false,
-    opacity: night ? 0.45 : 0.78,
+    vertexShader: /* glsl */ `
+      attribute vec2 corner;
+      attribute vec2 meta;
+      varying vec2 vUv;
+      varying vec3 vWP;
+      varying float vFade;
+      void main() {
+        vec4 mv = viewMatrix * modelMatrix * vec4(position, 1.0);
+        float size = meta.x;
+        mv.xy += corner * size * 0.6;
+        float v = meta.y;
+        vec2 cell = vec2(mod(v, 2.0), 1.0 - floor(v / 2.0));
+        vUv = (cell + corner * 0.5 + 0.5) * 0.5;
+        vWP = (inverse(viewMatrix) * mv).xyz;
+        // Fade clouds the plane is about to fly through, so they never fill the screen.
+        vFade = smoothstep(180.0, 700.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D uAtlas;
+      uniform vec3 uLight;
+      uniform vec3 uShade;
+      uniform float uNight;
+      varying vec2 vUv;
+      varying vec3 vWP;
+      varying float vFade;
+      ${"" /* atmosphere functions */}
+      ATMOS
+      void main() {
+        vec4 t = texture2D(uAtlas, vUv);
+        float a = t.a * vFade;
+        if (a < 0.01) discard;
+        vec3 rd = normalize(vWP - cameraPosition);
+        float toward = pow(max(dot(rd, uSunDir), 0.0), 4.0);
+        float light = t.r;
+        vec3 lit = mix(uShade, uLight * (1.3 + toward * 1.8), smoothstep(0.0, 0.85, light));
+        lit *= mix(1.0, 0.12, uNight);
+        vec3 col = applyAtmos(lit * 1.6, vWP);
+        gl_FragColor = vec4(col, a * 0.92);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
   });
-  const points = new THREE.Points(geo, mat);
+  mat.fragmentShader = mat.fragmentShader.replace("ATMOS", ATMOS_GLSL);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
   return {
-    mesh: points,
-    setNight(isNight: boolean) {
-      mat.color.setHex(isNight ? 0x3b406b : 0xfbf9f4);
-      mat.opacity = isNight ? 0.45 : 0.78;
-    },
+    mesh,
     dispose() {
       geo.dispose();
       mat.dispose();
@@ -844,7 +747,9 @@ export interface BuiltWorld {
   group: THREE.Group;
   sun: THREE.DirectionalLight;
   sunDirection: THREE.Vector3;
-  fog: THREE.FogExp2;
+  /** Image-based light for every standard material: the sky above, the city below. */
+  environment: THREE.Texture | null;
+  environmentIntensity: number;
   setNight(night: boolean): void;
   setQuality(quality: number): void;
   ensureAround(x: number, z: number): Promise<void>;
@@ -889,7 +794,6 @@ function getSharedWorker(): Worker | null {
 
 export async function buildWorld(
   city: City,
-  facades: THREE.Texture[],
   renderer: THREE.WebGLRenderer,
   base: string,
   initialNight: boolean,
@@ -905,181 +809,167 @@ export async function buildWorld(
   let quality = initialQuality;
   let disposed = false;
 
-  const uNight = { value: night ? 1 : 0 };
+  const atmo = createAtmosphere();
+  atmo.uFogDensity.value = look.fog;
+  atmo.uFogFalloff.value = look.falloff;
+  const uNight = atmo.uNight;
+  uNight.value = night ? 1 : 0;
 
-  // ---------- Sky & Environment ----------
-  const [dayElev, azimuth] = look.daySun;
-  const daySunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - dayElev), THREE.MathUtils.degToRad(azimuth));
-  const nightSunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(86), THREE.MathUtils.degToRad(azimuth));
-  const sunDirection = (night ? nightSunDir : daySunDir).clone();
+  // ---------- Sun, sky and the captured environment ----------
+  // The sun sits behind the visitor's left shoulder on the opening line, so the
+  // first view of the city is lit, with shadows falling away to the right.
+  const [elev] = look.sun;
+  const opening = launchPoint(city).heading;
+  const fx = Math.sin(opening);
+  const fz = -Math.cos(opening);
+  const turn = 0.75;
+  const azimuth = THREE.MathUtils.radToDeg(Math.atan2(fx * Math.cos(turn) - fz * Math.sin(turn), fx * Math.sin(turn) + fz * Math.cos(turn)));
+  const daySunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), THREE.MathUtils.degToRad(azimuth));
+  const moonDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(50), THREE.MathUtils.degToRad(azimuth + 150));
+  const sunDirection = (night ? moonDir : daySunDir).clone();
+  atmo.uSunDir.value.copy(daySunDir);
 
-  const daySky = new Sky();
-  daySky.scale.setScalar(15000);
-  const su = daySky.material.uniforms;
-  su.turbidity.value = look.turbidity;
-  su.rayleigh.value = look.rayleigh;
-  su.mieCoefficient.value = 0.004;
-  su.mieDirectionalG.value = 0.82;
-  su.sunPosition.value.copy(daySunDir);
+  const makeSky = (scale: number) => {
+    const sky = new Sky();
+    sky.scale.setScalar(scale);
+    const u = sky.material.uniforms;
+    u.turbidity.value = look.turbidity;
+    u.rayleigh.value = look.rayleigh;
+    u.mieCoefficient.value = look.mie;
+    u.mieDirectionalG.value = 0.86;
+    u.sunPosition.value.copy(daySunDir);
+    return sky;
+  };
+  const daySky = makeSky(20000);
+  // Drawn after the city: its costly shader runs only where sky is actually seen.
+  daySky.renderOrder = 5;
   daySky.visible = !night;
   group.add(daySky);
   keep(daySky.geometry);
   keep(daySky.material);
-
   const dusk = keep(createNightSky(azimuth));
+  dusk.group.children.forEach((c) => (c.renderOrder = 5));
   dusk.group.visible = night;
   group.add(dusk.group);
 
-  let envDay: THREE.Texture | null = null;
-  let envNight: THREE.Texture | null = null;
-  if (quality > 0) {
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envSceneDay = new THREE.Scene();
-    const envSky = new Sky();
-    envSky.scale.setScalar(1000);
-    Object.assign(envSky.material.uniforms, THREE.UniformsUtils.clone(daySky.material.uniforms));
-    envSky.material.uniforms.sunPosition.value.copy(daySunDir);
-    envSceneDay.add(envSky);
-    envDay = keep(pmrem.fromScene(envSceneDay).texture);
-    envSky.geometry.dispose();
-    envSky.material.dispose();
+  // The environment: the sky above and a stand-in for the city below, captured
+  // once per theme. The haze reads it; PMREM makes it the light on glass.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const ground = new THREE.Color();
+  const capture = (isNight: boolean) => {
+    const scene = new THREE.Scene();
+    const sky = isNight ? createNightSky(azimuth) : null;
+    const skyMesh = isNight ? null : makeSky(10000);
+    if (sky) scene.add(sky.group);
+    if (skyMesh) scene.add(skyMesh);
+    ground.setHex(isNight ? 0x1a1410 : look.groundDay).multiplyScalar(isNight ? 1 : 0.55);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(20000, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: ground }));
+    floor.position.y = -40;
+    scene.add(floor);
+    const cube = captureSky(renderer, scene, quality === 0 ? 32 : 128);
+    const env = pmrem.fromCubemap(cube.texture).texture;
+    sky?.dispose();
+    skyMesh?.geometry.dispose();
+    skyMesh?.material.dispose();
+    floor.geometry.dispose();
+    floor.material.dispose();
+    return { cube: keep(cube), env: keep(env) };
+  };
+  const dayEnv = capture(false);
+  const nightEnv = capture(true);
+  pmrem.dispose();
 
-    const envSceneNight = new THREE.Scene();
-    const envDusk = createNightSky(azimuth);
-    envDusk.group.scale.setScalar(0.05);
-    envSceneNight.add(envDusk.group);
-    envNight = keep(pmrem.fromScene(envSceneNight).texture);
-    envDusk.dispose();
-    pmrem.dispose();
-  }
-
-  // ---------- Lights & Fog (baked ground drop-shadows replace expensive shadow maps!) ----------
-  const sun = new THREE.DirectionalLight(0xffe8c2, 3.6);
+  // ---------- Lights ----------
+  const sun = new THREE.DirectionalLight(0xffc68a, 6.5);
   sun.position.copy(sunDirection).multiplyScalar(900);
-  sun.castShadow = false;
+  sun.shadow.mapSize.set(2048, 2048);
+  const shadowCam = sun.shadow.camera as THREE.OrthographicCamera;
+  shadowCam.left = shadowCam.bottom = -340;
+  shadowCam.right = shadowCam.top = 340;
+  shadowCam.near = 50;
+  shadowCam.far = 2600;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.9;
   group.add(sun, sun.target);
-
-  const hemi = new THREE.HemisphereLight(0xd4e6ff, 0x948062, 1.75);
+  const hemi = new THREE.HemisphereLight(0x9fc0e8, 0x6b5a44, 0.35);
   group.add(hemi);
 
-  const fog = new THREE.FogExp2(look.fogDay, look.fogDensityDay);
+  // ---------- Shared materials ----------
+  const buildingMat = keep(createBuildingMaterial(atmo));
+  const railMat = keep(withAtmosphere(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 }), atmo, "rails"));
+  const sunHdr = new THREE.Color(0xffc68a).multiplyScalar(6.5);
+  const waterMat = keep(createWaterMaterial(atmo, new THREE.Color(night ? look.waterNight : look.water), sunHdr));
 
-  // ---------- Shared Materials ----------
-  const activeEnv = night ? envNight : envDay;
-  const wallMats = createWallMaterials(facades, activeEnv, uNight).map((m) => keep(m));
-  const midMat = keep(createMidMaterial(activeEnv, uNight));
-  const roofMat = keep(
-    new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.88,
-      metalness: 0.05,
-      envMap: activeEnv,
-      envMapIntensity: 0.35,
-    }),
-  );
-  const railMat = keep(
-    new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.6,
-      metalness: 0.3,
-    }),
-  );
-  const waterNormal = waterNormals();
-  const waterMat = keep(
-    new THREE.MeshStandardMaterial({
-      color: night ? look.waterNight : look.waterDay,
-      normalMap: waterNormal,
-      normalScale: new THREE.Vector2(0.6, 0.6),
-      roughness: 0.12,
-      metalness: 0.28,
-      envMap: activeEnv,
-      envMapIntensity: 1.25,
-    }),
-  );
-
-  // Shared 1 km x 1 km ground tile plane geometry (rotated horizontal once)
   const tileSize = city.index.tileSize || TILE_SIZE;
   const sharedTilePlane = keep(new THREE.PlaneGeometry(tileSize + 1.5, tileSize + 1.5));
   sharedTilePlane.rotateX(-Math.PI / 2);
 
-  // Water plane underneath everything
-  const seaPlane = new THREE.Mesh(keep(new THREE.PlaneGeometry(38000, 38000)), waterMat);
+  const seaPlane = new THREE.Mesh(keep(new THREE.PlaneGeometry(60000, 60000)), waterMat);
   seaPlane.rotation.x = -Math.PI / 2;
-  seaPlane.position.y = 0.0;
   group.add(seaPlane);
 
-  const baseGround = keep(createBaseGround(city, night));
+  const baseGround = keep(createBaseGround(city, night, atmo));
   group.add(baseGround.group);
-
-  const treeProto = keep(createTreePrototypes(id));
+  const treeProto = keep(createTreePrototypes(id, atmo));
   treeProto.setNight(night);
-
-  const landmarks = keep(buildLandmarks(city.landmarks, activeEnv, uNight));
+  const landmarks = keep(buildLandmarks(city.landmarks, atmo));
   group.add(landmarks.group);
-
+  landmarks.group.traverse((o) => {
+    o.castShadow = true;
+    o.receiveShadow = true;
+  });
   if (id === "dubai" && quality > 0) {
-    const yachts = keep(createDubaiYachts(city, activeEnv));
+    const yachts = keep(createDubaiYachts(city, atmo));
     group.add(yachts.mesh);
   }
-
-  const clouds = keep(createThermalClouds(city, night));
+  const clouds = keep(createClouds(city, atmo, await cloudTexture(base)));
   group.add(clouds.mesh);
 
   const activeTiles = new Map<string, ActiveTile>();
+  const environment = { current: (night ? nightEnv : dayEnv).env };
 
   function applyTheme(isNight: boolean) {
     night = isNight;
     uNight.value = isNight ? 1 : 0;
     daySky.visible = !isNight;
     dusk.group.visible = isNight;
-    sunDirection.copy(isNight ? nightSunDir : daySunDir);
-
-    sun.color.setHex(isNight ? 0xffa07a : 0xffe8c2);
-    sun.intensity = isNight ? 0.85 : 3.6;
-    hemi.color.setHex(isNight ? 0x7084c8 : 0xd4e6ff);
-    hemi.groundColor.setHex(isNight ? 0x262436 : 0x948062);
-    hemi.intensity = isNight ? 1.5 : 1.75;
-
-    fog.color.setHex(isNight ? look.fogNight : look.fogDay);
-    fog.density = isNight ? look.fogDensityNight : look.fogDensityDay;
-
-    const env = isNight ? envNight : envDay;
-    for (const wm of wallMats) {
-      wm.envMap = env;
-      wm.envMapIntensity = isNight ? 1.2 : 0.85;
-    }
-    midMat.envMap = roofMat.envMap = waterMat.envMap = env;
-    waterMat.color.setHex(isNight ? look.waterNight : look.waterDay);
-    roofMat.color.setHex(isNight ? 0x5c6278 : 0xffffff);
-
+    sunDirection.copy(isNight ? moonDir : daySunDir);
+    atmo.uSunDir.value.copy(isNight ? moonDir : daySunDir);
+    const set = isNight ? nightEnv : dayEnv;
+    atmo.uSkyCube.value = set.cube.texture;
+    environment.current = set.env;
+    atmo.uSunGlow.value.set(isNight ? 0x000000 : 0xffc890);
+    atmo.uFogDensity.value = look.fog * (isNight ? 1.4 : 1);
+    atmo.uFill.value = isNight ? 0.55 : 0.5;
+    sun.color.setHex(isNight ? 0x8ea4ff : 0xffc68a);
+    sun.intensity = isNight ? 0.35 : 6.5;
+    sunHdr.setHex(isNight ? 0x8ea4ff : 0xffc68a).multiplyScalar(isNight ? 0.2 : 6.5);
+    hemi.color.setHex(isNight ? 0x3a4a80 : 0x9fc0e8);
+    hemi.groundColor.setHex(isNight ? 0x3a2414 : 0x6b5a44);
+    hemi.intensity = isNight ? 0.35 : 0.35;
+    (waterMat.uniforms.uDeep.value as THREE.Color).setHex(isNight ? look.waterNight : look.water);
     for (const t of activeTiles.values()) {
       if (t.groundMat) {
-        t.groundMat.color.setHex(isNight ? 0x52586c : 0xffffff);
-        t.groundMat.emissiveIntensity = isNight ? 1.65 : 0;
+        t.groundMat.color.setHex(isNight ? 0x3a3e4c : 0xffffff);
+        t.groundMat.emissiveIntensity = isNight ? 2.4 : 0;
       }
     }
-
     baseGround.setNight(isNight);
     treeProto.setNight(isNight);
-    clouds.setNight(isNight);
-    renderer.toneMappingExposure = isNight ? 0.96 : 0.86;
+    renderer.toneMappingExposure = isNight ? 0.85 : 0.5;
   }
   applyTheme(night);
 
-  // ---------- Web Worker + Tile Streamer ----------
+  // ---------- Web Worker + tile streamer ----------
   const tileGroup = new THREE.Group();
   group.add(tileGroup);
-
-  // Send sea mask once to worker so OffscreenCanvas cuts out coastal canals cleanly
   const workerInstance = getSharedWorker();
   if (workerInstance && !sentSeaCities.has(id)) {
     sentSeaCities.add(id);
     const seaMsg: WorkerMessageIn = {
       kind: "sea",
       cityId: id,
-      sea: city.sea
-        ? { half: city.data.half, cell: city.sea.cell, cols: city.sea.cols, rows: city.sea.rows, mask: city.sea.mask }
-        : null,
+      sea: city.sea ? { half: city.data.half, cell: city.sea.cell, cols: city.sea.cols, rows: city.sea.rows, mask: city.sea.mask } : null,
     };
     workerInstance.postMessage(seaMsg);
   }
@@ -1096,19 +986,13 @@ export async function buildWorld(
       });
     }
     const decoded = decodeTile(buffer, tileSize);
-    const data = buildTileGeometry(
-      decoded,
-      id,
-      lod,
-      tileSize,
-      city.sea ? { half: city.data.half, cell: city.sea.cell, cols: city.sea.cols, rows: city.sea.rows, mask: city.sea.mask } : null,
-      quality,
-    );
+    const sea = city.sea ? { half: city.data.half, cell: city.sea.cell, cols: city.sea.cols, rows: city.sea.rows, mask: city.sea.mask } : null;
+    const data = buildTileGeometry(decoded, id, lod, tileSize, sea, quality);
     return Promise.resolve({ id: 0, data, collision: needCollision ? decoded : undefined });
   }
 
   const buildingTile = new Map<string, TileLod>();
-  const maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const maxAniso = Math.min(4, renderer.capabilities.getMaxAnisotropy());
 
   async function fetchTileRaw(tx: number, tz: number): Promise<ArrayBuffer | null> {
     const key = `${tx},${tz}`;
@@ -1128,10 +1012,7 @@ export async function buildWorld(
     if (buf && !disposed) {
       sharedRawCache.set(cacheKey, buf);
       sharedRawOrder.push(cacheKey);
-      while (sharedRawOrder.length > 96) {
-        const oldest = sharedRawOrder.shift()!;
-        sharedRawCache.delete(oldest);
-      }
+      while (sharedRawOrder.length > 160) sharedRawCache.delete(sharedRawOrder.shift()!);
     }
     return buf;
   }
@@ -1142,6 +1023,22 @@ export async function buildWorld(
   const tmpScale = new THREE.Vector3();
   const tmpAxis = new THREE.Vector3(0, 1, 0);
   const tmpColor = new THREE.Color();
+  const groundKey = "ground-tile";
+  const groundDetail = (shader: THREE.WebGLProgramParametersWithUniforms) => {
+    // Fine grain in world space, so the ground holds up when the plane skims low.
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nfloat gHash(vec2 p){return fract(sin(dot(p, vec2(41.3, 289.1))) * 15731.743);}")
+      .replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+        {
+          vec2 q = vAtmoPos.xz;
+          float n = gHash(floor(q * 0.8)) * 0.5 + gHash(floor(q * 0.21)) * 0.5;
+          float near = 1.0 - smoothstep(200.0, 900.0, length(cameraPosition - vAtmoPos));
+          diffuseColor.rgb *= 1.0 + (n - 0.5) * 0.14 * near;
+        }`,
+      );
+  };
 
   function assembleTileGroup(data: BuiltTileData): ActiveTile {
     const g = new THREE.Group();
@@ -1161,56 +1058,52 @@ export async function buildWorld(
         nTex.wrapS = nTex.wrapT = THREE.ClampToEdgeWrapping;
       }
       groundMat = track(
-        new THREE.MeshStandardMaterial({
-          map: gTex,
-          alphaTest: 0.5,
-          roughness: 0.95,
-          metalness: 0,
-          color: night ? 0x52586c : 0xffffff,
-          emissive: 0xffffff,
-          emissiveMap: nTex,
-          emissiveIntensity: night ? 1.65 : 0,
-          polygonOffset: true,
-          polygonOffsetFactor: -1,
-          polygonOffsetUnits: -1,
-        }),
+        withAtmosphere(
+          new THREE.MeshStandardMaterial({
+            map: gTex,
+            alphaTest: 0.5,
+            roughness: 0.95,
+            metalness: 0,
+            color: night ? 0x3a3e4c : 0xffffff,
+            emissive: 0xffffff,
+            emissiveMap: nTex,
+            emissiveIntensity: night ? 2.4 : 0,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+          }),
+          atmo,
+          groundKey,
+          groundDetail,
+        ),
       );
       const quad = new THREE.Mesh(sharedTilePlane, groundMat);
       quad.position.set((data.tx + 0.5) * tileSize, 0.45, (data.tz + 0.5) * tileSize);
+      quad.receiveShadow = true;
       g.add(quad);
     }
 
-    if (data.wallsByStyle) {
-      data.wallsByStyle.forEach((w, styleIdx) => {
-        if (!w) return;
-        const geo = track(new THREE.BufferGeometry());
-        geo.setAttribute("position", new THREE.BufferAttribute(w.pos, 3));
-        geo.setAttribute("normal", new THREE.BufferAttribute(w.nrm, 3));
-        geo.setAttribute("uv", new THREE.BufferAttribute(w.uv, 2));
-        geo.setAttribute("color", new THREE.BufferAttribute(w.color, 3));
-        g.add(new THREE.Mesh(geo, wallMats[styleIdx]));
-      });
-    }
-    if (data.roofs) {
+    if (data.buildings) {
+      const b = data.buildings;
       const geo = track(new THREE.BufferGeometry());
-      geo.setAttribute("position", new THREE.BufferAttribute(data.roofs.pos, 3));
-      geo.setAttribute("normal", new THREE.BufferAttribute(data.roofs.nrm, 3));
-      geo.setAttribute("color", new THREE.BufferAttribute(data.roofs.color, 3));
-      g.add(new THREE.Mesh(geo, roofMat));
-    }
-    if (data.midBuildings) {
-      const geo = track(new THREE.BufferGeometry());
-      geo.setAttribute("position", new THREE.BufferAttribute(data.midBuildings.pos, 3));
-      geo.setAttribute("normal", new THREE.BufferAttribute(data.midBuildings.nrm, 3));
-      geo.setAttribute("color", new THREE.BufferAttribute(data.midBuildings.color, 3));
-      g.add(new THREE.Mesh(geo, midMat));
+      geo.setAttribute("position", new THREE.BufferAttribute(b.pos, 3));
+      geo.setAttribute("normal", new THREE.BufferAttribute(b.nrm, 3));
+      geo.setAttribute("uv", new THREE.BufferAttribute(b.uv, 2));
+      geo.setAttribute("color", new THREE.BufferAttribute(b.color, 3));
+      geo.setAttribute("info", new THREE.BufferAttribute(b.info, 3));
+      const mesh = new THREE.Mesh(geo, buildingMat);
+      mesh.castShadow = data.lod === 0;
+      mesh.receiveShadow = data.lod < 2;
+      g.add(mesh);
     }
     if (data.rails) {
       const geo = track(new THREE.BufferGeometry());
       geo.setAttribute("position", new THREE.BufferAttribute(data.rails.pos, 3));
       geo.setAttribute("color", new THREE.BufferAttribute(data.rails.color, 3));
       geo.computeVertexNormals();
-      g.add(new THREE.Mesh(geo, railMat));
+      const rails = new THREE.Mesh(geo, railMat);
+      rails.castShadow = rails.receiveShadow = true;
+      g.add(rails);
     }
     if (data.trees && data.trees.length >= 5 && quality > 0) {
       const count = data.trees.length / 5;
@@ -1233,9 +1126,11 @@ export async function buildWorld(
       crowns.instanceMatrix.needsUpdate = true;
       trunks.instanceMatrix.needsUpdate = true;
       if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
+      crowns.computeBoundingSphere();
+      trunks.computeBoundingSphere();
+      crowns.castShadow = true;
       g.add(crowns, trunks);
     }
-
     return { key: `${data.tx},${data.tz}`, tx: data.tx, tz: data.tz, lod: data.lod, group: g, disposables: tileDisposables, groundMat };
   }
 
@@ -1250,7 +1145,6 @@ export async function buildWorld(
     if (existing && existing.lod === lod) return;
     if (buildingTile.get(key) === lod) return;
     buildingTile.set(key, lod);
-
     const buf = await fetchTileRaw(tx, tz);
     if (!buf || disposed) {
       buildingTile.delete(key);
@@ -1264,10 +1158,7 @@ export async function buildWorld(
       resp.data.nightBitmap?.close();
       return;
     }
-    if (resp.collision && !city.hasTile(tx, tz)) {
-      city.addTile(resp.collision);
-    }
-
+    if (resp.collision && !city.hasTile(tx, tz)) city.addTile(resp.collision);
     const prev = activeTiles.get(key);
     if (prev) disposeTile(prev);
     const next = assembleTileGroup(resp.data);
@@ -1277,28 +1168,24 @@ export async function buildWorld(
 
   let lastStreamX = Infinity;
   let lastStreamZ = Infinity;
+  const ringRadius = () => (quality === 0 ? 1 : quality === 1 ? 3 : 4);
 
   function desiredTiles(x: number, z: number) {
     const cx = Math.floor(x / tileSize);
     const cz = Math.floor(z / tileSize);
-    const maxR = quality === 0 ? 1 : 3;
+    const maxR = ringRadius();
     const wanted: { tx: number; tz: number; dist: number; lod: TileLod }[] = [];
     for (let dx = -maxR; dx <= maxR; dx++) {
       for (let dz = -maxR; dz <= maxR; dz++) {
-        const dist = Math.hypot(dx, dz);
-        if (dist > maxR + 0.35) continue;
+        // Distance from the plane to the tile's nearest edge, in tiles.
+        const fx = x / tileSize - (cx + dx + 0.5);
+        const fz = z / tileSize - (cz + dz + 0.5);
+        const dist = Math.hypot(Math.max(0, Math.abs(fx) - 0.5), Math.max(0, Math.abs(fz) - 0.5));
+        if (dist > maxR - 0.4) continue;
         const tx = cx + dx;
         const tz = cz + dz;
         if (!city.tileSet.has(`${tx},${tz}`)) continue;
-        // Keep full LOD 0 in the 9-tile core (~1.5 km), crisp LOD 1 out to 2.5 km, LOD 2 silhouettes to 3.4 km -> <55 draw calls total!
-        const lod: TileLod =
-          quality === 0
-            ? (dist <= 0.5 ? 1 : 2)
-            : dist <= 1.5
-              ? 0
-              : dist <= 2.4
-                ? 1
-                : 2;
+        const lod: TileLod = quality === 0 ? (dist < 0.1 ? 1 : 2) : dist < 0.55 ? 0 : dist < 1.6 ? 1 : 2;
         wanted.push({ tx, tz, dist, lod });
       }
     }
@@ -1308,16 +1195,14 @@ export async function buildWorld(
 
   function updateStream(x: number, z: number) {
     if (disposed) return;
-    if (Math.hypot(x - lastStreamX, z - lastStreamZ) < 180) return;
+    if (Math.hypot(x - lastStreamX, z - lastStreamZ) < 120) return;
     lastStreamX = x;
     lastStreamZ = z;
-
     const wanted = desiredTiles(x, z);
     const keepKeys = new Set<string>(wanted.map((w) => `${w.tx},${w.tz}`));
-
     const cx = Math.floor(x / tileSize);
     const cz = Math.floor(z / tileSize);
-    const unloadR = (quality === 0 ? 1 : 3) + 1.8;
+    const unloadR = ringRadius() + 1.5;
     for (const [key, tile] of activeTiles) {
       if (!keepKeys.has(key) && Math.hypot(tile.tx - cx, tile.tz - cz) > unloadR) {
         disposeTile(tile);
@@ -1325,7 +1210,6 @@ export async function buildWorld(
         city.removeTile(tile.tx, tile.tz);
       }
     }
-
     let queued = 0;
     for (const w of wanted) {
       const key = `${w.tx},${w.tz}`;
@@ -1340,32 +1224,33 @@ export async function buildWorld(
   async function ensureAround(x: number, z: number) {
     lastStreamX = x;
     lastStreamZ = z;
-    const wanted = desiredTiles(x, z);
-    // Await near + mid ring (dist <= 2.4) so the entire visible vista is solid on frame 1!
-    const core = wanted.filter((w) => w.dist <= 2.4);
-    await Promise.all(core.map((w) => loadTileAtLod(w.tx, w.tz, w.lod)));
-    for (const w of wanted) {
-      if (w.dist > 2.4) void loadTileAtLod(w.tx, w.tz, w.lod);
-    }
+    // Everything in view is solid on the first frame: the whole ring loads before play.
+    await Promise.all(desiredTiles(x, z).map((w) => loadTileAtLod(w.tx, w.tz, w.lod)));
   }
 
   return {
     group,
     sun,
     sunDirection,
-    fog,
+    get environment() {
+      return environment.current;
+    },
+    get environmentIntensity() {
+      // Full-strength reflections by day (look.ts turns the flat fill down separately);
+      // at night glass mirrors mostly darkness.
+      return night ? 0.35 : 1;
+    },
     setNight(isNight: boolean) {
       if (isNight !== night) applyTheme(isNight);
     },
     setQuality(nextQ: number) {
-      const prevSoftware = quality === 0;
+      if (nextQ !== quality) lastStreamX = Infinity;
       quality = nextQ;
-      if (prevSoftware !== (quality === 0)) lastStreamX = Infinity;
     },
     ensureAround,
     updateStream,
     update(time: number) {
-      waterNormal.offset.set(time * 0.018, time * 0.011);
+      atmo.uTime.value = time;
       const pulse = 0.45 + 0.55 * Math.sin(time * 3.4);
       for (const b of landmarks.beacons) {
         b.visible = night;
@@ -1392,78 +1277,109 @@ export async function buildWorld(
   };
 }
 
+/**
+ * The site's paper plane, folded: a dart with two wing facets either side of a
+ * crease, a keel folded down the middle, and the brand's orange on the folded-up
+ * wingtips and trailing edge. Flat shading lets every fold catch the sun.
+ */
 export function paperPlane() {
-  const v = [
-    [0, 0.02, -1.65],
-    [-1.25, 0.14, 0.95],
-    [1.25, 0.14, 0.95],
-    [0, 0.0, 0.95],
-    [0, -0.36, 0.95],
-  ];
-  const faces = [
-    [0, 1, 3],
-    [0, 3, 2],
-    [0, 3, 4],
-    [0, 4, 3],
-  ];
+  const paper = new THREE.Color(0xfbf6ea);
+  const shade = new THREE.Color(0xeee6d4);
+  const orange = new THREE.Color(0xff4d1c);
   const positions: number[] = [];
-  faces.forEach((f) => f.forEach((i) => positions.push(...v[i])));
+  const colors: number[] = [];
+  const tri = (a: number[], b: number[], c: number[], col: THREE.Color) => {
+    positions.push(...a, ...b, ...c);
+    for (let i = 0; i < 3; i++) colors.push(col.r, col.g, col.b);
+  };
+  const nose = [0, 0.05, -1.95];
+  const rear = [0, 0.05, 1.0];
+  const keelBottom = [0, -0.46, 0.95];
+  const keelFront = [0, -0.08, -1.2];
+  for (const s of [-1, 1]) {
+    const crease = [s * 0.5, 0.11, 1.0];
+    const tip = [s * 1.28, 0.22, 1.0];
+    const winglet = [s * 1.36, 0.58, 1.0];
+    const wingletFront = [s * 1.3, 0.24, 0.25];
+    const edgeIn = [s * 0.5, 0.1, 0.82];
+    const edgeOut = [s * 1.22, 0.21, 0.84];
+    tri(nose, crease, rear, s < 0 ? paper : shade);
+    tri(nose, tip, crease, s < 0 ? shade : paper);
+    tri(tip, winglet, wingletFront, orange);
+    // The trailing-edge stripe.
+    tri(edgeIn, edgeOut, tip, orange);
+    tri(edgeIn, tip, crease, orange);
+  }
+  tri(nose, rear, keelBottom, shade);
+  tri(nose, keelBottom, keelFront, paper);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({
-      color: 0xfffaf0,
-      side: THREE.DoubleSide,
-      roughness: 0.55,
-      emissive: 0x7c7060,
-      emissiveIntensity: 0.35,
-    }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7, flatShading: true, emissive: 0xfff4e2, emissiveIntensity: 0.22 }),
   );
-  const fold = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.035, -1.6), new THREE.Vector3(0, 0.035, 0.95)]),
-    new THREE.LineBasicMaterial({ color: 0xff4d1c }),
-  );
+  mesh.castShadow = true;
   const plane = new THREE.Group();
-  plane.add(mesh, fold);
-  plane.children.forEach((c) => c.scale.setScalar(1.5));
+  plane.add(mesh);
+  mesh.scale.setScalar(1.45);
   return plane;
 }
 
+/**
+ * Wingtip vapour: two ribbons that taper and fade with age, and fade out near
+ * the camera so a trail never smears across the screen.
+ */
 export function createContrails(length = 72) {
   const group = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+  const uniforms = { uOpacity: { value: 0.4 } };
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
     transparent: true,
-    opacity: 0.38,
-    side: THREE.DoubleSide,
     depthWrite: false,
+    side: THREE.DoubleSide,
+    vertexShader: /* glsl */ `
+      attribute float age;
+      varying float vAge;
+      varying float vNear;
+      void main() {
+        vAge = age;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNear = smoothstep(6.0, 26.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uOpacity;
+      varying float vAge;
+      varying float vNear;
+      void main() {
+        float a = pow(1.0 - vAge, 1.6) * smoothstep(0.0, 0.04, vAge) * vNear * uOpacity;
+        gl_FragColor = vec4(vec3(1.0, 0.99, 0.97), a);
+        #include <colorspace_fragment>
+      }`,
   });
-
+  const ages = new Float32Array(length * 2);
+  for (let i = 0; i < length; i++) ages[i * 2] = ages[i * 2 + 1] = i / (length - 1);
   const ribbons = [0, 1].map(() => {
     const pos = new Float32Array(length * 2 * 3);
     const idx: number[] = [];
     for (let i = 0; i < length - 1; i++) {
       const a = i * 2;
-      const b = a + 1;
-      const c = a + 2;
-      const d = a + 3;
-      idx.push(a, b, c, b, d, c);
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("age", new THREE.BufferAttribute(ages, 1));
     geo.setIndex(idx);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
     group.add(mesh);
     return { geo, pos };
   });
-
   const tip = new THREE.Vector3();
   const right = new THREE.Vector3();
   let count = 0;
-
   return {
     group,
     reset() {
@@ -1471,12 +1387,12 @@ export function createContrails(length = 72) {
     },
     update(plane: THREE.Object3D, boosting: boolean) {
       right.set(1, 0, 0).applyQuaternion(plane.quaternion);
-      mat.opacity = boosting ? 0.62 : 0.34;
-      const halfW = boosting ? 0.22 : 0.11;
+      uniforms.uOpacity.value += ((boosting ? 0.75 : 0.42) - uniforms.uOpacity.value) * 0.1;
+      const halfW = boosting ? 0.2 : 0.1;
       for (let s = 0; s < 2; s++) {
         const arr = ribbons[s].pos;
         arr.copyWithin(6, 0, (length - 1) * 6);
-        tip.set(s ? 1.85 : -1.85, 0.18, 1.42).applyQuaternion(plane.quaternion).add(plane.position);
+        tip.set(s ? 1.95 : -1.95, 0.75, 1.45).applyQuaternion(plane.quaternion).add(plane.position);
         arr[0] = tip.x - right.x * halfW;
         arr[1] = tip.y - right.y * halfW;
         arr[2] = tip.z - right.z * halfW;
@@ -1484,22 +1400,19 @@ export function createContrails(length = 72) {
         arr[4] = tip.y + right.y * halfW;
         arr[5] = tip.z + right.z * halfW;
         if (count < length) {
-          for (let i = Math.max(1, count); i < length; i++) {
-            arr[i * 6] = tip.x; arr[i * 6 + 1] = tip.y; arr[i * 6 + 2] = tip.z;
-            arr[i * 6 + 3] = tip.x; arr[i * 6 + 4] = tip.y; arr[i * 6 + 5] = tip.z;
-          }
+          for (let i = Math.max(1, count); i < length; i++) arr.copyWithin(i * 6, 0, 6);
         }
-        for (let i = Math.floor(length * 0.6); i < length; i++) {
-          const t = 1 - (i - length * 0.6) / (length * 0.4);
+        // The trail spreads as it ages, like vapour.
+        for (let i = 1; i < length; i++) {
+          const grow = 1 + (i / length) * 0.04;
           const mx = (arr[i * 6] + arr[i * 6 + 3]) * 0.5;
           const my = (arr[i * 6 + 1] + arr[i * 6 + 4]) * 0.5;
           const mz = (arr[i * 6 + 2] + arr[i * 6 + 5]) * 0.5;
-          arr[i * 6] = mx + (arr[i * 6] - mx) * t;
-          arr[i * 6 + 1] = my + (arr[i * 6 + 1] - my) * t;
-          arr[i * 6 + 2] = mz + (arr[i * 6 + 2] - mz) * t;
-          arr[i * 6 + 3] = mx + (arr[i * 6 + 3] - mx) * t;
-          arr[i * 6 + 4] = my + (arr[i * 6 + 4] - my) * t;
-          arr[i * 6 + 5] = mz + (arr[i * 6 + 5] - mz) * t;
+          for (let k = 0; k < 2; k++) {
+            arr[i * 6 + k * 3] = mx + (arr[i * 6 + k * 3] - mx) * grow;
+            arr[i * 6 + k * 3 + 1] = my + (arr[i * 6 + k * 3 + 1] - my) * grow;
+            arr[i * 6 + k * 3 + 2] = mz + (arr[i * 6 + k * 3 + 2] - mz) * grow;
+          }
         }
         (ribbons[s].geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
       }
@@ -1507,6 +1420,98 @@ export function createContrails(length = 72) {
     },
     dispose() {
       ribbons.forEach((r) => r.geo.dispose());
+      mat.dispose();
+    },
+  };
+}
+
+/**
+ * A burst of sparks when the plane threads a ring: one draw call, a pool of
+ * particles flung outward from the ring's rim, fading as they fall.
+ */
+export function createBursts(max = 240) {
+  const pos = new Float32Array(max * 3);
+  const vel = new Float32Array(max * 3);
+  const life = new Float32Array(max);
+  const col = new Float32Array(max * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("life", new THREE.BufferAttribute(life, 1));
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */ `
+      attribute float life;
+      attribute vec3 color;
+      varying float vLife;
+      varying vec3 vColor;
+      void main() {
+        vLife = life;
+        vColor = color;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = life > 0.0 ? min(64.0, 900.0 * (0.4 + life) / -mv.z) : 0.0;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `
+      varying float vLife;
+      varying vec3 vColor;
+      void main() {
+        if (vLife <= 0.0) discard;
+        float d = length(gl_PointCoord - 0.5);
+        float a = smoothstep(0.5, 0.0, d) * vLife;
+        gl_FragColor = vec4(vColor * a * 1.6, a);
+      }`,
+  });
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  let next = 0;
+  const c = new THREE.Color();
+  const side = new THREE.Vector3();
+  const up = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  return {
+    points,
+    emit(at: THREE.Vector3, normal: THREE.Vector3, radius: number, hex: number, count = 90) {
+      n.copy(normal).normalize();
+      side.set(0, 1, 0).cross(n);
+      if (side.lengthSq() < 0.01) side.set(1, 0, 0);
+      side.normalize();
+      up.copy(n).cross(side).normalize();
+      for (let i = 0; i < count; i++) {
+        const k = next;
+        next = (next + 1) % max;
+        const a = Math.random() * Math.PI * 2;
+        const ox = Math.cos(a) * radius;
+        const oy = Math.sin(a) * radius;
+        pos[k * 3] = at.x + side.x * ox + up.x * oy;
+        pos[k * 3 + 1] = at.y + side.y * ox + up.y * oy;
+        pos[k * 3 + 2] = at.z + side.z * ox + up.z * oy;
+        const sp = 6 + Math.random() * 14;
+        vel[k * 3] = (side.x * Math.cos(a) + up.x * Math.sin(a)) * sp + n.x * 8;
+        vel[k * 3 + 1] = (side.y * Math.cos(a) + up.y * Math.sin(a)) * sp + n.y * 8;
+        vel[k * 3 + 2] = (side.z * Math.cos(a) + up.z * Math.sin(a)) * sp + n.z * 8;
+        life[k] = 1;
+        c.setHex(hex).lerp(new THREE.Color(0xffffff), Math.random() * 0.5);
+        col.set([c.r, c.g, c.b], k * 3);
+      }
+    },
+    update(dt: number) {
+      for (let k = 0; k < max; k++) {
+        if (life[k] <= 0) continue;
+        life[k] = Math.max(0, life[k] - dt * 1.1);
+        vel[k * 3 + 1] -= 9 * dt;
+        pos[k * 3] += vel[k * 3] * dt;
+        pos[k * 3 + 1] += vel[k * 3 + 1] * dt;
+        pos[k * 3 + 2] += vel[k * 3 + 2] * dt;
+      }
+      geo.attributes.position.needsUpdate = true;
+      geo.attributes.life.needsUpdate = true;
+      geo.attributes.color.needsUpdate = true;
+    },
+    dispose() {
+      geo.dispose();
       mat.dispose();
     },
   };

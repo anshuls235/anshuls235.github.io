@@ -105,11 +105,12 @@ test("binary SKY1 tiles encode/decode round-trip and build all 3 LODs cleanly", 
   const lod0 = buildTileGeometry(decoded, "dubai", 0);
   const lod1 = buildTileGeometry(decoded, "dubai", 1);
   const lod2 = buildTileGeometry(decoded, "dubai", 2);
-  assert.ok(lod0.wallsByStyle && lod0.wallsByStyle.some((w) => w && w.pos.length > 0), "LOD 0 walls built");
-  assert.ok(lod0.roofs && lod0.roofs.pos.length > 0, "LOD 0 roofs built");
+  assert.ok(lod0.buildings && lod0.buildings.pos.length > 0, "LOD 0 walls and roofs built");
+  assert.equal(lod0.buildings.info.length, lod0.buildings.pos.length, "every vertex knows its building's style, height and seed");
   assert.ok(lod0.roadMarks && lod0.roadMarks.length > 0, "LOD 0 lane dashes built");
-  assert.ok(lod1.midBuildings && lod1.midBuildings.pos.length > 0, "LOD 1 mid boxes built");
-  assert.ok(lod2.midBuildings && lod2.midBuildings.pos.length > 0, "LOD 2 far silhouettes built");
+  assert.ok(lod1.buildings && lod1.buildings.pos.length > 0, "LOD 1 footprints built");
+  assert.ok(lod2.buildings && lod2.buildings.pos.length > 0, "LOD 2 far towers built");
+  assert.ok(lod2.buildings.pos.length < lod0.buildings.pos.length, "far tiles are lighter than near ones");
 });
 
 import { nextGate, exitOf, crossing, seeded, START_TIME, type Gate } from "../src/sky/course";
