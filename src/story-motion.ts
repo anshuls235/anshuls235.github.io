@@ -129,6 +129,8 @@ export function initStory({ still, lenis, headerOffset }: Options): StoryControl
       passEl.querySelectorAll(".pass-log.is-open").forEach((l) => l.classList.remove("is-open"));
       log.classList.add("is-open");
       passEl.classList.add("show-log");
+      // Start the log from its title; on phones the pass body scrolls on its own.
+      passEl.querySelector(".pass-body")?.scrollTo({ top: 0 });
       button.setAttribute("aria-expanded", "true");
       log.querySelector<HTMLButtonElement>("[data-log-back]")?.focus({ preventScroll: true });
     });

@@ -3746,7 +3746,7 @@ html, body { background: var(--desk); }
 @media (max-width: 899px) {
   .journey-section.is-pinned .journey-track { height: calc(100vh + var(--journey-steps, 1) * 70vh); }
   @supports (height: 100svh) { .journey-section.is-pinned .journey-track { height: calc(100svh + var(--journey-steps, 1) * 70svh); } }
-  .journey-section.is-pinned .journey-pin { padding: calc(var(--header-h) + 6px) 0 12px; }
+  .journey-section.is-pinned .journey-pin { padding: calc(var(--header-h) + 6px) 0 12px; overflow-x: clip; }
   .journey-section.is-pinned .journey-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); row-gap: 10px; }
   .journey-section.is-pinned .journey-head { grid-column: 1; grid-row: 1; }
   .journey-section.is-pinned .journey-head .section-heading { margin: 0; }
@@ -3782,4 +3782,6 @@ html, body { background: var(--desk); }
   .journey-section.is-pinned .boarding-pass h5 { font-size: 13px; }
   .journey-section.is-pinned .role-row { padding-block: 5px; gap: 8px; }
   .journey-section.is-pinned .role-row .role-dates { font-size: 9.5px; }
+  /* On the back of the ticket, the way back stays in reach however long the log runs. */
+  .journey-section.is-pinned .log-back { position: sticky; bottom: 4px; z-index: 1; margin-top: 10px; }
 }
