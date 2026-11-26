@@ -68,7 +68,7 @@ export function nextGate(city: City, from: { x: number; y: number; z: number; he
     // The clock pays for the flying a ring asks for, with a few seconds to spare.
     if (!best || score > best.score) best = { gate: { x, y, z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "ring", radius: 18, bonus: Math.round(dist / 18) + 4 }, score };
   }
-  if (best && best.gate.y > Math.max(90, city.tallest * 0.35)) {
+  if (best && best.gate.y > Math.max(90, Math.min(city.tallest, 420) * 0.35)) {
     // A pickup on the approach, a little off the line: worth a small detour.
     const g = best.gate;
     const t = 0.45 + rand() * 0.2;

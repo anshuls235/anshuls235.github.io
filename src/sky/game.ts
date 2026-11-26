@@ -4,8 +4,8 @@
 // the towers, and circle up through the climb rings over the thermals.
 import * as THREE from "three";
 import { createWorld, createGlider, cityWind, type Glider } from "./glider";
-import { prepareCity, type City, type CityFile, type CityId } from "./citydata";
-import { buildWorld, loadFacades, paperPlane, type BuiltWorld } from "./world3d";
+import { prepareCity, type City, type CityId, type CityIndex } from "./citydata";
+import { buildWorld, createContrails, loadFacades, paperPlane, type BuiltWorld } from "./world3d";
 import { autopilot, assist, launchPoint, type PilotState } from "./pilot";
 import { crossing, exitOf, nextGate, seeded, START_TIME, type Gate, type PickupKind } from "./course";
 import { createSound, type Sound } from "./sound";
@@ -69,9 +69,9 @@ function loadCity(base: string, id: CityId) {
   if (!cities.has(id))
     cities.set(
       id,
-      fetch(`${base}assets/sky/${id}.json`).then(async (response) => {
+      fetch(`${base}assets/sky/${id}/index.json`).then(async (response) => {
         if (!response.ok) throw new Error(`City ${id} unavailable`);
-        return prepareCity((await response.json()) as CityFile);
+        return prepareCity((await response.json()) as CityIndex);
       }),
     );
   const pending = cities.get(id)!;
@@ -79,7 +79,7 @@ function loadCity(base: string, id: CityId) {
   return pending;
 }
 
-/** Fetch and prepare the first city and its facades while the visitor is still reading. */
+/** Fetch and prepare the first city index and facade atlas while the visitor is still reading. */
 export async function warmSky(base: string) {
   await Promise.all([loadCity(base, "dubai"), loadFacades(base, 8)]);
 }
@@ -107,11 +107,14 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // While the page scrolls past, the city renders lighter; full quality is for playing.
   let mode: "attract" | "play" = "attract";
+  let built: BuiltWorld | null = null;
   const effective = () => (mode === "play" ? quality : Math.min(quality, 1));
   const applyQuality = () => {
     const q = effective();
-    renderer.setPixelRatio(q === 0 ? 0.75 : Math.min(devicePixelRatio || 1, q === 1 ? 1.25 : 1.75));
+    const maxDpr = small ? 1.5 : 2;
+    renderer.setPixelRatio(q === 0 ? 0.5 : Math.min(devicePixelRatio || 1, q === 1 ? Math.min(1.5, maxDpr) : maxDpr));
     renderer.shadowMap.enabled = q === 2;
+    built?.setQuality(q);
   };
   applyQuality();
 
@@ -129,22 +132,13 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const soundButton = q<HTMLButtonElement>("[data-sky-sound]");
   const meter = q("[data-sky-meter]");
 
-  // Contrails from the wing tips
-  const TRAIL = 160;
-  const trails = [0, 1].map(() => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(TRAIL * 3), 3));
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }));
-    line.frustumCulled = false;
-    scene.add(line);
-    return line;
-  });
-  let trailCount = 0;
+  // Smooth tapering ribbon contrails from the wing tips
+  const contrails = createContrails(96);
+  scene.add(contrails.group);
 
   let world = createWorld();
   let glider: Glider = createGlider(world);
   let city: City | null = null;
-  let built: BuiltWorld | null = null;
   let assisted = true;
   let crashed = 0;
   const pilotState: PilotState = { leg: 0, climbing: false };
@@ -161,7 +155,6 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let elapsed = 0;
   let slowFrames = 0;
   let building = 0;
-  let builtQuality = -1;
   let current: CityId = IDS.includes(root.dataset.city as CityId) ? (root.dataset.city as CityId) : "dubai";
   const keys = new Set<string>();
   const stick = { x: 0, y: 0, active: false, ox: 0, oy: 0 };
@@ -219,7 +212,13 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     const ticket = ++building;
     const facades = await loadFacades(options.base, renderer.capabilities.getMaxAnisotropy());
     if (ticket !== building || !city) return;
-    const next = await buildWorld(city, facades, renderer, night, effective());
+    const next = await buildWorld(city, facades, renderer, options.base, night, effective());
+    if (ticket !== building) {
+      next.dispose();
+      return;
+    }
+    const start = launchPoint(city);
+    await next.ensureAround(start.x, start.z);
     if (ticket !== building) {
       next.dispose();
       return;
@@ -229,7 +228,6 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       built.dispose();
     }
     built = next;
-    builtQuality = effective();
     scene.add(built.group);
     scene.fog = built.fog;
     // Compile shaders off the main thread where the browser can, before the first frame.
@@ -290,7 +288,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     distance = 0;
     ringsPassed = 0;
     flightTime = 0;
-    trailCount = 0;
+    contrails.reset();
     clock = START_TIME;
     boost = 0.5;
     boosting = false;
@@ -482,43 +480,53 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   }
 
   function updateTrails() {
-    for (let s = 0; s < 2; s++) {
-      const attr = trails[s].geometry.attributes.position as THREE.BufferAttribute;
-      const arr = attr.array as Float32Array;
-      arr.copyWithin(3, 0, (TRAIL - 1) * 3);
-      tmp.set(s ? 1.8 : -1.8, 0.15, 1.4).applyQuaternion(plane.quaternion).add(plane.position);
-      arr[0] = tmp.x;
-      arr[1] = tmp.y;
-      arr[2] = tmp.z;
-      if (trailCount < TRAIL) for (let i = trailCount; i < TRAIL; i++) arr.set([tmp.x, tmp.y, tmp.z], i * 3);
-      attr.needsUpdate = true;
-    }
-    trailCount = Math.min(TRAIL, trailCount + 1);
+    contrails.update(plane, boosting);
   }
+
+  const camSide = new THREE.Vector3();
+  const camWantPos = new THREE.Vector3();
+  const camWantLook = new THREE.Vector3();
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const camTargetUp = new THREE.Vector3();
 
   function updateCamera(snap = false) {
     const forward = tmp.set(0, 0, -1).applyQuaternion(plane.quaternion);
     forward.y *= 0.35;
     forward.normalize();
     const attract = mode === "attract";
-    const side = new THREE.Vector3(-forward.z, 0, forward.x);
+    camSide.set(-forward.z, 0, forward.x);
     const swing = attract ? Math.sin(elapsed * 0.06) * 0.7 : 0;
     // Hands off, the plane sits in the right third, clear of the words.
     const frameRight = attract && root.clientWidth > 900 ? 1 : 0;
     const speed = glider.telemetry.airspeed;
     const back = attract ? -15 : -11 - Math.max(0, speed - 20) * 0.12;
-    const wantPos = plane.position.clone().addScaledVector(forward, back).add(new THREE.Vector3(0, attract ? 4 : 3, 0)).addScaledVector(side, swing * 8 - frameRight * 4);
-    const wantLook = plane.position.clone().addScaledVector(forward, 16).addScaledVector(side, -frameRight * 9).add(new THREE.Vector3(0, -1, 0));
+    camWantPos
+      .copy(plane.position)
+      .addScaledVector(forward, back)
+      .addScaledVector(camSide, swing * 8 - frameRight * 4);
+    camWantPos.y += attract ? 4 : 3;
+    // Subtle camera shake when firing the booster
+    if (boosting && !crashed && !attract) {
+      const amp = 0.14;
+      camWantPos.x += Math.sin(elapsed * 53) * amp;
+      camWantPos.y += Math.cos(elapsed * 67) * amp;
+    }
+    camWantLook
+      .copy(plane.position)
+      .addScaledVector(forward, 16)
+      .addScaledVector(camSide, -frameRight * 9);
+    camWantLook.y -= 1;
     if (snap) {
-      camPos.copy(wantPos);
-      camLook.copy(wantLook);
+      camPos.copy(camWantPos);
+      camLook.copy(camWantLook);
     } else {
-      camPos.lerp(wantPos, attract ? 0.08 : 0.14);
-      camLook.lerp(wantLook, 0.2);
+      camPos.lerp(camWantPos, attract ? 0.08 : 0.14);
+      camLook.lerp(camWantLook, 0.2);
     }
     // Lean into turns: the camera banks with the plane, a little less than it does.
     planeUp.set(0, 1, 0).applyQuaternion(plane.quaternion);
-    camUp.lerp(new THREE.Vector3(0, 1, 0).lerp(planeUp, attract ? 0.15 : 0.45), 0.08).normalize();
+    camTargetUp.copy(worldUp).lerp(planeUp, attract ? 0.15 : 0.45);
+    camUp.lerp(camTargetUp, 0.08).normalize();
     camera.up.copy(camUp);
     camera.position.copy(camPos);
     camera.lookAt(camLook);
@@ -626,7 +634,6 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       quality--;
       slowFrames = 0;
       applyQuality();
-      void buildScene();
     }
     acc += Math.min(raw, 0.05);
     while (acc >= STEP) {
@@ -637,6 +644,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     syncPlane();
     if (!crashed && countdown <= 0) updateTrails();
     updateCamera();
+    built?.updateStream(glider.body.position.x, glider.body.position.z);
     gates.forEach(({ mesh, gate, orb }, i) => {
       mesh.rotation.z = gate.kind === "climb" ? elapsed * 0.15 : elapsed * 0.4 + i;
       if (orb) {
@@ -687,7 +695,6 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       sound?.setMuted(muted);
     } else sound?.wind(0);
     applyQuality();
-    if (city && effective() !== builtQuality) void buildScene();
     launch();
     if (next === "play") {
       say(`You have the controls over ${city?.data.name ?? "the city"}. Fly through the rings before the clock runs out. Arrow keys or WASD, or aim with the mouse. Hold Space to boost, R to relaunch, Escape to land.`);
@@ -782,7 +789,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   };
   const theme = () => {
     night = document.documentElement.dataset.theme === "dark";
-    void buildScene().then(() => city && render());
+    built?.setNight(night);
+    if (city && !frame) render();
   };
   const contextLost = (event: Event) => {
     event.preventDefault();
@@ -827,6 +835,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       if (mode === "play") window.dispatchEvent(new CustomEvent("sky-play", { detail: false }));
       sound?.stop();
       clearGates();
+      contrails.dispose();
       built?.dispose();
       renderer.dispose();
     },

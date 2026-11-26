@@ -2,10 +2,23 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createWorld, createGlider, cityWind, thermalCore } from "../src/sky/glider";
-import { prepareCity, type CityFile, type CityId } from "../src/sky/citydata";
+import { prepareCity, type City, type CityId, type CityIndex } from "../src/sky/citydata";
+import { decodeTile, encodeTile, TILE_SIZE, type TileInput } from "../src/sky/tileformat";
+import { buildTileGeometry } from "../src/sky/tile-geom";
 import { autopilot, assist, launchPoint } from "../src/sky/pilot";
 
-const load = (id: CityId) => prepareCity(JSON.parse(readFileSync(`public/assets/sky/${id}.json`, "utf8")) as CityFile);
+function load(id: CityId): City {
+  const index = JSON.parse(readFileSync(`public/assets/sky/${id}/index.json`, "utf8")) as CityIndex;
+  const city = prepareCity(index);
+  // Load all tiles in Node tests so collision & roofAt cover the entire city map.
+  for (const key of index.tiles) {
+    const [tx, tz] = key.split(",").map(Number);
+    const buf = readFileSync(`public/assets/sky/${id}/t_${tx}_${tz}.bin`);
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    city.addTile(decodeTile(ab, index.tileSize));
+  }
+  return city;
+}
 
 function fly(id: CityId, seconds: number, pilot: "auto" | ((g: ReturnType<typeof createGlider>, t: number) => void)) {
   const city = load(id);
@@ -32,7 +45,7 @@ for (const id of ["dubai", "bengaluru", "delhi"] as CityId[]) {
     const { city, crashed, g } = fly(id, 240, "auto");
     assert.ok(city.thermals.length >= 4, `${city.thermals.length} thermals`);
     assert.equal(crashed, "", crashed);
-    assert.ok(g.body.position.y > city.tallest * 0.5, `still flying at ${g.body.position.y.toFixed(0)} m`);
+    assert.ok(g.body.position.y > Math.min(city.tallest, 420) * 0.5, `still flying at ${g.body.position.y.toFixed(0)} m`);
   });
 }
 
@@ -64,7 +77,39 @@ test("the sea floods from open water and stops at the coast", () => {
   assert.ok(dubai.sea, "Dubai has a sea mask");
   assert.ok(dubai.isWater(-1500, -1500), "the Gulf is water");
   assert.ok(!dubai.isWater(1200, 1200), "inland is dry");
-  assert.ok(dubai.tallest > 350, "the Marina's tallest towers come from real heights");
+  assert.ok(dubai.tallest > 350, "Dubai's tallest towers come from real heights");
+  assert.ok(dubai.landmarks.some((l) => l.name === "Burj Khalifa" && l.height > 800), "Burj Khalifa landmark present");
+});
+
+test("binary SKY1 tiles encode/decode round-trip and build all 3 LODs cleanly", () => {
+  const sample: TileInput = {
+    tx: 1,
+    tz: -2,
+    buildings: [{ height: 64.5, style: 0, roofType: 1, tint: 3, ring: [1100, -1900, 1140, -1900, 1140, -1860, 1100, -1860] }],
+    roads: [{ width: 16, kind: 2, points: [1050, -1950, 1200, -1800] }],
+    rails: [{ width: 8, kind: 1, points: [1020, -1920, 1220, -1920] }],
+    water: [[1250, -1850, 1300, -1850, 1300, -1800, 1250, -1800]],
+    islands: [],
+    green: [[1010, -1850, 1080, -1850, 1080, -1780, 1010, -1780]],
+    sand: [],
+    flags: 0,
+  };
+  const bin = encodeTile(sample, TILE_SIZE);
+  const decoded = decodeTile(bin.buffer as ArrayBuffer, TILE_SIZE);
+  assert.equal(decoded.tx, 1);
+  assert.equal(decoded.tz, -2);
+  assert.equal(decoded.buildings.length, 1);
+  assert.equal(decoded.buildings[0].height, 64.5);
+  assert.equal(decoded.roads.length, 1);
+  assert.equal(decoded.rails.length, 1);
+  const lod0 = buildTileGeometry(decoded, "dubai", 0);
+  const lod1 = buildTileGeometry(decoded, "dubai", 1);
+  const lod2 = buildTileGeometry(decoded, "dubai", 2);
+  assert.ok(lod0.walls && lod0.walls.pos.length > 0, "LOD 0 walls built");
+  assert.ok(lod0.roofs && lod0.roofs.pos.length > 0, "LOD 0 roofs built");
+  assert.ok(lod0.roadMarks && lod0.roadMarks.length > 0, "LOD 0 lane dashes built");
+  assert.ok(lod1.midBuildings && lod1.midBuildings.pos.length > 0, "LOD 1 mid boxes built");
+  assert.ok(lod2.midBuildings && lod2.midBuildings.pos.length > 0, "LOD 2 far silhouettes built");
 });
 
 import { nextGate, exitOf, crossing, seeded, START_TIME, type Gate } from "../src/sky/course";
