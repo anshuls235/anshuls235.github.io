@@ -105,7 +105,7 @@ test("binary SKY1 tiles encode/decode round-trip and build all 3 LODs cleanly", 
   const lod0 = buildTileGeometry(decoded, "dubai", 0);
   const lod1 = buildTileGeometry(decoded, "dubai", 1);
   const lod2 = buildTileGeometry(decoded, "dubai", 2);
-  assert.ok(lod0.walls && lod0.walls.pos.length > 0, "LOD 0 walls built");
+  assert.ok(lod0.wallsByStyle && lod0.wallsByStyle.some((w) => w && w.pos.length > 0), "LOD 0 walls built");
   assert.ok(lod0.roofs && lod0.roofs.pos.length > 0, "LOD 0 roofs built");
   assert.ok(lod0.roadMarks && lod0.roadMarks.length > 0, "LOD 0 lane dashes built");
   assert.ok(lod1.midBuildings && lod1.midBuildings.pos.length > 0, "LOD 1 mid boxes built");

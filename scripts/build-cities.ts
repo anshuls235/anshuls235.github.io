@@ -56,7 +56,7 @@ const SPECS: Spec[] = [
     id: "dubai",
     name: "Dubai",
     bounds: [25.068, 55.128, 25.204, 55.284],
-    spawnLatLon: [25.188, 55.258, 32], // Business Bay looking NE straight at Burj Khalifa & Downtown
+    spawnLatLon: [25.080, 55.140, 42], // Dubai Marina looking NE along the skyscrapers toward Palm, SZR & Burj Khalifa
     style: (h, _a, t, r) => (h > 65 ? (r < 0.6 || /office|commercial|hotel/.test(t.building ?? "") ? 0 : 1) : h > 28 ? (r < 0.45 ? 2 : 1) : 1),
     fallback: (area, t, r) => (/house|villa|garage|roof|shed/.test(t.building ?? "") ? 7 : area > 2000 ? 22 + r * 35 : area > 800 ? 12 + r * 14 : 8 + r * 6),
     landmarks: [
@@ -574,7 +574,8 @@ function build(spec: Spec, dir: string) {
   const [spawnX, spawnZ] = local({ lat: spec.spawnLatLon[0], lon: spec.spawnLatLon[1] });
   const spawnHeading = (spec.spawnLatLon[2] * Math.PI) / 180;
 
-  // Thermals across the full city (up to 16), starting nearest the scenic spawn district
+  // Thermals across the full city (up to 24), clustered closer near the iconic spawn district
+  // so legs stay ~800-1100 m and the plane launches at dramatic skyline altitude (~170-300 m).
   const candidates: [number, number][] = [];
   const inset = 500;
   for (let x = -half[0] + inset; x <= half[0] - inset; x += 200) {
@@ -586,19 +587,34 @@ function build(spec: Spec, dir: string) {
   if (candidates.length) {
     // First thermal: nearest candidate to the iconic spawn point
     sites.push(candidates.reduce((a, b) => (Math.hypot(b[0] - spawnX, b[1] - spawnZ) < Math.hypot(a[0] - spawnX, a[1] - spawnZ) ? b : a)));
-    while (sites.length < 16) {
+    // Second thermal: ~750-1100 m ahead along the scenic spawn heading
+    const hx = Math.sin(spawnHeading);
+    const hz = -Math.cos(spawnHeading);
+    const second = candidates
+      .filter((c) => {
+        const d = Math.hypot(c[0] - sites[0][0], c[1] - sites[0][1]);
+        return d >= 650 && d <= 1250;
+      })
+      .sort((a, b) => {
+        const da = (a[0] - sites[0][0]) * hx + (a[1] - sites[0][1]) * hz;
+        const db = (b[0] - sites[0][0]) * hx + (b[1] - sites[0][1]) * hz;
+        return db - da;
+      })[0];
+    if (second) sites.push(second);
+    while (sites.length < 22) {
       let best: [number, number] | null = null;
       let bestD = 0;
       for (const c of candidates) {
         const d = Math.min(...sites.map((st) => Math.hypot(st[0] - c[0], st[1] - c[1])));
         if (d > bestD) [best, bestD] = [c, d];
       }
-      if (!best || bestD < 800) break;
+      if (!best || bestD < 750) break;
       sites.push(best);
     }
   }
   const tour = sites.length ? [sites[0]] : [];
   const left = sites.slice(1);
+  if (left.length && sites.length > 1) tour.push(left.shift()!); // keep the scenic first leg!
   while (left.length) {
     const last = tour.at(-1)!;
     left.sort((a, b) => Math.hypot(a[0] - last[0], a[1] - last[1]) - Math.hypot(b[0] - last[0], b[1] - last[1]));
@@ -616,7 +632,7 @@ function build(spec: Spec, dir: string) {
     return {
       from: [Math.round(from[0]), Math.round(from[1])] as [number, number],
       to: [Math.round(to[0]), Math.round(to[1])] as [number, number],
-      depart: Math.round(Math.min(560, clear + 40 + length / 6)),
+      depart: Math.round(Math.min(380, clear + 35 + length / 6.5)),
     };
   });
   const thermalTop = Math.max(Math.min(tallest, 480) + 140, ...legs.map((l) => l.depart + 90));

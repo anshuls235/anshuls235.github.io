@@ -10,11 +10,11 @@ import { decodeTile, TILE_SIZE } from "./tileformat";
 import { buildTileGeometry, type BuiltTileData, type TileLod } from "./tile-geom";
 import type { WorkerRequest, WorkerResponse } from "./tile-worker";
 
-const FACADE_FILES = [
-  "glass-tower",
-  "residential-tower",
-  "office-glass",
-  "indian-midrise",
+const FACADES = [
+  { file: "glass-tower", rough: 0.2, metal: 0.34, floors: 4 },
+  { file: "residential-tower", rough: 0.78, metal: 0.04, floors: 1 },
+  { file: "office-glass", rough: 0.32, metal: 0.24, floors: 1 },
+  { file: "indian-midrise", rough: 0.88, metal: 0.0, floors: 1 },
 ] as const;
 
 /** Per-city visual palette: sun angle, ground tone, fog tint & density. */
@@ -80,50 +80,24 @@ function seeded(seed: number) {
   return () => ((s = (s * 16807) % 2147483647) / 2147483647);
 }
 
-/** Loads the 4 facade webp images once and packs them into a single 1024x1024 2x2 atlas. */
-let atlasPromise: Promise<THREE.CanvasTexture> | null = null;
-export function loadFacades(base: string, anisotropy: number): Promise<THREE.CanvasTexture> {
-  if (atlasPromise) return atlasPromise;
-  atlasPromise = (async () => {
-    const imgs = await Promise.all(
-      FACADE_FILES.map(
-        (name) =>
-          new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            img.decoding = "async";
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error(`Failed to load facade ${name}`));
-            img.src = `${base}assets/sky/${name}.webp`;
-          }),
-      ),
-    );
-    const size = 1024;
-    const half = size / 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
-    // 0: (0,0) top-left in WebGL UV (note: flipY=true by default so canvas bottom is v=0!)
-    // Draw with flipY=false so (0,0) is top-left consistently with ATLAS_OFFSET!
-    ctx.drawImage(imgs[0], 0, 0, half, half); // (0, 0)
-    ctx.drawImage(imgs[1], half, 0, half, half); // (0.5, 0)
-    ctx.drawImage(imgs[2], 0, half, half, half); // (0, 0.5)
-    ctx.drawImage(imgs[3], half, half, half, half); // (0.5, 0.5)
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.flipY = false;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.generateMipmaps = true;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.anisotropy = Math.min(8, anisotropy);
-    tex.needsUpdate = true;
-    return tex;
-  })();
-  atlasPromise.catch(() => {
-    atlasPromise = null;
+/** Loads the 4 photographic facade webp textures once with native RepeatWrapping & hardware mipmaps. */
+let facadePromise: Promise<THREE.Texture[]> | null = null;
+export function loadFacades(base: string, anisotropy: number): Promise<THREE.Texture[]> {
+  if (facadePromise) return facadePromise;
+  const loader = new THREE.TextureLoader();
+  facadePromise = Promise.all(
+    FACADES.map(async (f) => {
+      const tex = await loader.loadAsync(`${base}assets/sky/${f.file}.webp`);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = Math.min(8, anisotropy);
+      return tex;
+    }),
+  );
+  facadePromise.catch(() => {
+    facadePromise = null;
   });
-  return atlasPromise;
+  return facadePromise;
 }
 
 /** Tileable procedural water normal map (cheap animated ripples, generated once). */
@@ -167,65 +141,55 @@ function waterNormals(): THREE.CanvasTexture {
   return t;
 }
 
-/** Shared wall material using the 2x2 facade atlas, vertex color/AO, and dynamic uNight emissive windows. */
-function createWallMaterial(atlas: THREE.Texture, env: THREE.Texture | null, uNight: { value: number }) {
-  const mat = new THREE.MeshStandardMaterial({
-    map: atlas,
-    vertexColors: true,
-    roughness: 0.55,
-    metalness: 0.16,
-    envMap: env,
-    envMapIntensity: 0.75,
+/** Shared wall materials using native RepeatWrapping photographic facades, base AO, and uNight windows. */
+function createWallMaterials(facades: THREE.Texture[], env: THREE.Texture | null, uNight: { value: number }) {
+  return FACADES.map((f, idx) => {
+    const mat = new THREE.MeshStandardMaterial({
+      map: facades[idx],
+      vertexColors: true,
+      roughness: f.rough,
+      metalness: f.metal,
+      envMap: env,
+      envMapIntensity: 0.78,
+    });
+    const floors = f.floors;
+    const lit = idx === 3 ? 0.34 : 0.44;
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uNight = uNight;
+      shader.uniforms.uFloors = { value: floors };
+      shader.uniforms.uLit = { value: lit };
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uNight;\nuniform float uFloors;\nuniform float uLit;")
+        .replace(
+          "#include <emissivemap_fragment>",
+          `#include <emissivemap_fragment>
+          if (uNight > 0.01) {
+            vec2 grid = vMapUv * vec2(2.0, uFloors);
+            vec2 cell = floor(grid);
+            float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+            vec3 texel = texture2D(map, vMapUv).rgb;
+            float glass = smoothstep(0.58, 0.20, dot(texel, vec3(0.299, 0.587, 0.114)));
+            float on = step(h, uLit) * glass;
+            float farFade = smoothstep(0.22, 0.75, length(fwidth(grid)));
+            on = mix(on, uLit * 0.5, farFade);
+            vec3 warm = mix(vec3(1.0, 0.68, 0.34), vec3(0.88, 0.94, 1.0), step(0.80, fract(h * 11.3)));
+            totalEmissiveRadiance += (warm * on * (0.85 + fract(h * 7.1) * 0.5) + texel * 0.06) * uNight;
+          }`,
+        );
+    };
+    mat.customProgramCacheKey = () => `sky-wall-v3-${idx}`;
+    return mat;
   });
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uNight = uNight;
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nattribute vec2 aAtlas;\nvarying vec2 vAtlas;\nvarying vec2 vTileUv;")
-      .replace("#include <uv_vertex>", "#include <uv_vertex>\nvAtlas = aAtlas;\nvTileUv = uv;");
-    shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nuniform float uNight;\nvarying vec2 vAtlas;\nvarying vec2 vTileUv;")
-      .replace(
-        "#include <map_fragment>",
-        `#ifdef USE_MAP
-          vec2 localUv = fract(vTileUv);
-          vec2 atlasUv = localUv * 0.492 + vAtlas + 0.004;
-          vec4 sampledDiffuseColor = texture2D(map, atlasUv);
-          diffuseColor *= sampledDiffuseColor;
-        #endif`,
-      )
-      .replace(
-        "#include <emissivemap_fragment>",
-        `#include <emissivemap_fragment>
-        if (uNight > 0.01) {
-          vec2 localUvE = fract(vTileUv);
-          vec2 atlasUvE = localUvE * 0.492 + vAtlas + 0.004;
-          vec3 texel = texture2D(map, atlasUvE).rgb;
-          float lum = dot(texel, vec3(0.299, 0.587, 0.114));
-          // Glass panes are darker in the facade photo
-          float glass = smoothstep(0.58, 0.20, lum);
-          vec2 grid = vTileUv * vec2(2.5, 2.0);
-          vec2 cell = floor(grid);
-          float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-          float on = step(h, 0.42) * glass;
-          float farFade = smoothstep(0.25, 0.85, length(fwidth(grid)));
-          on = mix(on, 0.24, farFade);
-          vec3 warm = mix(vec3(1.0, 0.68, 0.34), vec3(0.88, 0.94, 1.0), step(0.80, fract(h * 11.3)));
-          totalEmissiveRadiance += warm * on * (0.95 + fract(h * 7.1) * 0.55) * uNight;
-        }`,
-      );
-  };
-  mat.customProgramCacheKey = () => "sky-atlas-walls-v2";
-  return mat;
 }
 
-/** Shared mid/far LOD building material with subtle night window glow. */
+/** Shared mid/far LOD building material with architectural floor bands (day + night). */
 function createMidMaterial(env: THREE.Texture | null, uNight: { value: number }) {
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.72,
-    metalness: 0.12,
+    roughness: 0.68,
+    metalness: 0.16,
     envMap: env,
-    envMapIntensity: 0.5,
+    envMapIntensity: 0.6,
   });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uNight = uNight;
@@ -238,19 +202,29 @@ function createMidMaterial(env: THREE.Texture | null, uNight: { value: number })
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nuniform float uNight;\nvarying vec3 vWorldPos;\nvarying vec3 vWorldNrm;")
       .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        if (abs(vWorldNrm.y) < 0.5) {
+          // Subtle architectural floor & bay bands so distant towers never look like blank cubes
+          float floorBand = 0.86 + 0.14 * step(0.32, fract(vWorldPos.y * 0.27));
+          float bayBand = 0.92 + 0.08 * step(0.18, fract((vWorldPos.x + vWorldPos.z) * 0.16));
+          diffuseColor.rgb *= floorBand * bayBand;
+        }`,
+      )
+      .replace(
         "#include <emissivemap_fragment>",
         `#include <emissivemap_fragment>
         if (uNight > 0.01 && abs(vWorldNrm.y) < 0.5) {
-          float flr = floor(vWorldPos.y * 0.28);
+          float flr = floor(vWorldPos.y * 0.27);
           float bay = floor((vWorldPos.x + vWorldPos.z) * 0.14);
           float h = fract(sin(dot(vec2(bay, flr), vec2(12.9898, 78.233))) * 43758.5453);
-          float lit = step(h, 0.36) * smoothstep(2.0, 12.0, vWorldPos.y);
+          float lit = step(h, 0.38) * smoothstep(2.0, 12.0, vWorldPos.y);
           vec3 glow = mix(vec3(1.0, 0.68, 0.34), vec3(0.95, 0.88, 0.72), fract(h * 9.0));
           totalEmissiveRadiance += glow * lit * 0.68 * uNight;
         }`,
       );
   };
-  mat.customProgramCacheKey = () => "sky-mid-buildings-v2";
+  mat.customProgramCacheKey = () => "sky-mid-buildings-v3";
   return mat;
 }
 
@@ -277,7 +251,7 @@ function createNightSky(azimuth: number) {
         gl_FragColor = vec4(c, 1.0);
       }`,
   });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(22000, 40, 20), material);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(14000, 40, 20), material);
   const stars = new THREE.BufferGeometry();
   const pts: number[] = [];
   const rand = seeded(3);
@@ -285,7 +259,7 @@ function createNightSky(azimuth: number) {
     const y = 0.14 + rand() * 0.86;
     const a = rand() * Math.PI * 2;
     const r = Math.sqrt(1 - y * y);
-    pts.push(Math.cos(a) * r * 19000, y * 19000, Math.sin(a) * r * 19000);
+    pts.push(Math.cos(a) * r * 13000, y * 13000, Math.sin(a) * r * 13000);
   }
   stars.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
   const starField = new THREE.Points(
@@ -520,7 +494,7 @@ function createBaseGround(city: City, night: boolean) {
   );
   const ground = new THREE.Mesh(keep(new THREE.PlaneGeometry(hx * 2, hz * 2)), groundMat);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = 0.08;
+  ground.position.y = 0.35;
   ground.receiveShadow = true;
 
   // Far surround skirt outside the city bounds (only on land sides; sea shows through on water sides)
@@ -535,7 +509,7 @@ function createBaseGround(city: City, night: boolean) {
   const step = 400;
   const quads: number[] = [];
   const quad = (x0: number, z0: number, x1: number, z1: number) =>
-    quads.push(x0, 0.04, z0, x1, 0.04, z0, x1, 0.04, z1, x0, 0.04, z0, x1, 0.04, z1, x0, 0.04, z1);
+    quads.push(x0, 0.15, z0, x1, 0.15, z0, x1, 0.15, z1, x0, 0.15, z0, x1, 0.15, z1, x0, 0.15, z1);
   for (let x = -hx; x < hx; x += step) {
     const x1 = Math.min(hx, x + step);
     if (!city.isWater((x + x1) / 2, -hz + 60)) quad(x, -hz - far, x1, -hz);
@@ -716,7 +690,7 @@ function getSharedWorker(): Worker | null {
 
 export async function buildWorld(
   city: City,
-  atlas: THREE.Texture,
+  facades: THREE.Texture[],
   renderer: THREE.WebGLRenderer,
   base: string,
   initialNight: boolean,
@@ -741,7 +715,7 @@ export async function buildWorld(
   const sunDirection = (night ? nightSunDir : daySunDir).clone();
 
   const daySky = new Sky();
-  daySky.scale.setScalar(30000);
+  daySky.scale.setScalar(15000);
   const su = daySky.material.uniforms;
   su.turbidity.value = look.turbidity;
   su.rayleigh.value = look.rayleigh;
@@ -798,7 +772,7 @@ export async function buildWorld(
 
   // ---------- Shared Tile Materials ----------
   const activeEnv = night ? envNight : envDay;
-  const wallMat = keep(createWallMaterial(atlas, activeEnv, uNight));
+  const wallMats = createWallMaterials(facades, activeEnv, uNight).map((m) => keep(m));
   const midMat = keep(createMidMaterial(activeEnv, uNight));
   const roofMat = keep(
     new THREE.MeshStandardMaterial({
@@ -814,11 +788,17 @@ export async function buildWorld(
       vertexColors: true,
       roughness: 0.92,
       metalness: 0.02,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     }),
   );
   const roadMarkMat = keep(
     new THREE.MeshBasicMaterial({
       color: night ? 0xffb866 : 0xe8e2d0,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
     }),
   );
   const railMat = keep(
@@ -826,12 +806,18 @@ export async function buildWorld(
       vertexColors: true,
       roughness: 0.65,
       metalness: 0.3,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
     }),
   );
   const parkMat = keep(
     new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.96,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     }),
   );
   const waterNormal = waterNormals();
@@ -883,8 +869,11 @@ export async function buildWorld(
     fog.density = isNight ? look.fogDensityNight : look.fogDensityDay;
 
     const env = isNight ? envNight : envDay;
-    wallMat.envMap = midMat.envMap = roofMat.envMap = waterMat.envMap = env;
-    wallMat.envMapIntensity = isNight ? 1.15 : 0.72;
+    for (const wm of wallMats) {
+      wm.envMap = env;
+      wm.envMapIntensity = isNight ? 1.15 : 0.78;
+    }
+    midMat.envMap = roofMat.envMap = waterMat.envMap = env;
     waterMat.color.setHex(isNight ? look.waterNight : look.waterDay);
     roadMarkMat.color.setHex(isNight ? 0xffb866 : 0xe8e2d0);
     parkMat.color.setHex(isNight ? 0x545d6e : 0xffffff);
@@ -967,16 +956,18 @@ export async function buildWorld(
       return geo;
     };
 
-    if (data.walls) {
-      const geo = track(new THREE.BufferGeometry());
-      geo.setAttribute("position", new THREE.BufferAttribute(data.walls.pos, 3));
-      geo.setAttribute("normal", new THREE.BufferAttribute(data.walls.nrm, 3));
-      geo.setAttribute("uv", new THREE.BufferAttribute(data.walls.uv, 2));
-      geo.setAttribute("aAtlas", new THREE.BufferAttribute(data.walls.atlas, 2));
-      geo.setAttribute("color", new THREE.BufferAttribute(data.walls.color, 3));
-      const mesh = new THREE.Mesh(geo, wallMat);
-      mesh.castShadow = mesh.receiveShadow = quality > 1;
-      g.add(mesh);
+    if (data.wallsByStyle) {
+      data.wallsByStyle.forEach((w, styleIdx) => {
+        if (!w) return;
+        const geo = track(new THREE.BufferGeometry());
+        geo.setAttribute("position", new THREE.BufferAttribute(w.pos, 3));
+        geo.setAttribute("normal", new THREE.BufferAttribute(w.nrm, 3));
+        geo.setAttribute("uv", new THREE.BufferAttribute(w.uv, 2));
+        geo.setAttribute("color", new THREE.BufferAttribute(w.color, 3));
+        const mesh = new THREE.Mesh(geo, wallMats[styleIdx]);
+        mesh.castShadow = mesh.receiveShadow = quality > 1;
+        g.add(mesh);
+      });
     }
     if (data.roofs) {
       const geo = track(new THREE.BufferGeometry());
@@ -1095,7 +1086,7 @@ export async function buildWorld(
     const ts = city.index.tileSize || TILE_SIZE;
     const cx = Math.floor(x / ts);
     const cz = Math.floor(z / ts);
-    const maxR = quality === 0 ? 1 : quality === 1 ? 2 : 3;
+    const maxR = quality === 0 ? 1 : 3;
     const wanted: { tx: number; tz: number; dist: number; lod: TileLod }[] = [];
     for (let dx = -maxR; dx <= maxR; dx++) {
       for (let dz = -maxR; dz <= maxR; dz++) {
@@ -1104,13 +1095,14 @@ export async function buildWorld(
         const tx = cx + dx;
         const tz = cz + dz;
         if (!city.tileSet.has(`${tx},${tz}`)) continue;
-        // On software WebGL (quality 0), use lightweight LOD 1/2 boxes so frames stay fast in CI.
+        // Software WebGL (quality 0): lightweight LOD 1/2 boxes for CI speed.
+        // Real GPUs (quality >= 1): full photographic LOD 0 out to ~2.3 km so the skyline is crisp!
         const lod: TileLod =
           quality === 0
             ? (dist <= 0.5 ? 1 : 2)
-            : dist <= 1.45
+            : dist <= 2.3
               ? 0
-              : dist <= 2.35
+              : dist <= 2.9
                 ? 1
                 : 2;
         wanted.push({ tx, tz, dist, lod });
@@ -1122,18 +1114,18 @@ export async function buildWorld(
 
   function updateStream(x: number, z: number) {
     if (disposed) return;
-    if (Math.hypot(x - lastStreamX, z - lastStreamZ) < 120) return;
+    if (Math.hypot(x - lastStreamX, z - lastStreamZ) < 160) return;
     lastStreamX = x;
     lastStreamZ = z;
 
     const wanted = desiredTiles(x, z);
     const keepKeys = new Set<string>(wanted.map((w) => `${w.tx},${w.tz}`));
 
-    // Unload tiles beyond radius + 1
+    // Unload tiles well beyond visible radius so nothing pops out prematurely
     const ts = city.index.tileSize || TILE_SIZE;
     const cx = Math.floor(x / ts);
     const cz = Math.floor(z / ts);
-    const unloadR = (quality === 0 ? 2 : 3) + 1.2;
+    const unloadR = (quality === 0 ? 1 : 3) + 1.8;
     for (const [key, tile] of activeTiles) {
       if (!keepKeys.has(key) && Math.hypot(tile.tx - cx, tile.tz - cz) > unloadR) {
         disposeTile(tile);
@@ -1142,7 +1134,6 @@ export async function buildWorld(
       }
     }
 
-    // Queue up to 6 missing/upgraded tiles at a time
     let queued = 0;
     for (const w of wanted) {
       const key = `${w.tx},${w.tz}`;
@@ -1158,12 +1149,11 @@ export async function buildWorld(
     lastStreamX = x;
     lastStreamZ = z;
     const wanted = desiredTiles(x, z);
-    // Await the immediate 3x3 core (dist <= 1.5, LOD 0) so the first frame is crisp and fast
-    const core = wanted.filter((w) => w.dist <= 1.5);
+    // Await all near photographic tiles (dist <= 2.3) so the city renders completely solid on frame 1!
+    const core = wanted.filter((w) => w.dist <= 2.3);
     await Promise.all(core.map((w) => loadTileAtLod(w.tx, w.tz, w.lod)));
-    // Kick off outer rings asynchronously without blocking first paint
     for (const w of wanted) {
-      if (w.dist > 1.5) void loadTileAtLod(w.tx, w.tz, w.lod);
+      if (w.dist > 2.3) void loadTileAtLod(w.tx, w.tz, w.lod);
     }
   }
 
@@ -1176,9 +1166,10 @@ export async function buildWorld(
       if (isNight !== night) applyTheme(isNight);
     },
     setQuality(nextQ: number) {
+      const prevSoftware = quality === 0;
       quality = nextQ;
       sun.castShadow = quality > 1;
-      lastStreamX = Infinity;
+      if (prevSoftware !== (quality === 0)) lastStreamX = Infinity;
     },
     ensureAround,
     updateStream,
@@ -1194,6 +1185,8 @@ export async function buildWorld(
       }
     },
     render(scene, camera) {
+      daySky.position.copy(camera.position);
+      dusk.group.position.copy(camera.position);
       renderer.render(scene, camera);
     },
     setSize() {

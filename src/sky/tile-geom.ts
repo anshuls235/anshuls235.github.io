@@ -8,7 +8,6 @@ export interface WallBuffers {
   pos: Float32Array;
   nrm: Float32Array;
   uv: Float32Array;
-  atlas: Float32Array; // [ox, oy] per vertex in 2x2 facade atlas
   color: Float32Array; // RGB tint * base AO
 }
 
@@ -27,7 +26,8 @@ export interface BuiltTileData {
   tx: number;
   tz: number;
   lod: TileLod;
-  walls?: WallBuffers;
+  /** Up to 4 merged wall buffers, one per real photographic facade style (native RepeatWrapping). */
+  wallsByStyle?: (WallBuffers | null)[];
   roofs?: SimpleMeshBuffers;
   midBuildings?: SimpleMeshBuffers;
   roads?: FlatColorBuffers;
@@ -39,20 +39,13 @@ export interface BuiltTileData {
   trees?: Float32Array;
 }
 
-// Facade atlas layout (2x2):
-// 0: glass-tower (0, 0), 1: residential-tower (0.5, 0)
-// 2: office-glass (0, 0.5), 3: indian-midrise (0.5, 0.5)
+// Facade world-metre repeat scale matching the 4 photographic textures:
+// 0: glass-tower, 1: residential-tower, 2: office-glass, 3: indian-midrise
 const FACADE_SCALE: [number, number][] = [
-  [18, 14], // glass-tower
-  [14, 3.8], // residential-tower
-  [14, 4.2], // office-glass
+  [16, 14], // glass-tower
+  [14, 3.6], // residential-tower
+  [14, 4.0], // office-glass
   [12, 3.4], // indian-midrise
-];
-const ATLAS_OFFSET: [number, number][] = [
-  [0, 0],
-  [0.5, 0],
-  [0, 0.5],
-  [0.5, 0.5],
 ];
 
 // Subtle architectural colour tints (linear-ish RGB multipliers)
@@ -316,7 +309,7 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     for (let i = 0; i < tris.length; i += 3) {
       const a = tris[i], b = tris[i + 1], d = tris[i + 2];
       // CCW in (x, z) -> reverse to face +Y in Three.js
-      gPos.push(ring[a * 2], 0.14, ring[a * 2 + 1], ring[d * 2], 0.14, ring[d * 2 + 1], ring[b * 2], 0.14, ring[b * 2 + 1]);
+      gPos.push(ring[a * 2], 0.9, ring[a * 2 + 1], ring[d * 2], 0.9, ring[d * 2 + 1], ring[b * 2], 0.9, ring[b * 2 + 1]);
       gCol.push(c[0], c[1], c[2], c[0], c[1], c[2], c[0], c[1], c[2]);
     }
   });
@@ -324,7 +317,7 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     const tris = triangulateFlat(ring);
     for (let i = 0; i < tris.length; i += 3) {
       const a = tris[i], b = tris[i + 1], d = tris[i + 2];
-      gPos.push(ring[a * 2], 0.12, ring[a * 2 + 1], ring[d * 2], 0.12, ring[d * 2 + 1], ring[b * 2], 0.12, ring[b * 2 + 1]);
+      gPos.push(ring[a * 2], 0.65, ring[a * 2 + 1], ring[d * 2], 0.65, ring[d * 2 + 1], ring[b * 2], 0.65, ring[b * 2 + 1]);
       gCol.push(0.84, 0.77, 0.61, 0.84, 0.77, 0.61, 0.84, 0.77, 0.61);
     }
   }
@@ -335,7 +328,7 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     const tris = triangulateFlat(ring);
     for (let i = 0; i < tris.length; i += 3) {
       const a = tris[i], b = tris[i + 1], d = tris[i + 2];
-      wPos.push(ring[a * 2], 0.19, ring[a * 2 + 1], ring[d * 2], 0.19, ring[d * 2 + 1], ring[b * 2], 0.19, ring[b * 2 + 1]);
+      wPos.push(ring[a * 2], 1.15, ring[a * 2 + 1], ring[d * 2], 1.15, ring[d * 2 + 1], ring[b * 2], 1.15, ring[b * 2 + 1]);
     }
   }
   if (wPos.length) out.water = new Float32Array(wPos);
@@ -346,11 +339,11 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
   const rMarks: number[] = [];
   for (const road of tile.roads) {
     if (lod === 1 && road.kind === 0) continue; // mid LOD skips minor residential streets
-    const y = road.kind === 2 ? 0.24 : road.kind === 1 ? 0.21 : 0.18;
+    const y = road.kind === 2 ? 1.85 : road.kind === 1 ? 1.65 : 1.45;
     const shade = road.kind === 2 ? 0.20 : road.kind === 1 ? 0.24 : 0.29;
     pushRibbon(road.points, road.width * 0.5, y, shade, shade, shade + 0.02, rPos, rCol);
     if (lod === 0 && road.kind === 2) {
-      pushRoadDashes(road.points, y + 0.04, rMarks);
+      pushRoadDashes(road.points, 2.08, rMarks);
     }
   }
   if (rPos.length) out.roads = { pos: new Float32Array(rPos), color: new Float32Array(rCol) };
@@ -360,7 +353,7 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     const railPos: number[] = [];
     const railCol: number[] = [];
     for (const rail of tile.rails) {
-      const y = rail.kind === 1 ? 6.5 : 0.27;
+      const y = rail.kind === 1 ? 8.0 : 2.28;
       const c = rail.kind === 1 ? 0.62 : 0.34;
       pushRibbon(rail.points, rail.width * 0.5, y, c, c, c + 0.02, railPos, railCol);
     }
@@ -385,12 +378,13 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     return out;
   }
 
-  // ---------- LOD 0 (Near): full extruded footprints with 2x2 facade atlas, base AO, distinct roofs, trees ----------
-  const wPosArr: number[] = [];
-  const wNrmArr: number[] = [];
-  const wUvArr: number[] = [];
-  const wAtlArr: number[] = [];
-  const wColArr: number[] = [];
+  // ---------- LOD 0 (Near): full extruded footprints grouped by the 4 real photographic facades ----------
+  const buckets = Array.from({ length: 4 }, () => ({
+    pos: [] as number[],
+    nrm: [] as number[],
+    uv: [] as number[],
+    col: [] as number[],
+  }));
 
   const roofPos: number[] = [];
   const roofNrm: number[] = [];
@@ -400,9 +394,9 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     const h = b.height;
     const style = b.style & 3;
     const [fw, fh] = FACADE_SCALE[style];
-    const [ax, ay] = ATLAS_OFFSET[style];
+    const w = buckets[style];
     const tint = WALL_TINTS[b.tint & 7];
-    const aoBottom = 0.45;
+    const aoBottom = 0.48;
     const aoH = Math.min(h, 14);
     const aoTop = aoH < h ? 1.0 : aoBottom + (1 - aoBottom) * (h / 14);
 
@@ -422,17 +416,13 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
       const u1 = (along + len) / fw;
       const v1 = h / fh;
 
-      // Bottom-to-top wall quad (split at aoH for crisp ground contact AO on tall towers)
       if (h > 18) {
         const vm = aoH / fh;
         // Lower AO band: 0 .. aoH
-        wPosArr.push(x0, 0, z0, x1, 0, z1, x1, aoH, z1, x0, 0, z0, x1, aoH, z1, x0, aoH, z0);
-        wUvArr.push(u0, 0, u1, 0, u1, vm, u0, 0, u1, vm, u0, vm);
-        for (let k = 0; k < 6; k++) {
-          wNrmArr.push(nx, 0, nz);
-          wAtlArr.push(ax, ay);
-        }
-        wColArr.push(
+        w.pos.push(x0, 0, z0, x1, 0, z1, x1, aoH, z1, x0, 0, z0, x1, aoH, z1, x0, aoH, z0);
+        w.uv.push(u0, 0, u1, 0, u1, vm, u0, 0, u1, vm, u0, vm);
+        for (let k = 0; k < 6; k++) w.nrm.push(nx, 0, nz);
+        w.col.push(
           tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
           tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
           tint[0], tint[1], tint[2],
@@ -441,21 +431,17 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
           tint[0], tint[1], tint[2],
         );
         // Upper band: aoH .. h
-        wPosArr.push(x0, aoH, z0, x1, aoH, z1, x1, h, z1, x0, aoH, z0, x1, h, z1, x0, h, z0);
-        wUvArr.push(u0, vm, u1, vm, u1, v1, u0, vm, u1, v1, u0, v1);
+        w.pos.push(x0, aoH, z0, x1, aoH, z1, x1, h, z1, x0, aoH, z0, x1, h, z1, x0, h, z0);
+        w.uv.push(u0, vm, u1, vm, u1, v1, u0, vm, u1, v1, u0, v1);
         for (let k = 0; k < 6; k++) {
-          wNrmArr.push(nx, 0, nz);
-          wAtlArr.push(ax, ay);
-          wColArr.push(tint[0], tint[1], tint[2]);
+          w.nrm.push(nx, 0, nz);
+          w.col.push(tint[0], tint[1], tint[2]);
         }
       } else {
-        wPosArr.push(x0, 0, z0, x1, 0, z1, x1, h, z1, x0, 0, z0, x1, h, z1, x0, h, z0);
-        wUvArr.push(u0, 0, u1, 0, u1, v1, u0, 0, u1, v1, u0, v1);
-        for (let k = 0; k < 6; k++) {
-          wNrmArr.push(nx, 0, nz);
-          wAtlArr.push(ax, ay);
-        }
-        wColArr.push(
+        w.pos.push(x0, 0, z0, x1, 0, z1, x1, h, z1, x0, 0, z0, x1, h, z1, x0, h, z0);
+        w.uv.push(u0, 0, u1, 0, u1, v1, u0, 0, u1, v1, u0, v1);
+        for (let k = 0; k < 6; k++) w.nrm.push(nx, 0, nz);
+        w.col.push(
           tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
           tint[0] * aoBottom, tint[1] * aoBottom, tint[2] * aoBottom,
           tint[0] * aoTop, tint[1] * aoTop, tint[2] * aoTop,
@@ -511,15 +497,17 @@ export function buildTileGeometry(tile: DecodedTile, cityId: CityId, lod: TileLo
     }
   }
 
-  if (wPosArr.length) {
-    out.walls = {
-      pos: new Float32Array(wPosArr),
-      nrm: new Float32Array(wNrmArr),
-      uv: new Float32Array(wUvArr),
-      atlas: new Float32Array(wAtlArr),
-      color: new Float32Array(wColArr),
-    };
-  }
+  const wallsByStyle = buckets.map((w) =>
+    w.pos.length
+      ? {
+          pos: new Float32Array(w.pos),
+          nrm: new Float32Array(w.nrm),
+          uv: new Float32Array(w.uv),
+          color: new Float32Array(w.col),
+        }
+      : null,
+  );
+  if (wallsByStyle.some(Boolean)) out.wallsByStyle = wallsByStyle;
   if (roofPos.length) {
     out.roofs = {
       pos: new Float32Array(roofPos),

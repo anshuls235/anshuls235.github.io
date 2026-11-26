@@ -18,8 +18,10 @@ export interface WorkerResponse {
 
 function collectTransferables(d: BuiltTileData): Transferable[] {
   const list: Transferable[] = [];
-  if (d.walls) {
-    list.push(d.walls.pos.buffer, d.walls.nrm.buffer, d.walls.uv.buffer, d.walls.atlas.buffer, d.walls.color.buffer);
+  if (d.wallsByStyle) {
+    for (const w of d.wallsByStyle) {
+      if (w) list.push(w.pos.buffer, w.nrm.buffer, w.uv.buffer, w.color.buffer);
+    }
   }
   if (d.roofs) list.push(d.roofs.pos.buffer, d.roofs.nrm.buffer, d.roofs.color.buffer);
   if (d.midBuildings) list.push(d.midBuildings.pos.buffer, d.midBuildings.nrm.buffer, d.midBuildings.color.buffer);
