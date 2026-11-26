@@ -1,20 +1,32 @@
-// Web Worker: decodes binary SKY1 city tiles and builds transferable LOD geometry
-// off the main thread so streaming never drops frames.
-import { decodeTile, TILE_SIZE, type CityId } from "./tileformat";
-import { buildTileGeometry, type BuiltTileData, type TileLod } from "./tile-geom";
+// Web Worker: decodes binary SKY1 city tiles, paints per-tile OffscreenCanvas ground
+// & night-light textures, and builds transferable LOD geometry off the main thread.
+import { decodeTile, TILE_SIZE, type CityId, type DecodedTile } from "./tileformat";
+import { buildTileGeometry, type BuiltTileData, type SeaMaskInfo, type TileLod } from "./tile-geom";
 
-export interface WorkerRequest {
-  id: number;
-  cityId: CityId;
-  lod: TileLod;
-  tileSize?: number;
-  buffer: ArrayBuffer;
-}
+export type WorkerMessageIn =
+  | {
+      kind: "sea";
+      cityId: CityId;
+      sea: SeaMaskInfo | null;
+    }
+  | {
+      kind: "build";
+      id: number;
+      cityId: CityId;
+      lod: TileLod;
+      quality?: number;
+      tileSize?: number;
+      needCollision?: boolean;
+      buffer: ArrayBuffer;
+    };
 
 export interface WorkerResponse {
   id: number;
   data: BuiltTileData;
+  collision?: DecodedTile;
 }
+
+const seaByCity = new Map<CityId, SeaMaskInfo | null>();
 
 function collectTransferables(d: BuiltTileData): Transferable[] {
   const list: Transferable[] = [];
@@ -25,19 +37,29 @@ function collectTransferables(d: BuiltTileData): Transferable[] {
   }
   if (d.roofs) list.push(d.roofs.pos.buffer, d.roofs.nrm.buffer, d.roofs.color.buffer);
   if (d.midBuildings) list.push(d.midBuildings.pos.buffer, d.midBuildings.nrm.buffer, d.midBuildings.color.buffer);
+  if (d.rails) list.push(d.rails.pos.buffer, d.rails.color.buffer);
+  if (d.groundBitmap) list.push(d.groundBitmap);
+  if (d.nightBitmap) list.push(d.nightBitmap);
   if (d.roads) list.push(d.roads.pos.buffer, d.roads.color.buffer);
   if (d.roadMarks) list.push(d.roadMarks.buffer);
-  if (d.rails) list.push(d.rails.pos.buffer, d.rails.color.buffer);
   if (d.ground) list.push(d.ground.pos.buffer, d.ground.color.buffer);
   if (d.water) list.push(d.water.buffer);
   if (d.trees) list.push(d.trees.buffer);
   return list;
 }
 
-self.onmessage = (event: MessageEvent<WorkerRequest>) => {
-  const { id, cityId, lod, tileSize, buffer } = event.data;
-  const tile = decodeTile(buffer, tileSize ?? TILE_SIZE);
-  const data = buildTileGeometry(tile, cityId, lod);
+self.onmessage = (event: MessageEvent<WorkerMessageIn>) => {
+  const msg = event.data;
+  if (msg.kind === "sea") {
+    seaByCity.set(msg.cityId, msg.sea);
+    return;
+  }
+  const { id, cityId, lod, quality, tileSize, needCollision, buffer } = msg;
+  const ts = tileSize ?? TILE_SIZE;
+  const tile = decodeTile(buffer, ts);
+  const data = buildTileGeometry(tile, cityId, lod, ts, seaByCity.get(cityId) ?? null, quality ?? 2);
   const transfer = collectTransferables(data);
-  (self as unknown as Worker).postMessage({ id, data } satisfies WorkerResponse, transfer);
+  const resp: WorkerResponse = { id, data };
+  if (needCollision) resp.collision = tile;
+  (self as unknown as Worker).postMessage(resp, transfer);
 };

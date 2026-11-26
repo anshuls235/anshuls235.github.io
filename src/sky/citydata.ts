@@ -1,6 +1,6 @@
 // Real cities from OpenStreetMap, prepared for tiled flight. Pure data work, no DOM:
-// decodes the compact CityIndex, manages per-tile building/water collision grids as
-// tiles stream in and out, and exposes hits(), roofAt(), isWater() for flight & course.
+// decodes the compact CityIndex, manages zero-allocation integer-keyed building/water
+// collision grids as tiles stream in and out, and exposes hits(), roofAt(), isWater().
 import type { Obstacle, Thermal } from "./glider";
 import { decodeRle, type CityId, type CityIndex, type CityLandmark, type DecodedTile, type TileBuilding } from "./tileformat";
 
@@ -15,7 +15,6 @@ export interface Leg {
 
 export interface City {
   index: CityIndex;
-  /** Compatibility summary matching previous City.data fields */
   data: {
     id: CityId;
     name: string;
@@ -30,14 +29,10 @@ export interface City {
   legs: Leg[];
   sea: { cell: number; cols: number; rows: number; mask: Uint8Array } | null;
   tileSet: Set<string>;
-  /** Register a decoded tile's buildings & inland water for collision / roofAt queries. */
   addTile(tile: DecodedTile): void;
-  /** Unregister a tile when it streams out of range. */
   removeTile(tx: number, tz: number): void;
   hasTile(tx: number, tz: number): boolean;
-  /** True when (x, y, z) is inside a building or landmark. */
   hits(x: number, y: number, z: number): boolean;
-  /** Tallest roof within `radius` metres of (x, z). */
   roofAt(x: number, z: number, radius: number): number;
   isWater(x: number, z: number): boolean;
 }
@@ -62,12 +57,14 @@ export function pointInRing(x: number, z: number, ring: ArrayLike<number>, offse
 
 interface TileCollision {
   buildings: TileBuilding[];
-  grid: Map<string, number[]>;
+  grid: Map<number, number[]>;
   water: Float32Array[];
   islands: Float32Array[];
 }
 
 const CELL = 50;
+// Pack signed 16-bit integer grid coords into a single 32-bit SMI (zero string GC!)
+const packKey = (a: number, b: number) => (((a + 16384) & 0x7fff) << 15) | ((b + 16384) & 0x7fff);
 
 export function prepareCity(index: CityIndex): City {
   const sea = index.sea
@@ -92,17 +89,17 @@ export function prepareCity(index: CityIndex): City {
 
   const tileSize = index.tileSize;
   const tileSet = new Set<string>(index.tiles);
-  const loaded = new Map<string, TileCollision>();
+  const loaded = new Map<number, TileCollision>();
 
   function addTile(tile: DecodedTile) {
-    const key = `${tile.tx},${tile.tz}`;
-    if (loaded.has(key)) return;
-    const grid = new Map<string, number[]>();
+    const tKey = packKey(tile.tx, tile.tz);
+    if (loaded.has(tKey)) return;
+    const grid = new Map<number, number[]>();
     tile.buildings.forEach((b, i) => {
       const [x0, z0, x1, z1] = b.bbox;
       for (let gx = Math.floor(x0 / CELL); gx <= Math.floor(x1 / CELL); gx++) {
         for (let gz = Math.floor(z0 / CELL); gz <= Math.floor(z1 / CELL); gz++) {
-          const ck = `${gx},${gz}`;
+          const ck = packKey(gx, gz);
           let list = grid.get(ck);
           if (!list) {
             list = [];
@@ -112,7 +109,7 @@ export function prepareCity(index: CityIndex): City {
         }
       }
     });
-    loaded.set(key, {
+    loaded.set(tKey, {
       buildings: tile.buildings,
       grid,
       water: tile.water,
@@ -121,22 +118,25 @@ export function prepareCity(index: CityIndex): City {
   }
 
   function removeTile(tx: number, tz: number) {
-    loaded.delete(`${tx},${tz}`);
+    loaded.delete(packKey(tx, tz));
   }
 
   function hasTile(tx: number, tz: number) {
-    return loaded.has(`${tx},${tz}`);
+    return loaded.has(packKey(tx, tz));
   }
 
   function hits(x: number, y: number, z: number): boolean {
-    // Check procedural hero landmarks first
-    for (const lm of index.landmarks) {
+    for (let l = 0; l < index.landmarks.length; l++) {
+      const lm = index.landmarks[l];
+      if (lm.kind === "connaught" || lm.kind === "stadium") continue; // open courtyard/field at center
       if (y < lm.height) {
         const dx = x - lm.x;
         const dz = z - lm.z;
-        // Taper radius for tall spires / Burj Khalifa
         const frac = Math.max(0, y / lm.height);
-        const r = lm.kind === "burj" || lm.kind === "spire" ? lm.radius * (1 - frac * 0.72) : lm.radius;
+        const r =
+          lm.kind === "burj" || lm.kind === "spire" || lm.kind === "twist"
+            ? lm.radius * (1 - frac * 0.72)
+            : lm.radius * 0.65;
         if (dx * dx + dz * dz <= r * r) return true;
       }
     }
@@ -144,11 +144,10 @@ export function prepareCity(index: CityIndex): City {
     const tz = Math.floor(z / tileSize);
     const gx = Math.floor(x / CELL);
     const gz = Math.floor(z / CELL);
-    const ck = `${gx},${gz}`;
-    // Check current tile and immediate neighbours (for buildings straddling tile edges)
+    const ck = packKey(gx, gz);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        const tc = loaded.get(`${tx + dx},${tz + dz}`);
+        const tc = loaded.get(packKey(tx + dx, tz + dz));
         if (!tc) continue;
         const list = tc.grid.get(ck);
         if (!list) continue;
@@ -165,9 +164,10 @@ export function prepareCity(index: CityIndex): City {
 
   function roofAt(x: number, z: number, radius: number): number {
     let top = 0;
-    for (const lm of index.landmarks) {
+    for (let l = 0; l < index.landmarks.length; l++) {
+      const lm = index.landmarks[l];
       if (Math.hypot(x - lm.x, z - lm.z) <= radius + lm.radius) {
-        top = Math.max(top, lm.height);
+        if (lm.height > top) top = lm.height;
       }
     }
     const minTx = Math.floor((x - radius) / tileSize) - 1;
@@ -182,17 +182,18 @@ export function prepareCity(index: CityIndex): City {
 
     for (let tx = minTx; tx <= maxTx; tx++) {
       for (let tz = minTz; tz <= maxTz; tz++) {
-        const tc = loaded.get(`${tx},${tz}`);
+        const tc = loaded.get(packKey(tx, tz));
         if (!tc) continue;
         for (let gx = gx0; gx <= gx1; gx++) {
           for (let gz = gz0; gz <= gz1; gz++) {
-            const list = tc.grid.get(`${gx},${gz}`);
+            const list = tc.grid.get(packKey(gx, gz));
             if (!list) continue;
             for (let k = 0; k < list.length; k++) {
               const b = tc.buildings[list[k]];
+              if (b.height <= top) continue;
               const dx = Math.max(b.bbox[0] - x, 0, x - b.bbox[2]);
               const dz = Math.max(b.bbox[1] - z, 0, z - b.bbox[3]);
-              if (dx * dx + dz * dz <= r2 && b.height > top) top = b.height;
+              if (dx * dx + dz * dz <= r2) top = b.height;
             }
           }
         }
@@ -209,7 +210,7 @@ export function prepareCity(index: CityIndex): City {
     }
     const tx = Math.floor(x / tileSize);
     const tz = Math.floor(z / tileSize);
-    const tc = loaded.get(`${tx},${tz}`);
+    const tc = loaded.get(packKey(tx, tz));
     if (!tc) return false;
     return tc.water.some((w) => pointInRing(x, z, w)) && !tc.islands.some((w) => pointInRing(x, z, w));
   }

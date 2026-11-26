@@ -108,10 +108,24 @@ export function nextGate(
     };
     return [g];
   }
-  // Running low: into the nearest thermal, then up through a climb ring above it.
-  const t = city.thermals.reduce((a, b) => (Math.hypot(b.x - from.x, b.z - from.z) < Math.hypot(a.x - from.x, a.z - from.z) ? b : a));
+  // Running low: lead into the nearest safe thermal whose approach & circling core clear nearby roofs!
+  const ranked = [...city.thermals].sort(
+    (a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z),
+  );
+  let chosen = ranked[0];
+  for (const cand of ranked) {
+    const r = Math.hypot(cand.x - from.x, cand.z - from.z);
+    const estY = Math.max(55, from.y - r / GLIDE - 6);
+    const cAt = thermalCore(cand, estY, city.breeze);
+    if (city.roofAt(cAt.x, cAt.z, 110) < estY - 25 && clearOver(city, from.x, from.z, cAt.x, cAt.z) <= from.y + 10) {
+      chosen = cand;
+      break;
+    }
+  }
+  const t = chosen;
   const reach = Math.hypot(t.x - from.x, t.z - from.z);
-  const entry = Math.max(40, from.y - reach / GLIDE - 6);
+  const baseAt = thermalCore(t, Math.max(55, from.y - reach / GLIDE), city.breeze);
+  const entry = Math.max(55, city.roofAt(baseAt.x, baseAt.z, 110) + 30, from.y - reach / GLIDE - 6);
   const at = thermalCore(t, entry, city.breeze);
   const heading = Math.atan2(at.x - from.x, -(at.z - from.z));
   const top = entry + 110;

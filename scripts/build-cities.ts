@@ -35,6 +35,9 @@ interface LandmarkSpec {
   radius: number;
   kind: LandmarkKind;
   color: number;
+  yaw?: number;
+  /** Keep underlying OSM buildings (e.g. around Connaught Place / Stadium) if false */
+  clearFootprint?: boolean;
 }
 
 interface Spec {
@@ -42,13 +45,30 @@ interface Spec {
   name: string;
   /** Crop, south-west and north-east corners [s, w, n, e]. */
   bounds: [number, number, number, number];
-  /** Preferred launch district [lat, lon, headingDeg]. */
+  /** Exact scenic launch point [lat, lon, headingDeg]. */
   spawnLatLon: [number, number, number];
   /** Facade styles: 0 glass tower, 1 residential tower, 2 office glass, 3 Indian mid-rise. */
   style: (h: number, area: number, tags: Record<string, string>, r: number) => number;
   /** Height when OpenStreetMap has none. */
-  fallback: (area: number, tags: Record<string, string>, r: number) => number;
+  fallback: (area: number, tags: Record<string, string>, r: number, lat: number, lon: number) => number;
   landmarks: LandmarkSpec[];
+}
+
+/** True when (lat, lon) lies inside one of Dubai's high-rise skyscraper corridors. */
+function inDubaiSkyscraperZone(lat: number, lon: number): number {
+  // Dubai Marina & JBR (supertall cluster)
+  if (lat >= 25.069 && lat <= 25.093 && lon >= 55.128 && lon <= 55.153) return 1.0;
+  // JLT (Jumeirah Lakes Towers)
+  if (lat >= 25.068 && lat <= 25.083 && lon >= 55.138 && lon <= 55.160) return 0.85;
+  // Downtown Dubai & Business Bay
+  if (lat >= 25.180 && lat <= 25.204 && lon >= 55.252 && lon <= 55.284) return 1.0;
+  // Sheikh Zayed Road / DIFC corridor (diagonal spine from Media City to Trade Centre)
+  const t = (lat - 25.09) / (25.204 - 25.09);
+  if (t >= 0 && t <= 1) {
+    const spineLon = 55.155 + t * (55.278 - 55.155);
+    if (Math.abs(lon - spineLon) < 0.008) return 0.8;
+  }
+  return 0;
 }
 
 const SPECS: Spec[] = [
@@ -56,42 +76,66 @@ const SPECS: Spec[] = [
     id: "dubai",
     name: "Dubai",
     bounds: [25.068, 55.128, 25.204, 55.284],
-    spawnLatLon: [25.080, 55.140, 42], // Dubai Marina looking NE along the skyscrapers toward Palm, SZR & Burj Khalifa
-    style: (h, _a, t, r) => (h > 65 ? (r < 0.6 || /office|commercial|hotel/.test(t.building ?? "") ? 0 : 1) : h > 28 ? (r < 0.45 ? 2 : 1) : 1),
-    fallback: (area, t, r) => (/house|villa|garage|roof|shed/.test(t.building ?? "") ? 7 : area > 2000 ? 22 + r * 35 : area > 800 ? 12 + r * 14 : 8 + r * 6),
+    spawnLatLon: [25.0755, 55.1315, 44], // Right off JBR/Marina entrance facing NE into Marina supertalls, Palm, Burj Al Arab & Burj Khalifa!
+    style: (h, _a, t, r) => (h > 65 ? (r < 0.62 || /office|commercial|hotel/.test(t.building ?? "") ? 0 : 1) : h > 28 ? (r < 0.45 ? 2 : 1) : 1),
+    fallback: (area, t, r, lat, lon) => {
+      if (/house|villa|garage|roof|shed/.test(t.building ?? "")) return 8 + r * 4;
+      const zone = inDubaiSkyscraperZone(lat, lon);
+      if (zone > 0 && area >= 220 && area <= 6500) {
+        return Math.round((85 + r * r * 165) * zone);
+      }
+      return area > 2000 ? 22 + r * 35 : area > 800 ? 12 + r * 14 : 8 + r * 6;
+    },
     landmarks: [
-      { name: "Burj Khalifa", lat: 25.1972, lon: 55.2744, height: 828, radius: 52, kind: "burj", color: 0xcfdbe6 },
-      { name: "Burj Al Arab", lat: 25.1412, lon: 55.1852, height: 321, radius: 34, kind: "sail", color: 0xf4f1e8 },
-      { name: "Princess Tower", lat: 25.0887, lon: 55.1469, height: 413, radius: 22, kind: "spire", color: 0xb9cde0 },
-      { name: "JW Marriott Marquis", lat: 25.1856, lon: 55.2581, height: 355, radius: 24, kind: "spire", color: 0xaec4d8 },
-      { name: "Address Downtown", lat: 25.1944, lon: 55.2791, height: 302, radius: 22, kind: "spire", color: 0xd8cdb8 },
+      { name: "Burj Khalifa", lat: 25.1972, lon: 55.2744, height: 828, radius: 58, kind: "burj", color: 0xd6e4f0 },
+      { name: "Burj Al Arab", lat: 25.1412, lon: 55.1852, height: 321, radius: 42, kind: "sail", color: 0xf8f6f0, yaw: 0.6 },
+      { name: "Ain Dubai", lat: 25.0796, lon: 55.1225, height: 250, radius: 36, kind: "wheel", color: 0xf5f5f2, yaw: 0.7 },
+      { name: "Cayan Tower", lat: 25.0869, lon: 55.1453, height: 306, radius: 24, kind: "twist", color: 0xc5d6e6 },
+      { name: "Princess Tower", lat: 25.0887, lon: 55.1469, height: 413, radius: 25, kind: "spire", color: 0xd0e0ee },
+      { name: "Atlantis The Palm", lat: 25.1304, lon: 55.1171, height: 98, radius: 75, kind: "atlantis", color: 0xe8b49a, yaw: -0.75 },
+      { name: "Museum of the Future", lat: 25.2032, lon: 55.2815, height: 78, radius: 44, kind: "torus", color: 0xdde5ec, yaw: 0.5 },
+      { name: "JW Marriott Marquis", lat: 25.1856, lon: 55.2581, height: 355, radius: 26, kind: "spire", color: 0xaec4d8 },
     ],
   },
   {
     id: "bengaluru",
     name: "Bengaluru",
     bounds: [12.926, 77.566, 13.016, 77.656],
-    spawnLatLon: [12.968, 77.606, -48], // Near MG Road looking NW toward UB City, Cubbon Park & Vidhana Soudha
-    style: (h, _a, t, r) => (h > 30 ? (r < 0.6 ? 2 : 1) : /commercial|office|retail/.test(t.building ?? "") && r < 0.45 ? 2 : 3),
-    fallback: (area, _t, r) => (area > 2500 ? 16 + r * 18 : area > 600 ? 9 + r * 9 : 6 + r * 5),
+    spawnLatLon: [12.9742, 77.6055, -72], // MG Road / Chinnaswamy looking straight across Cubbon Park at Red High Court, Vidhana Soudha & UB City!
+    style: (h, _a, t, r) => (h > 28 ? (r < 0.65 ? 2 : 0) : /commercial|office|retail/.test(t.building ?? "") && r < 0.5 ? 2 : 3),
+    fallback: (area, t, r, lat, lon) => {
+      const cbd = lat >= 12.966 && lat <= 12.984 && lon >= 77.592 && lon <= 77.620;
+      if (cbd && (/office|commercial|hotel/.test(t.building ?? "") || area > 1400)) return 32 + r * 48;
+      return area > 2200 ? 18 + r * 22 : area > 550 ? 10 + r * 11 : 6 + r * 6;
+    },
     landmarks: [
-      { name: "Vidhana Soudha", lat: 12.9796, lon: 77.5907, height: 46, radius: 64, kind: "dome", color: 0xe2d6c2 },
-      { name: "UB City", lat: 12.9716, lon: 77.596, height: 123, radius: 24, kind: "spire", color: 0x9fb8cc },
-      { name: "Public Utility Building", lat: 12.9746, lon: 77.6119, height: 106, radius: 20, kind: "spire", color: 0xc9c2b4 },
+      { name: "Vidhana Soudha", lat: 12.9796, lon: 77.5907, height: 52, radius: 75, kind: "vidhana", color: 0xf0eadc, yaw: 0.35 },
+      { name: "Karnataka High Court", lat: 12.9776, lon: 77.5928, height: 24, radius: 58, kind: "highcourt", color: 0xb83b2b, yaw: 0.35 },
+      { name: "Chinnaswamy Stadium", lat: 12.9788, lon: 77.5996, height: 38, radius: 88, kind: "stadium", color: 0xf2efe9 },
+      { name: "UB City", lat: 12.9716, lon: 77.5960, height: 128, radius: 38, kind: "spire", color: 0xdccbb2 },
+      { name: "Public Utility Building", lat: 12.9746, lon: 77.6119, height: 106, radius: 24, kind: "spire", color: 0xc2ccd4 },
     ],
   },
   {
     id: "delhi",
     name: "Delhi",
     bounds: [28.574, 77.176, 28.664, 77.274],
-    spawnLatLon: [28.613, 77.239, -86], // East of India Gate looking W along Kartavya Path toward Rashtrapati Bhavan & CP
-    style: (h, _a, t, r) => (h > 32 ? (r < 0.7 ? 2 : 0) : /commercial|office/.test(t.building ?? "") && r < 0.4 ? 2 : r < 0.35 ? 1 : 3),
-    fallback: (area, t, r) => (/office|commercial/.test(t.building ?? "") || area > 3000 ? 24 + r * 28 : area > 900 ? 12 + r * 12 : 7 + r * 5),
+    spawnLatLon: [28.6126, 77.2368, -88], // East of India Gate looking straight through the Arch down Kartavya Path to Rashtrapati Bhavan & CP!
+    style: (h, _a, t, r) => (h > 30 ? (r < 0.7 ? 2 : 0) : /commercial|office/.test(t.building ?? "") && r < 0.45 ? 2 : r < 0.35 ? 1 : 3),
+    fallback: (area, t, r, lat, lon) => {
+      const cp = Math.hypot(lat - 28.6315, lon - 77.2197) < 0.012;
+      if (cp && area > 900) return 22 + r * 38;
+      return /office|commercial/.test(t.building ?? "") || area > 2800 ? 22 + r * 28 : area > 850 ? 12 + r * 12 : 8 + r * 6;
+    },
     landmarks: [
-      { name: "India Gate", lat: 28.6129, lon: 77.2295, height: 42, radius: 26, kind: "arch", color: 0xd9b382 },
-      { name: "Rashtrapati Bhavan", lat: 28.6143, lon: 77.1994, height: 54, radius: 72, kind: "dome", color: 0xc98a63 },
-      { name: "Civic Centre", lat: 28.6426, lon: 77.2275, height: 112, radius: 22, kind: "spire", color: 0xa8bcc9 },
-      { name: "Jama Masjid", lat: 28.6507, lon: 77.2334, height: 41, radius: 42, kind: "dome", color: 0xd6c7b4 },
+      { name: "India Gate", lat: 28.6129, lon: 77.2295, height: 44, radius: 28, kind: "indiagate", color: 0xd99b66 },
+      { name: "Rashtrapati Bhavan", lat: 28.6143, lon: 77.1994, height: 58, radius: 95, kind: "rashtrapati", color: 0xc97b53 },
+      { name: "Parliament House", lat: 28.6172, lon: 77.2082, height: 30, radius: 82, kind: "parliament", color: 0xd8a878 },
+      { name: "Connaught Place", lat: 28.6315, lon: 77.2197, height: 22, radius: 165, kind: "connaught", color: 0xf5f2ea, clearFootprint: false },
+      { name: "Jama Masjid", lat: 28.6507, lon: 77.2334, height: 44, radius: 55, kind: "mosque", color: 0xc45c44 },
+      { name: "Red Fort", lat: 28.6562, lon: 77.2410, height: 34, radius: 95, kind: "redfort", color: 0xb54434 },
+      { name: "Humayun's Tomb", lat: 28.5933, lon: 77.2507, height: 47, radius: 52, kind: "tomb", color: 0xc86448 },
+      { name: "Civic Centre", lat: 28.6426, lon: 77.2275, height: 112, radius: 24, kind: "spire", color: 0xa8bcc9 },
     ],
   },
 ];
@@ -249,7 +293,7 @@ function pointInFlatRing(x: number, z: number, ring: number[]): boolean {
 }
 
 function floodSeaMask(half: [number, number], coastLines: number[][][], seaSeed: [number, number]) {
-  const cell = 16; // 16 m grid -> ~950x950 for 15 km city (~900 KB raw, ~15 KB RLE!)
+  const cell = 10; // 10 m grid -> preserves narrow 35 m Marina canal mouths & Palm Jumeirah fronds!
   const cols = Math.ceil((half[0] * 2) / cell);
   const rows = Math.ceil((half[1] * 2) / cell);
   const wall = new Uint8Array(cols * rows);
@@ -258,14 +302,16 @@ function floodSeaMask(half: [number, number], coastLines: number[][][], seaSeed:
     for (let i = 0; i + 1 < line.length; i++) {
       const [ax, az] = line[i];
       const [bx, bz] = line[i + 1];
-      const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / (cell / 2)) + 1;
+      const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / (cell * 0.45)) + 1;
+      let prevC = -1, prevR = -1;
       for (let s = 0; s <= steps; s++) {
         const [c, r] = toCell(ax + ((bx - ax) * s) / steps, az + ((bz - az) * s) / steps);
-        for (const [dc, dr] of [[0, 0], [1, 0], [0, 1]]) {
-          const cc = c + dc;
-          const rr = r + dr;
-          if (cc >= 0 && rr >= 0 && cc < cols && rr < rows) wall[rr * cols + cc] = 1;
+        if (c >= 0 && r >= 0 && c < cols && r < rows) wall[r * cols + c] = 1;
+        // 4-connected corner bridge so diagonal steps never leak without bloating wall width to 32 m
+        if (prevC >= 0 && c !== prevC && r !== prevR) {
+          if (prevC >= 0 && r >= 0 && prevC < cols && r < rows) wall[r * cols + prevC] = 1;
         }
+        prevC = c; prevR = r;
       }
     }
   }
@@ -355,8 +401,21 @@ function build(spec: Spec, dir: string) {
   // Landmarks in local coordinates
   const landmarks: CityLandmark[] = spec.landmarks.map((lm) => {
     const [x, z] = local({ lat: lm.lat, lon: lm.lon });
-    return { name: lm.name, x: Math.round(x), z: Math.round(z), height: lm.height, radius: lm.radius, kind: lm.kind, color: lm.color };
+    return {
+      name: lm.name,
+      x: Math.round(x),
+      z: Math.round(z),
+      height: lm.height,
+      radius: lm.radius,
+      kind: lm.kind,
+      color: lm.color,
+      yaw: lm.yaw,
+    };
   });
+  const clearLandmarks = spec.landmarks
+    .map((lm, i) => ({ lm, local: landmarks[i] }))
+    .filter(({ lm }) => lm.clearFootprint !== false)
+    .map(({ local: l }) => l);
 
   // Track all buildings for spatial grid (thermals / legs / obstacles)
   const allBuildings: { h: number; x0: number; z0: number; x1: number; z1: number }[] = [];
@@ -395,11 +454,11 @@ function build(spec: Spec, dir: string) {
         }
         cx /= ring.length; cz /= ring.length;
         // Skip generic OSM footprints directly under a procedural hero landmark so they don't z-fight
-        if (landmarks.some((lm) => Math.hypot(cx - lm.x, cz - lm.z) < lm.radius * 0.85)) continue;
+        if (clearLandmarks.some((lm) => Math.hypot(cx - lm.x, cz - lm.z) < lm.radius * 0.85)) continue;
 
         const r = hash(String(g[0].lat) + String(g[0].lon));
         const tagged = metres(t.height) || (Number(t["building:levels"]) ? Number(t["building:levels"]) * 3.4 + 3 : NaN);
-        const h = Math.round(Math.min(500, Number.isFinite(tagged) && tagged > 2 ? tagged : spec.fallback(a, t, r)));
+        const h = Math.round(Math.min(500, Number.isFinite(tagged) && tagged > 2 ? tagged : spec.fallback(a, t, r, g[0].lat, g[0].lon)));
         tallest = Math.max(tallest, h);
         const style = spec.style(h, a, t, r);
         const roofType = h > 55 ? 1 : 0; // parapet/stepped roof on towers
@@ -574,8 +633,24 @@ function build(spec: Spec, dir: string) {
   const [spawnX, spawnZ] = local({ lat: spec.spawnLatLon[0], lon: spec.spawnLatLon[1] });
   const spawnHeading = (spec.spawnLatLon[2] * Math.PI) / 180;
 
-  // Thermals across the full city (up to 24), clustered closer near the iconic spawn district
-  // so legs stay ~800-1100 m and the plane launches at dramatic skyline altitude (~170-300 m).
+  // Exact breeze matching src/sky/citydata.ts so thermalCore(t0, launchY) lands right on (spawnX, spawnZ)!
+  const CITY_BREEZE: Record<CityId, [number, number]> = {
+    dubai: [3.2, 3.2],
+    bengaluru: [3, 0.6],
+    delhi: [2.2, 1.6],
+  };
+  const [bx, bz] = CITY_BREEZE[spec.id];
+  const t0Strength = 4.8;
+  // Target scenic launch altitude (~240 m in Dubai Marina, ~175 m in Bengaluru & Delhi)
+  const targetLaunchY = Math.max(spec.id === "dubai" ? 245 : 175, roofAt(spawnX, spawnZ, 75) + 55);
+  const rise0 = targetLaunchY / t0Strength;
+  const t0Base: [number, number] = [spawnX - bx * rise0, spawnZ - bz * rise0];
+
+  // Second thermal: ~850 m ahead along the exact scenic spawnHeading so Frame 1 points dead at the landmarks!
+  const fwdX = Math.sin(spawnHeading);
+  const fwdZ = -Math.cos(spawnHeading);
+  const t1Target: [number, number] = [t0Base[0] + fwdX * 850, t0Base[1] + fwdZ * 850];
+
   const candidates: [number, number][] = [];
   const inset = 500;
   for (let x = -half[0] + inset; x <= half[0] - inset; x += 200) {
@@ -583,24 +658,8 @@ function build(spec: Spec, dir: string) {
       if (!isWater(x, z) && roofAt(x, z, 95) < 40) candidates.push([x, z]);
     }
   }
-  const sites: [number, number][] = [];
+  const sites: [number, number][] = [t0Base, t1Target];
   if (candidates.length) {
-    // First thermal: nearest candidate to the iconic spawn point
-    sites.push(candidates.reduce((a, b) => (Math.hypot(b[0] - spawnX, b[1] - spawnZ) < Math.hypot(a[0] - spawnX, a[1] - spawnZ) ? b : a)));
-    // Second thermal: ~750-1100 m ahead along the scenic spawn heading
-    const hx = Math.sin(spawnHeading);
-    const hz = -Math.cos(spawnHeading);
-    const second = candidates
-      .filter((c) => {
-        const d = Math.hypot(c[0] - sites[0][0], c[1] - sites[0][1]);
-        return d >= 650 && d <= 1250;
-      })
-      .sort((a, b) => {
-        const da = (a[0] - sites[0][0]) * hx + (a[1] - sites[0][1]) * hz;
-        const db = (b[0] - sites[0][0]) * hx + (b[1] - sites[0][1]) * hz;
-        return db - da;
-      })[0];
-    if (second) sites.push(second);
     while (sites.length < 22) {
       let best: [number, number] | null = null;
       let bestD = 0;
@@ -612,9 +671,8 @@ function build(spec: Spec, dir: string) {
       sites.push(best);
     }
   }
-  const tour = sites.length ? [sites[0]] : [];
-  const left = sites.slice(1);
-  if (left.length && sites.length > 1) tour.push(left.shift()!); // keep the scenic first leg!
+  const tour = [sites[0], sites[1]];
+  const left = sites.slice(2);
   while (left.length) {
     const last = tour.at(-1)!;
     left.sort((a, b) => Math.hypot(a[0] - last[0], a[1] - last[1]) - Math.hypot(b[0] - last[0], b[1] - last[1]));
@@ -627,12 +685,15 @@ function build(spec: Spec, dir: string) {
     let clear = 0;
     for (let d = 0; d <= length; d += 25) {
       const f = length ? d / length : 0;
-      clear = Math.max(clear, roofAt(from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f, 60));
+      // Check clearance along the downwind-drifted glide line (around ~220 m height)
+      const drift = 220 / t0Strength;
+      clear = Math.max(clear, roofAt(from[0] + bx * drift + (to[0] - from[0]) * f, from[1] + bz * drift + (to[1] - from[1]) * f, 65));
     }
+    const depart = i === 0 ? Math.max(targetLaunchY - 20, clear + 35 + length / 7) : Math.min(440, clear + 38 + length / 6.2);
     return {
       from: [Math.round(from[0]), Math.round(from[1])] as [number, number],
       to: [Math.round(to[0]), Math.round(to[1])] as [number, number],
-      depart: Math.round(Math.min(380, clear + 35 + length / 6.5)),
+      depart: Math.round(depart),
     };
   });
   const thermalTop = Math.max(Math.min(tallest, 480) + 140, ...legs.map((l) => l.depart + 90));

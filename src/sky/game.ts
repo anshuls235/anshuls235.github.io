@@ -111,15 +111,15 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const effective = () => (mode === "play" ? quality : Math.min(quality, 1));
   const applyQuality = () => {
     const q = effective();
-    const maxDpr = small ? 1.5 : 2;
-    renderer.setPixelRatio(q === 0 ? 0.5 : Math.min(devicePixelRatio || 1, q === 1 ? Math.min(1.5, maxDpr) : maxDpr));
-    renderer.shadowMap.enabled = q === 2;
+    const maxDpr = small ? 1.25 : 1.5;
+    renderer.setPixelRatio(q === 0 ? 0.5 : Math.min(devicePixelRatio || 1, maxDpr));
+    renderer.shadowMap.enabled = false;
     built?.setQuality(q);
   };
   applyQuality();
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(62, 1, 2.0, 20000);
+  const camera = new THREE.PerspectiveCamera(62, 1, 2.0, 26000);
   const plane = paperPlane();
   scene.add(plane);
   const q = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector);
@@ -170,6 +170,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let combo = 0;
   let ringPoints = 0;
   let skimCooldown = 0;
+  let skimTick = 0;
   const BOOST_THRUST = 245; // newtons
   const multiplier = () => Math.min(5, 1 + Math.floor(combo / 3));
 
@@ -231,8 +232,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     built = next;
     scene.add(built.group);
     scene.fog = built.fog;
-    // Compile shaders off the main thread where the browser can, before the first frame.
-    await renderer.compileAsync(scene, camera).catch(() => undefined);
+    renderer.compile(scene, camera);
     resize();
   }
 
@@ -349,7 +349,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       await buildScene();
       if (current !== id) return;
       launch();
-      if (mode === "attract") for (let i = 0; i < 120 * 4; i++) physics(STEP); // start mid-glide
+      if (mode === "attract") for (let i = 0; i < 120; i++) physics(STEP); // settle into trimmed glide right in front of the skyline
       root.classList.remove("is-loading");
       root.classList.add("is-ready");
       say(`Flying over ${next.data.name}.`);
@@ -429,14 +429,17 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     if (boosting) boost = Math.max(0, boost - dt * 0.22);
     gust = Math.max(0, gust - dt);
     skimCooldown = Math.max(0, skimCooldown - dt);
-    // Risk-reward near-miss: skimming within 14 m of a taller skyscraper awards points & boost!
-    if (skimCooldown <= 0 && p.y > 12 && city.roofAt(p.x, p.z, 14) > p.y + 4) {
-      skimCooldown = 2.5;
-      const pts = 75 * multiplier();
-      ringPoints += pts;
-      boost = Math.min(1, boost + 0.14);
-      sound?.pickup("boost");
-      flash(`Close shave! +${pts}`);
+    // Risk-reward near-miss (checked at 10 Hz): skimming within 14 m of a taller skyscraper awards points & boost!
+    if (++skimTick >= 12) {
+      skimTick = 0;
+      if (skimCooldown <= 0 && p.y > 12 && city.roofAt(p.x, p.z, 14) > p.y + 4) {
+        skimCooldown = 2.5;
+        const pts = 75 * multiplier();
+        ringPoints += pts;
+        boost = Math.min(1, boost + 0.14);
+        sound?.pickup("boost");
+        flash(`Close shave! +${pts}`);
+      }
     }
     clock -= dt;
     if (clock <= 0) {

@@ -4,7 +4,24 @@
 // Pure TypeScript, zero DOM/Three.js dependencies (shared by build script, worker, and runtime).
 
 export type CityId = "bengaluru" | "delhi" | "dubai";
-export type LandmarkKind = "burj" | "spire" | "arch" | "dome" | "sail";
+export type LandmarkKind =
+  | "burj"
+  | "sail"
+  | "wheel"
+  | "atlantis"
+  | "torus"
+  | "twist"
+  | "spire"
+  | "vidhana"
+  | "highcourt"
+  | "stadium"
+  | "indiagate"
+  | "rashtrapati"
+  | "parliament"
+  | "connaught"
+  | "mosque"
+  | "redfort"
+  | "tomb";
 
 export const TILE_MAGIC = 0x534b5931; // "SKY1"
 export const TILE_SIZE = 1000; // 1 km tiles
@@ -18,6 +35,7 @@ export interface CityLandmark {
   radius: number;
   kind: LandmarkKind;
   color: number;
+  yaw?: number;
 }
 
 export interface CityIndex {
