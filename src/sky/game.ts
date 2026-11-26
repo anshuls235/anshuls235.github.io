@@ -120,7 +120,6 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.5;
   renderer.shadowMap.type = THREE.PCFShadowMap;
-  // Shadows redraw every other frame: the map moves in whole texels, so it does not show.
   renderer.shadowMap.autoUpdate = false;
   // While the page scrolls past, the city renders lighter; full quality is for playing.
   let mode: "attract" | "play" = "attract";
@@ -130,24 +129,25 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let renderScale = 1;
   let paceTime = 0;
   let paceFrames = 0;
-  let shadowTick = 0;
   let built: BuiltWorld | null = null;
   const effective = () => (mode === "play" ? quality : Math.min(quality, 1));
+  let night = document.documentElement.dataset.theme === "dark";
   const applyQuality = () => {
     const q = effective();
     const maxDpr = small ? 1.25 : 1.5;
     baseRatio = q === 0 ? 0.5 : Math.min(devicePixelRatio || 1, maxDpr);
     renderer.setPixelRatio(baseRatio * renderScale);
     // Real sun shadows, building on building, when the machine can afford them.
-    renderer.shadowMap.enabled = q >= 2;
-    if (built) built.sun.castShadow = q >= 2;
+    // At night the moon casts nothing worth the cost; that budget goes to the glow of the lights.
+    renderer.shadowMap.enabled = q >= 2 && !night;
+    if (built) built.sun.castShadow = renderer.shadowMap.enabled;
     built?.setQuality(q);
   };
   applyQuality();
 
   const scene = new THREE.Scene();
   if (debug) Object.assign(window, { skyRenderer: renderer, skyScene: scene });
-  const camera = new THREE.PerspectiveCamera(62, 1, 2.0, 26000);
+  const camera = new THREE.PerspectiveCamera(62, 1, 3, 26000);
   const plane = paperPlane();
   scene.add(plane);
   const q = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector);
@@ -170,6 +170,10 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   // every landmark ever stamped in this browser (the passport), per city.
   const stamped = new Set<string>();
   let labels: { name: string; sprite: THREE.Sprite }[] = [];
+  type Spot = { name: string; x: number; z: number; height: number; radius: number };
+  let spots: Spot[] = [];
+  let labelTick = 0;
+  let labelsDirty = true;
 
   let world = createWorld();
   let glider: Glider = createGlider(world);
@@ -182,7 +186,6 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let clock = START_TIME;
   let countdown = 0;
   let flightTime = 0;
-  let night = document.documentElement.dataset.theme === "dark";
   let visible = false;
   let frame = 0;
   let last = 0;
@@ -256,7 +259,10 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     });
     labels = [];
     if (!city) return;
-    for (const lm of city.landmarks) {
+    // Every 3D landmark, plus the named places the map knows: tombs, gates, temples, parks, stadiums.
+    const seen = new Set<string>();
+    spots = [...city.landmarks, ...(city.index.postcards ?? [])].filter((p) => !seen.has(p.name) && seen.add(p.name));
+    for (const lm of spots) {
       const c = document.createElement("canvas");
       const g = c.getContext("2d")!;
       const text = lm.name.toUpperCase();
@@ -285,7 +291,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthWrite: false, transparent: true, toneMapped: false }));
       sprite.center.set(0.5, 0);
       sprite.scale.set((0.032 * w) / 52, 0.032, 1);
-      sprite.position.set(lm.x, Math.min(lm.height, 600) + 30, lm.z);
+      sprite.position.set(lm.x, Math.min(Math.max(lm.height, 20), 600) + 30, lm.z);
       sprite.renderOrder = 8;
       sprite.visible = false;
       scene.add(sprite);
@@ -296,7 +302,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     if (!city) return null;
     let best: { x: number; z: number } | null = null;
     let bestD = 2600;
-    for (const lm of city.landmarks) {
+    for (const lm of spots) {
       if (stamped.has(lm.name)) continue;
       const d = Math.hypot(lm.x - x, lm.z - z);
       if (d < bestD) {
@@ -416,6 +422,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     ringPoints = 0;
     skimCooldown = 0;
     stamped.clear();
+    labelsDirty = true;
     glider.controls.thrust = 0;
     root.dataset.skyState = "flying";
     if (over) over.hidden = true;
@@ -448,7 +455,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       set("distance", `${(distance / 1000).toFixed(1)} km`);
       set("time", `${Math.floor(flightTime / 60)}:${String(Math.floor(flightTime % 60)).padStart(2, "0")}`);
       set("best", String(best));
-      const total = city.landmarks.length;
+      const total = spots.length;
       const kept = passport(city.data.id);
       set("postcards", `${stamped.size}/${total}`);
       const stampsEl = over.querySelector<HTMLElement>('[data-over="stamps"]');
@@ -528,7 +535,12 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const probe = new THREE.Vector3();
   const planeUp = new THREE.Vector3();
   const tmpN = new THREE.Vector3();
+  const prevPos = new THREE.Vector3();
+  const prevQuat = new THREE.Quaternion();
   const shadowAt = new THREE.Vector3();
+  const lightX = new THREE.Vector3();
+  const lightY = new THREE.Vector3();
+  const lightZ = new THREE.Vector3();
 
   function physics(dt: number) {
     if (!city) return;
@@ -567,10 +579,11 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     // Risk-reward near-miss (checked at 10 Hz): skimming within 14 m of a taller skyscraper awards points & boost!
     if (++skimTick >= 12) {
       skimTick = 0;
-      for (const lm of city.landmarks) {
+      for (const lm of spots) {
         if (stamped.has(lm.name)) continue;
-        if (Math.hypot(p.x - lm.x, p.z - lm.z) < lm.radius + 70 && p.y < lm.height + 110) {
+        if (Math.hypot(p.x - lm.x, p.z - lm.z) < lm.radius + 70 && p.y < lm.height + 130) {
           stamped.add(lm.name);
+          labelsDirty = true;
           addToPassport(city.data.id, lm.name);
           const pts = 250 * multiplier();
           ringPoints += pts;
@@ -659,7 +672,9 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const worldUp = new THREE.Vector3(0, 1, 0);
   const camTargetUp = new THREE.Vector3();
 
-  function updateCamera(snap = false) {
+  function updateCamera(snap = false, dt = 1 / 60) {
+    // Smoothing by time, not by frame, so the camera feels the same at any frame rate.
+    const ease = (rate: number) => 1 - Math.exp(-rate * dt);
     const forward = tmp.set(0, 0, -1).applyQuaternion(plane.quaternion);
     forward.y *= 0.35;
     forward.normalize();
@@ -690,21 +705,21 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       camPos.copy(camWantPos);
       camLook.copy(camWantLook);
     } else {
-      camPos.lerp(camWantPos, attract ? 0.08 : 0.14);
-      camLook.lerp(camWantLook, 0.2);
+      camPos.lerp(camWantPos, ease(attract ? 5 : 10));
+      camLook.lerp(camWantLook, ease(14));
     }
     // Lean into turns: the camera banks with the plane, a little less than it does.
     planeUp.set(0, 1, 0).applyQuaternion(plane.quaternion);
     camTargetUp.copy(worldUp).lerp(planeUp, attract ? 0.15 : 0.45);
-    camUp.lerp(camTargetUp, 0.08).normalize();
+    camUp.lerp(camTargetUp, ease(5)).normalize();
     camera.up.copy(camUp);
     camera.position.copy(camPos);
     camera.lookAt(camLook);
     // Speed widens the view.
-    kick = Math.max(0, kick - 0.03);
+    kick = Math.max(0, kick - dt * 1.8);
     const fov = clamp(60 + (speed - 20) * 0.6 + (boosting ? 8 : 0), 56, 88) + kick * 7 + (root.clientWidth < root.clientHeight ? 12 : 0);
     if (Math.abs(camera.fov - fov) > 0.05) {
-      camera.fov += (fov - camera.fov) * 0.08;
+      camera.fov += (fov - camera.fov) * ease(5);
       camera.updateProjectionMatrix();
     }
     if (built) {
@@ -712,9 +727,15 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       // centre moves in whole shadow texels so the edges do not crawl.
       shadowAt.copy(plane.position).addScaledVector(forward.setY(0).normalize(), 160);
       shadowAt.y = 0;
+      // Snap in the light's own frame: whole texels across and up the shadow map.
       const texel = 680 / 2048;
-      shadowAt.x = Math.round(shadowAt.x / texel) * texel;
-      shadowAt.z = Math.round(shadowAt.z / texel) * texel;
+      lightZ.copy(built.sunDirection).normalize();
+      lightX.set(0, 1, 0).cross(lightZ).normalize();
+      lightY.copy(lightZ).cross(lightX);
+      const ax = Math.round(shadowAt.dot(lightX) / texel) * texel;
+      const ay = Math.round(shadowAt.dot(lightY) / texel) * texel;
+      const az = shadowAt.dot(lightZ);
+      shadowAt.copy(lightX).multiplyScalar(ax).addScaledVector(lightY, ay).addScaledVector(lightZ, az);
       built.sun.target.position.copy(shadowAt);
       built.sun.position.copy(shadowAt).addScaledVector(built.sunDirection, 1200);
       built.sun.target.updateMatrixWorld();
@@ -800,8 +821,9 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       return;
     }
     const raw = last ? (now - last) / 1000 : STEP;
-    // At the lowest quality, draw every other frame.
-    if (quality === 0 && last && raw < 1 / 40) {
+    // At the lowest quality, and while the city only plays behind the page's
+    // words, draw at most 30 frames a second: the website stays light.
+    if ((quality === 0 || mode === "attract") && last && raw < 1 / 40) {
       frame = requestAnimationFrame(loop);
       return;
     }
@@ -829,13 +851,22 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     }
     acc += Math.min(raw, 0.05);
     while (acc >= STEP) {
+      prevPos.set(glider.body.position.x, glider.body.position.y, glider.body.position.z);
+      prevQuat.set(glider.body.quaternion.x, glider.body.quaternion.y, glider.body.quaternion.z, glider.body.quaternion.w);
       physics(STEP);
       elapsed += STEP;
       acc -= STEP;
     }
     syncPlane();
+    // Physics ticks at 120 Hz, frames at whatever the screen does: show the plane
+    // between its last two states, so it glides instead of stepping unevenly.
+    if (prevPos.distanceToSquared(plane.position) < 2500) {
+      const t = acc / STEP;
+      plane.position.lerpVectors(prevPos, plane.position, t);
+      plane.quaternion.copy(prevQuat.slerp(plane.quaternion, t));
+    }
     if (!crashed && countdown <= 0) updateTrails();
-    updateCamera();
+    updateCamera(false, Math.min(raw, 0.1));
     built?.updateStream(glider.body.position.x, glider.body.position.z);
     gates.forEach(({ mesh, gate, orb }, i) => {
       mesh.rotation.z = gate.kind === "climb" ? elapsed * 0.15 : elapsed * 0.4 + i;
@@ -846,13 +877,18 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     });
     built?.update(elapsed);
     bursts.update(Math.min(raw, 0.05));
-    for (const { name, sprite } of labels) {
-      const show = mode === "play" && !crashed && !stamped.has(name);
-      sprite.visible = show && sprite.position.distanceToSquared(plane.position) < 3200 * 3200;
+    // Tags for the five nearest unstamped places within reach, so the sky never fills with labels.
+    if (++labelTick % 15 === 0 || labelsDirty) {
+      labelsDirty = false;
+      const near = labels
+        .filter(({ name, sprite }) => mode === "play" && !crashed && !stamped.has(name) && sprite.position.distanceToSquared(plane.position) < 1800 * 1800)
+        .sort((a, b) => a.sprite.position.distanceToSquared(plane.position) - b.sprite.position.distanceToSquared(plane.position))
+        .slice(0, 5);
+      for (const l of labels) l.sprite.visible = near.includes(l);
     }
     updateHud();
     updatePointer();
-    renderer.shadowMap.needsUpdate = renderer.shadowMap.enabled && (shadowTick++ & 1) === 0;
+    renderer.shadowMap.needsUpdate = renderer.shadowMap.enabled;
     if (built) built.render(scene, camera);
     else renderer.render(scene, camera);
     frame = requestAnimationFrame(loop);
@@ -988,6 +1024,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const theme = () => {
     night = document.documentElement.dataset.theme === "dark";
     built?.setNight(night);
+    applyQuality();
     if (built) {
       scene.environment = built.environment;
       scene.environmentIntensity = built.environmentIntensity;

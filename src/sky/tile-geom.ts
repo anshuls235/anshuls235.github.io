@@ -29,6 +29,9 @@ export interface BuildingBuffers {
   color: Float32Array;
   /** Style (0 glass tower, 1 residential, 2 office, 3 mid-rise), height, seed. */
   info: Float32Array;
+  /** Walls: where the wall starts along the facade, its length, and whether its
+   *  start and end corners turn inward (1) or outward (0). Roofs: zeros. */
+  edge: Float32Array;
 }
 
 export interface BuiltTileData {
@@ -49,6 +52,8 @@ export interface BuiltTileData {
   water?: Float32Array;
   /** Packed [x, z, scale, yaw, colorIdx] * N */
   trees?: Float32Array;
+  /** Street lamps along the roads, packed [x, z, kind] * N, lit at night. */
+  lights?: Float32Array;
 }
 
 // City palettes in sRGB, turned linear for the GPU. Glass towers take their wall
@@ -275,7 +280,8 @@ class BuildingSink {
   uv: number[] = [];
   col: number[] = [];
   info: number[] = [];
-  wall(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, u0: number, c: [number, number, number], style: number, h: number, seed: number) {
+  edge: number[] = [];
+  wall(x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, u0: number, c: [number, number, number], style: number, h: number, seed: number, inStart = 0, inEnd = 0) {
     const len = Math.hypot(x1 - x0, z1 - z0);
     const nx = (z1 - z0) / len;
     const nz = -(x1 - x0) / len;
@@ -286,6 +292,7 @@ class BuildingSink {
       this.nrm.push(nx, 0, nz);
       this.col.push(c[0], c[1], c[2]);
       this.info.push(style, h, seed);
+      this.edge.push(u0, len, inStart, inEnd);
     }
     return len;
   }
@@ -300,18 +307,31 @@ class BuildingSink {
         this.nrm.push(0, 1, 0);
         this.col.push(c[0], c[1], c[2]);
         this.info.push(style, h, seed);
+        this.edge.push(0, 0, 0, 0);
       }
     }
   }
   prism(ring: Float32Array, y0: number, y1: number, wall: [number, number, number], roof: [number, number, number], style: number, h: number, seed: number) {
     const n = ring.length >> 1;
+    let area = 0;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      area += ring[i * 2] * ring[j * 2 + 1] - ring[j * 2] * ring[i * 2 + 1];
+    }
+    // A corner turns inward when it bends against the ring's own winding.
+    const inward = (i: number) => {
+      const a = (i + n - 1) % n;
+      const b = (i + 1) % n;
+      const cross = (ring[i * 2] - ring[a * 2]) * (ring[b * 2 + 1] - ring[i * 2 + 1]) - (ring[i * 2 + 1] - ring[a * 2 + 1]) * (ring[b * 2] - ring[i * 2]);
+      return cross * area < 0 ? 1 : 0;
+    };
     let along = 0;
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
       const x0 = ring[i * 2], z0 = ring[i * 2 + 1];
       const x1 = ring[j * 2], z1 = ring[j * 2 + 1];
       if (Math.hypot(x1 - x0, z1 - z0) < 0.05) continue;
-      along += this.wall(x0, z0, x1, z1, y0, y1, along, wall, style, h, seed);
+      along += this.wall(x0, z0, x1, z1, y0, y1, along, wall, style, h, seed, inward(i), inward(j));
     }
     this.roof(ring, y1, roof, style, h, seed);
   }
@@ -323,6 +343,7 @@ class BuildingSink {
       uv: new Float32Array(this.uv),
       color: new Float32Array(this.col),
       info: new Float32Array(this.info),
+      edge: new Float32Array(this.edge),
     };
   }
 }
@@ -489,11 +510,27 @@ function paintTileGroundBitmaps(
   g.setLineDash([]);
 
   // Baked directional drop-shadow + contact AO under every building (replaces GPU-heavy shadow maps!)
+  // A soft contact shadow around every base grounds the buildings.
+  // One path for all footprints, blurred once (blurring each would take seconds).
+  if (lod < 2 && tile.buildings.length) {
+    g.beginPath();
+    for (const b of tile.buildings) {
+      const r = b.ring;
+      if (r.length < 6) continue;
+      g.moveTo(r[0], r[1]);
+      for (let i = 2; i < r.length; i += 2) g.lineTo(r[i], r[i + 1]);
+      g.closePath();
+    }
+    g.filter = `blur(${Math.max(1, Math.round(3 * scale))}px)`;
+    g.fillStyle = "rgba(16, 14, 12, 0.45)";
+    g.fill();
+    g.filter = "none";
+  }
   // Footprints in roof colours: under extruded buildings they are hidden; where a
   // far tile leaves small buildings flat, they still read as rooftops from the air.
   for (const b of tile.buildings) {
     const c = ROOFS[cityId][b.tint & 7];
-    fillRing(b.ring, "rgba(20, 18, 16, 0.22)", 1.2, 1.2);
+    fillRing(b.ring, "rgba(20, 18, 16, 0.3)", 0, 0);
     fillRing(b.ring, `rgb(${(c >> 16) & 255}, ${(c >> 8) & 255}, ${c & 255})`, 0, 0);
   }
 
@@ -544,7 +581,7 @@ function paintTileGroundBitmaps(
   }
 
   // Night street-lights emissive texture (warm golden highways + soft amber residential glow)
-  const nSize = 256;
+  const nSize = lod === 0 ? 512 : 256;
   const nCanvas = new OffscreenCanvas(nSize, nSize);
   const ng = nCanvas.getContext("2d")!;
   ng.fillStyle = "#000000";
@@ -615,6 +652,35 @@ export function buildTileGeometry(
       pushRibbon(rail.points, rail.width * 0.5, 8.5, 0.72, 0.74, 0.77, railPos, railCol);
     }
     if (railPos.length) out.rails = { pos: new Float32Array(railPos), color: new Float32Array(railCol) };
+  }
+
+  // ---------- Street lamps: both kerbs of main roads, one side of side streets ----------
+  if (lod < 2) {
+    const lamps: number[] = [];
+    for (const road of tile.roads) {
+      if (lod === 1 && road.kind === 0) continue;
+      const pts = road.points;
+      const spacing = road.kind === 2 ? 30 : road.kind === 1 ? 36 : 46;
+      let carry = spacing * 0.5;
+      for (let i = 0; i + 3 < pts.length; i += 2) {
+        const dx = pts[i + 2] - pts[i];
+        const dz = pts[i + 3] - pts[i + 1];
+        const len = Math.hypot(dx, dz);
+        if (len < 0.5) continue;
+        const nx = -dz / len;
+        const nz = dx / len;
+        const off = road.width * 0.5 + 1.2;
+        for (let t = carry; t < len; t += spacing) {
+          const x = pts[i] + (dx * t) / len;
+          const z = pts[i + 1] + (dz * t) / len;
+          lamps.push(x + nx * off, z + nz * off, road.kind);
+          if (road.kind > 0) lamps.push(x - nx * off, z - nz * off, road.kind);
+        }
+        carry = (carry - len) % spacing;
+        if (carry < 0) carry += spacing;
+      }
+    }
+    if (lamps.length) out.lights = new Float32Array(lamps);
   }
 
   // ---------- Buildings: one buffer for every LOD, drawn by one facade shader ----------

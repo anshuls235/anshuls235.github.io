@@ -9,6 +9,12 @@ import * as THREE from "three";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
 import { ATMOS_GLSL, captureSky, createAtmosphere, createBuildingMaterial, createWaterMaterial, withAtmosphere, type Atmosphere } from "./look";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
 import { thermalCore } from "./glider";
 import { launchPoint } from "./pilot";
 import type { City, CityId, CityLandmark } from "./citydata";
@@ -43,48 +49,61 @@ function seeded(seed: number) {
   return () => ((s = (s * 16807) % 2147483647) / 2147483647);
 }
 
-function createNightSky(azimuth: number) {
-  const glow = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90), THREE.MathUtils.degToRad(azimuth));
+/**
+ * The night: deep blue overhead, the city's own orange glow low on every side,
+ * a moon with a soft halo, and stars that thin out toward the hazy horizon.
+ */
+function createNightSky(moonDir: THREE.Vector3) {
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    uniforms: { glow: { value: glow } },
+    uniforms: { moon: { value: moonDir.clone().normalize() } },
     vertexShader: "varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-    fragmentShader: `uniform vec3 glow; varying vec3 vDir;
+    fragmentShader: `uniform vec3 moon; varying vec3 vDir;
       void main(){
-        float h = max(vDir.y, -0.05);
-        vec3 zenith = vec3(0.02, 0.035, 0.11);
-        vec3 mid = vec3(0.075, 0.11, 0.28);
-        vec3 horizon = vec3(0.24, 0.22, 0.42);
-        vec3 c = mix(horizon, mid, smoothstep(0.0, 0.18, h));
-        c = mix(c, zenith, smoothstep(0.15, 0.7, h));
-        float toward = max(0.0, dot(normalize(vec3(vDir.x, 0.0, vDir.z)), glow));
-        float band = exp(-max(h, 0.0) * 8.5);
-        c += vec3(0.90, 0.42, 0.22) * pow(toward, 3.0) * band * 0.88 + vec3(0.48, 0.28, 0.34) * band * 0.22;
-        if (vDir.y < 0.0) c = mix(c, vec3(0.04, 0.05, 0.10), smoothstep(0.0, 0.05, -vDir.y));
+        float h = max(vDir.y, 0.0);
+        vec3 zenith = vec3(0.004, 0.008, 0.03);
+        vec3 mid = vec3(0.016, 0.03, 0.085);
+        vec3 horizon = vec3(0.09, 0.075, 0.1);
+        vec3 c = mix(horizon, mid, smoothstep(0.0, 0.22, h));
+        c = mix(c, zenith, smoothstep(0.2, 0.85, h));
+        // Light pollution: the city glows orange just above the horizon.
+        c += vec3(0.32, 0.14, 0.05) * exp(-h * 14.0) * 0.55;
+        float m = max(dot(vDir, moon), 0.0);
+        c += vec3(0.75, 0.8, 0.95) * pow(m, 900.0) * 6.0;   // the disc
+        c += vec3(0.25, 0.3, 0.45) * pow(m, 18.0) * 0.18;   // the halo
+        if (vDir.y < 0.0) c = mix(c, vec3(0.05, 0.04, 0.05), smoothstep(0.0, 0.08, -vDir.y));
         gl_FragColor = vec4(c, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }`,
   });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(14000, 40, 20), material);
   const stars = new THREE.BufferGeometry();
   const pts: number[] = [];
+  const sizes: number[] = [];
   const rand = seeded(3);
-  for (let i = 0; i < 1200; i++) {
-    const y = 0.12 + rand() * 0.88;
+  for (let i = 0; i < 1800; i++) {
+    const y = 0.08 + rand() * 0.92;
     const a = rand() * Math.PI * 2;
     const r = Math.sqrt(1 - y * y);
     pts.push(Math.cos(a) * r * 13000, y * 13000, Math.sin(a) * r * 13000);
+    sizes.push(rand() < 0.08 ? 2.6 : 1.2 + rand() * 0.8);
   }
   stars.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-  const starField = new THREE.Points(
-    stars,
-    new THREE.PointsMaterial({ color: 0xdfe6ff, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0.88, fog: false }),
-  );
+  stars.setAttribute("size", new THREE.Float32BufferAttribute(sizes, 1));
+  const starMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    vertexShader: `attribute float size; varying float vH; void main(){ vH = normalize(position).y; gl_PointSize = size; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying float vH; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.1, d) * smoothstep(0.05, 0.35, vH); gl_FragColor = vec4(vec3(0.85, 0.9, 1.0), a); }`,
+  });
+  const starField = new THREE.Points(stars, starMat);
   const group = new THREE.Group();
   group.add(dome, starField);
   return {
     group,
-    dispose: () => [dome.geometry, material, stars, starField.material as THREE.Material].forEach((d) => d.dispose()),
+    dispose: () => [dome.geometry, material, stars, starMat].forEach((d) => d.dispose()),
   };
 }
 
@@ -289,16 +308,32 @@ function buildLandmarks(landmarks: CityLandmark[], atmo: Atmosphere) {
       // India Gate (44 m) + Ceremonial Chhatri Canopy in warm Bharatpur ochre-red sandstone!
       const w = r * 1.45;
       const d = r * 0.58;
-      const legW = w * 0.31;
       const archH = h * 0.62;
       // Plinth
-      add(new THREE.BoxGeometry(w * 1.3, 2.5, d * 1.5).translate(0, 1.25, 0), 0xc67c4e);
-      // Left & right piers (oriented N-S so the E-W Kartavya Path passes right through the arch!)
-      add(new THREE.BoxGeometry(d, archH, legW).translate(0, archH / 2, -w * 0.34), 0xd99660);
-      add(new THREE.BoxGeometry(d, archH, legW).translate(0, archH / 2, w * 0.34), 0xd99660);
-      // Upper entablature & stepped Lutyens attic
-      add(new THREE.BoxGeometry(d * 1.08, h * 0.24, w * 1.04).translate(0, archH + h * 0.12, 0), 0xde9e68);
-      add(new THREE.BoxGeometry(d * 0.88, h * 0.14, w * 0.82).translate(0, h * 0.93, 0), 0xc98452);
+      add(new THREE.BoxGeometry(d * 1.6, 2.5, w * 1.3).translate(0, 1.25, 0), 0xc67c4e);
+      // The arch itself: one extruded face with a round-headed opening, so it reads
+      // as a gate from any side (the path runs east-west, through it).
+      const archW = w * 0.36;
+      const shape = new THREE.Shape();
+      shape.moveTo(-w / 2, 0);
+      shape.lineTo(w / 2, 0);
+      shape.lineTo(w / 2, h * 0.78);
+      shape.lineTo(-w / 2, h * 0.78);
+      shape.closePath();
+      const hole = new THREE.Path();
+      hole.moveTo(-archW / 2, 0);
+      hole.lineTo(archW / 2, 0);
+      hole.lineTo(archW / 2, archH - archW / 2);
+      hole.absarc(0, archH - archW / 2, archW / 2, 0, Math.PI, false);
+      hole.lineTo(-archW / 2, 0);
+      shape.holes.push(hole);
+      const arch = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false, curveSegments: 14 });
+      arch.translate(0, 2.5, -d / 2).rotateY(Math.PI / 2);
+      add(arch, 0xd99660);
+      // Cornice and the stepped attic above.
+      add(new THREE.BoxGeometry(d * 1.12, h * 0.05, w * 1.05).translate(0, 2.5 + h * 0.8, 0), 0xc98452);
+      add(new THREE.BoxGeometry(d * 0.86, h * 0.12, w * 0.78).translate(0, 2.5 + h * 0.88, 0), 0xde9e68);
+      add(new THREE.BoxGeometry(d * 0.6, h * 0.06, w * 0.5).translate(0, 2.5 + h * 0.97, 0), 0xc98452);
       // Sandstone Canopy 150 m east on the axis
       add(new THREE.CylinderGeometry(9, 11, 3, 12).translate(145, 1.5, 0), 0xc67c4e);
       for (const a of [0.8, 2.35, 3.92, 5.5]) {
@@ -395,7 +430,7 @@ function buildLandmarks(landmarks: CityLandmark[], atmo: Atmosphere) {
               if (uNight > 0.01) {
                 float band = smoothstep(0.50, 0.92, sin(vLmPos.y * 0.45));
                 vec3 accent = ${glassy ? "vec3(0.80, 0.90, 1.0)" : "vec3(1.0, 0.78, 0.45)"};
-                totalEmissiveRadiance += accent * (0.34 + band * 0.52) * uNight;
+                totalEmissiveRadiance += accent * (0.12 + band * 0.3) * uNight;
               }`,
             );
         },
@@ -713,7 +748,9 @@ function createClouds(city: City, atmo: Atmosphere, atlas: THREE.Texture) {
         float toward = pow(max(dot(rd, uSunDir), 0.0), 4.0);
         float light = t.r;
         vec3 lit = mix(uShade, uLight * (1.3 + toward * 1.8), smoothstep(0.0, 0.85, light));
-        lit *= mix(1.0, 0.12, uNight);
+        // At night: moonlit tops, and bases lit orange by the city below.
+        vec3 nightLit = mix(vec3(0.16, 0.08, 0.035), vec3(0.06, 0.07, 0.11), smoothstep(0.0, 0.85, light));
+        lit = mix(lit, nightLit, uNight);
         vec3 col = applyAtmos(lit * 1.6, vWP);
         gl_FragColor = vec4(col, a * 0.92);
         #include <tonemapping_fragment>
@@ -822,10 +859,11 @@ export async function buildWorld(
   const opening = launchPoint(city).heading;
   const fx = Math.sin(opening);
   const fz = -Math.cos(opening);
-  const turn = 0.75;
+  // Mostly from the side: one face lit, the next in shade, so every building reads as a solid.
+  const turn = 1.25;
   const azimuth = THREE.MathUtils.radToDeg(Math.atan2(fx * Math.cos(turn) - fz * Math.sin(turn), fx * Math.sin(turn) + fz * Math.cos(turn)));
   const daySunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), THREE.MathUtils.degToRad(azimuth));
-  const moonDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(50), THREE.MathUtils.degToRad(azimuth + 150));
+  const moonDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(62), THREE.MathUtils.degToRad(azimuth + 160));
   const sunDirection = (night ? moonDir : daySunDir).clone();
   atmo.uSunDir.value.copy(daySunDir);
 
@@ -847,7 +885,7 @@ export async function buildWorld(
   group.add(daySky);
   keep(daySky.geometry);
   keep(daySky.material);
-  const dusk = keep(createNightSky(azimuth));
+  const dusk = keep(createNightSky(moonDir));
   dusk.group.children.forEach((c) => (c.renderOrder = 5));
   dusk.group.visible = night;
   group.add(dusk.group);
@@ -858,7 +896,7 @@ export async function buildWorld(
   const ground = new THREE.Color();
   const capture = (isNight: boolean) => {
     const scene = new THREE.Scene();
-    const sky = isNight ? createNightSky(azimuth) : null;
+    const sky = isNight ? createNightSky(moonDir) : null;
     const skyMesh = isNight ? null : makeSky(10000);
     if (sky) scene.add(sky.group);
     if (skyMesh) scene.add(skyMesh);
@@ -904,11 +942,22 @@ export async function buildWorld(
   const sharedTilePlane = keep(new THREE.PlaneGeometry(tileSize + 1.5, tileSize + 1.5));
   sharedTilePlane.rotateX(-Math.PI / 2);
 
+  // The ground is three layers within half a metre of each other: sea, the whole
+  // city's base, then each tile's painted map. Depth cannot tell them apart far
+  // away (that is the flicker), so they are painted in order instead, each over
+  // the last, before anything else is drawn.
+  waterMat.depthWrite = false;
   const seaPlane = new THREE.Mesh(keep(new THREE.PlaneGeometry(60000, 60000)), waterMat);
   seaPlane.rotation.x = -Math.PI / 2;
+  seaPlane.renderOrder = -3;
   group.add(seaPlane);
 
   const baseGround = keep(createBaseGround(city, night, atmo));
+  baseGround.group.traverse((o) => {
+    o.renderOrder = -2;
+    const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+    if (m) m.depthFunc = THREE.AlwaysDepth;
+  });
   group.add(baseGround.group);
   const treeProto = keep(createTreePrototypes(id, atmo));
   treeProto.setNight(night);
@@ -925,6 +974,42 @@ export async function buildWorld(
   const clouds = keep(createClouds(city, atmo, await cloudTexture(base)));
   group.add(clouds.mesh);
 
+  // Street lamps: glowing points, sized in metres so they shrink with distance,
+  // never below a steady 1.5 px (smaller points shimmer as they cross pixels).
+  const lampUniforms = { uScale: { value: 600 } };
+  const lampMat = keep(
+    new THREE.ShaderMaterial({
+      uniforms: lampUniforms,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: /* glsl */ `
+        uniform float uScale;
+        attribute float kind;
+        varying float vFade;
+        varying vec3 vColor;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          float d = -mv.z;
+          float px = uScale * (kind > 1.5 ? 2.4 : 1.8) / max(d, 1.0);
+          vFade = smoothstep(4500.0, 900.0, d) * clamp(px / 1.5, 0.35, 1.0);
+          gl_PointSize = clamp(px, 1.5, 16.0);
+          vColor = kind > 1.5 ? vec3(1.0, 0.78, 0.5) : vec3(1.0, 0.6, 0.26);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: /* glsl */ `
+        varying float vFade;
+        varying vec3 vColor;
+        void main() {
+          float r = length(gl_PointCoord - 0.5) * 2.0;
+          float a = exp(-r * r * 4.0) * vFade;
+          gl_FragColor = vec4(vColor * a * 2.2, a);
+        }`,
+    }),
+  );
+  lampMat.visible = night;
+
+  let post: { composer: EffectComposer; pass: RenderPass; bloom: UnrealBloomPass; fxaa: ShaderPass } | null = null;
   const activeTiles = new Map<string, ActiveTile>();
   const environment = { current: (night ? nightEnv : dayEnv).env };
 
@@ -940,7 +1025,7 @@ export async function buildWorld(
     environment.current = set.env;
     atmo.uSunGlow.value.set(isNight ? 0x000000 : 0xffc890);
     atmo.uFogDensity.value = look.fog * (isNight ? 1.4 : 1);
-    atmo.uFill.value = isNight ? 0.55 : 0.5;
+    atmo.uFill.value = isNight ? 0.55 : 0.34;
     sun.color.setHex(isNight ? 0x8ea4ff : 0xffc68a);
     sun.intensity = isNight ? 0.35 : 6.5;
     sunHdr.setHex(isNight ? 0x8ea4ff : 0xffc68a).multiplyScalar(isNight ? 0.2 : 6.5);
@@ -950,12 +1035,13 @@ export async function buildWorld(
     (waterMat.uniforms.uDeep.value as THREE.Color).setHex(isNight ? look.waterNight : look.water);
     for (const t of activeTiles.values()) {
       if (t.groundMat) {
-        t.groundMat.color.setHex(isNight ? 0x3a3e4c : 0xffffff);
-        t.groundMat.emissiveIntensity = isNight ? 2.4 : 0;
+        t.groundMat.color.setHex(isNight ? 0x22252f : 0xffffff);
+        t.groundMat.emissiveIntensity = isNight ? 1.8 : 0;
       }
     }
     baseGround.setNight(isNight);
     treeProto.setNight(isNight);
+    lampMat.visible = isNight;
     renderer.toneMappingExposure = isNight ? 0.85 : 0.5;
   }
   applyTheme(night);
@@ -1023,6 +1109,7 @@ export async function buildWorld(
   const tmpScale = new THREE.Vector3();
   const tmpAxis = new THREE.Vector3(0, 1, 0);
   const tmpColor = new THREE.Color();
+  const tmpSize = new THREE.Vector2();
   const groundKey = "ground-tile";
   const groundDetail = (shader: THREE.WebGLProgramParametersWithUniforms) => {
     // Fine grain in world space, so the ground holds up when the plane skims low.
@@ -1064,13 +1151,11 @@ export async function buildWorld(
             alphaTest: 0.5,
             roughness: 0.95,
             metalness: 0,
-            color: night ? 0x3a3e4c : 0xffffff,
+            color: night ? 0x22252f : 0xffffff,
             emissive: 0xffffff,
             emissiveMap: nTex,
-            emissiveIntensity: night ? 2.4 : 0,
-            polygonOffset: true,
-            polygonOffsetFactor: -1,
-            polygonOffsetUnits: -1,
+            emissiveIntensity: night ? 1.8 : 0,
+            depthFunc: THREE.AlwaysDepth,
           }),
           atmo,
           groundKey,
@@ -1080,6 +1165,7 @@ export async function buildWorld(
       const quad = new THREE.Mesh(sharedTilePlane, groundMat);
       quad.position.set((data.tx + 0.5) * tileSize, 0.45, (data.tz + 0.5) * tileSize);
       quad.receiveShadow = true;
+      quad.renderOrder = -1;
       g.add(quad);
     }
 
@@ -1091,6 +1177,7 @@ export async function buildWorld(
       geo.setAttribute("uv", new THREE.BufferAttribute(b.uv, 2));
       geo.setAttribute("color", new THREE.BufferAttribute(b.color, 3));
       geo.setAttribute("info", new THREE.BufferAttribute(b.info, 3));
+      geo.setAttribute("edge", new THREE.BufferAttribute(b.edge, 4));
       const mesh = new THREE.Mesh(geo, buildingMat);
       mesh.castShadow = data.lod === 0;
       mesh.receiveShadow = data.lod < 2;
@@ -1131,6 +1218,23 @@ export async function buildWorld(
       crowns.castShadow = true;
       g.add(crowns, trunks);
     }
+    if (data.lights && data.lights.length >= 3) {
+      const n = data.lights.length / 3;
+      const pos = new Float32Array(n * 3);
+      const kind = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        pos[i * 3] = data.lights[i * 3];
+        pos[i * 3 + 1] = 9;
+        pos[i * 3 + 2] = data.lights[i * 3 + 1];
+        kind[i] = data.lights[i * 3 + 2];
+      }
+      const geo = track(new THREE.BufferGeometry());
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute("kind", new THREE.BufferAttribute(kind, 1));
+      const lamps = new THREE.Points(geo, lampMat);
+      lamps.renderOrder = 3;
+      g.add(lamps);
+    }
     return { key: `${data.tx},${data.tz}`, tx: data.tx, tz: data.tz, lod: data.lod, group: g, disposables: tileDisposables, groundMat };
   }
 
@@ -1159,9 +1263,19 @@ export async function buildWorld(
       return;
     }
     if (resp.collision && !city.hasTile(tx, tz)) city.addTile(resp.collision);
+    // Uploading a tile (a 1k ground map, a few hundred thousand vertices) takes a
+    // few milliseconds; tiles queue up and go in one per frame, so flight never stalls.
+    if (direct) install(resp.data);
+    else ready.push(resp.data);
+  }
+
+  const ready: BuiltTileData[] = [];
+  let direct = false;
+  function install(data: BuiltTileData) {
+    const key = `${data.tx},${data.tz}`;
     const prev = activeTiles.get(key);
     if (prev) disposeTile(prev);
-    const next = assembleTileGroup(resp.data);
+    const next = assembleTileGroup(data);
     activeTiles.set(key, next);
     tileGroup.add(next.group);
   }
@@ -1185,7 +1299,13 @@ export async function buildWorld(
         const tx = cx + dx;
         const tz = cz + dz;
         if (!city.tileSet.has(`${tx},${tz}`)) continue;
-        const lod: TileLod = quality === 0 ? (dist < 0.1 ? 1 : 2) : dist < 0.55 ? 0 : dist < 1.6 ? 1 : 2;
+        let lod: TileLod = quality === 0 ? (dist < 0.1 ? 1 : 2) : dist < 0.55 ? 0 : dist < 1.6 ? 1 : 2;
+        // Hysteresis: a tile near a boundary keeps its detail, so it does not pop back and forth.
+        const cur = activeTiles.get(`${tx},${tz}`)?.lod;
+        if (quality > 0 && cur !== undefined && cur !== lod) {
+          const edge = Math.min(Math.abs(dist - 0.55), Math.abs(dist - 1.6));
+          if (edge < 0.25) lod = cur;
+        }
         wanted.push({ tx, tz, dist, lod });
       }
     }
@@ -1225,7 +1345,9 @@ export async function buildWorld(
     lastStreamX = x;
     lastStreamZ = z;
     // Everything in view is solid on the first frame: the whole ring loads before play.
+    direct = true;
     await Promise.all(desiredTiles(x, z).map((w) => loadTileAtLod(w.tx, w.tz, w.lod)));
+    direct = false;
   }
 
   return {
@@ -1251,6 +1373,8 @@ export async function buildWorld(
     updateStream,
     update(time: number) {
       atmo.uTime.value = time;
+      const next = ready.shift();
+      if (next && !disposed) install(next);
       const pulse = 0.45 + 0.55 * Math.sin(time * 3.4);
       for (const b of landmarks.beacons) {
         b.visible = night;
@@ -1261,17 +1385,62 @@ export async function buildWorld(
       }
     },
     render(scene, camera) {
+      const cam = camera as THREE.PerspectiveCamera;
+      if (night && quality >= 2) {
+        // Night on a capable GPU: lit windows, lamps and landmarks bloom.
+        if (!post) {
+          const size = renderer.getSize(tmpSize);
+          // No multisampling here (it halves the frame rate on integrated GPUs);
+          // a cheap FXAA pass after tone mapping smooths the edges instead.
+          const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType });
+          const composer = new EffectComposer(renderer, target);
+          composer.setPixelRatio(renderer.getPixelRatio());
+          composer.setSize(size.x, size.y);
+          const pass = new RenderPass(scene, camera);
+          const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.75, 0.55, 0.55);
+          const fxaa = new ShaderPass(FXAAShader);
+          composer.addPass(pass);
+          composer.addPass(bloom);
+          composer.addPass(new OutputPass());
+          composer.addPass(fxaa);
+          const px = renderer.getPixelRatio();
+          fxaa.material.uniforms.resolution.value.set(1 / (size.x * px), 1 / (size.y * px));
+          post = { composer, pass, bloom, fxaa };
+        }
+        post.pass.scene = scene;
+        post.pass.camera = camera;
+        lampUniforms.uScale.value = renderer.getDrawingBufferSize(tmpSize).y / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
+        daySky.position.copy(camera.position);
+        dusk.group.position.copy(camera.position);
+        post.composer.render();
+        return;
+      }
+      lampUniforms.uScale.value = renderer.getDrawingBufferSize(tmpSize).y / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
       daySky.position.copy(camera.position);
       dusk.group.position.copy(camera.position);
       renderer.render(scene, camera);
     },
-    setSize() {
-      /* direct rendering */
+    setSize(width: number, height: number) {
+      if (!post) return;
+      const px = renderer.getPixelRatio();
+      post.composer.setPixelRatio(px);
+      post.composer.setSize(width, height);
+      post.fxaa.material.uniforms.resolution.value.set(1 / (width * px), 1 / (height * px));
     },
     dispose() {
       disposed = true;
+      for (const d of ready.splice(0)) {
+        d.groundBitmap?.close();
+        d.nightBitmap?.close();
+      }
       for (const tile of activeTiles.values()) disposeTile(tile);
       activeTiles.clear();
+      if (post) {
+        post.composer.renderTarget1.dispose();
+        post.composer.renderTarget2.dispose();
+        post.bloom.dispose();
+        post.composer.dispose();
+      }
       disposables.forEach((d) => d.dispose());
     },
   };

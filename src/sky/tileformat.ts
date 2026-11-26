@@ -57,6 +57,8 @@ export interface CityIndex {
   /** Flat array of [x, z, w, d, h, ...] for tall towers (> 45 m) used by ridge lift */
   obstacles: number[];
   landmarks: CityLandmark[];
+  /** Named places to stamp: heritage, sights, worship, stadiums, parks, towers. */
+  postcards?: { name: string; x: number; z: number; radius: number; height: number; kind: string }[];
   sea?: {
     cell: number;
     cols: number;

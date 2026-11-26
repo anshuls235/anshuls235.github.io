@@ -87,23 +87,146 @@ export function withAtmosphere<T extends THREE.Material>(material: T, atmo: Atmo
   return material;
 }
 
+/** Bay width and floor height (metres) per facade style. */
+const BAYS: [number, number][] = [
+  [1.6, 3.9], // glass curtain wall
+  [3.4, 3.1], // residential tower
+  [2.6, 3.8], // office ribbon windows
+  [3.0, 3.3], // mid-rise
+];
+const CELLS = 8; // each texture layer holds 8 bays × 8 floors
+const TEX = 512;
+
+let facadeArray: THREE.DataArrayTexture | null = null;
 /**
- * Plain extruded buildings, dressed in the shader: window grids by style (glass
- * curtain wall, punched residential, office ribbon, small mid-rise windows),
- * glass that reflects the sky, a dark plinth and contact shading at the base,
- * textured roofs, and windows that light up at night.
+ * The facades as a mipmapped texture array, one layer per style, painted once.
+ * R: glass, G: detail shading (mullions, slabs, pane tint), B and A: two
+ * night-time lighting patterns (sparse and busy). Being a real texture, the GPU
+ * filters it: windows settle into a steady average with distance instead of
+ * shimmering, by day and by night.
+ */
+export function facadeTextures() {
+  if (facadeArray) return facadeArray;
+  const layers = BAYS.length;
+  const data = new Uint8Array(TEX * TEX * 4 * layers);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = TEX;
+  const g = canvas.getContext("2d", { willReadFrequently: true })!;
+  let s = 11;
+  const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const cell = TEX / CELLS;
+  for (let layer = 0; layer < layers; layer++) {
+    // Paint each channel as greyscale in turn, then pack.
+    const paint = (draw: () => void) => {
+      g.fillStyle = "#000";
+      g.fillRect(0, 0, TEX, TEX);
+      g.fillStyle = "#fff";
+      draw();
+      return g.getImageData(0, 0, TEX, TEX).data;
+    };
+    // Window rectangle within a cell: x0, x1, y0, y1 (fractions; y from the floor up).
+    const win = [
+      [0.05, 0.95, 0.16, 0.98],
+      [0.17, 0.83, 0.3, 0.86],
+      [0.02, 0.98, 0.36, 0.94],
+      [0.27, 0.73, 0.3, 0.8],
+    ][layer];
+    // Canvas rows become texture rows bottom-up (no flip), so y here runs up a floor.
+    const rectOf = (cx: number, cy: number): [number, number, number, number] => [
+      cx * cell + win[0] * cell,
+      cy * cell + win[2] * cell,
+      (win[1] - win[0]) * cell,
+      (win[3] - win[2]) * cell,
+    ];
+    const glass = paint(() => {
+      for (let cy = 0; cy < CELLS; cy++) for (let cx = 0; cx < CELLS; cx++) g.fillRect(...rectOf(cx, cy));
+    });
+    const detail = paint(() => {
+      g.fillStyle = "#d8d8d8";
+      g.fillRect(0, 0, TEX, TEX);
+      for (let cy = 0; cy < CELLS; cy++) {
+        // A floor slab line at the bottom of every floor.
+        g.fillStyle = "#8a8a8a";
+        g.fillRect(0, cy * cell, TEX, 3);
+        for (let cx = 0; cx < CELLS; cx++) {
+          const v = 150 + Math.floor(rand() * 90);
+          g.fillStyle = `rgb(${v},${v},${v})`;
+          const [x, y, w, h] = rectOf(cx, cy);
+          g.fillRect(x, y, w, h);
+          if (layer === 0 || layer === 2) {
+            // Mullions inside the glass.
+            g.fillStyle = "#6a6a6a";
+            for (const f of layer === 2 ? [0.33, 0.66] : [0.5]) g.fillRect(x + w * f - 1, y, 2, h);
+          }
+          if (layer === 1 && cx % 2 === 0) {
+            // Balcony fronts on alternate bays.
+            g.fillStyle = "#f2f2f2";
+            g.fillRect(cx * cell + cell * 0.1, cy * cell + cell * 0.26, cell * 0.8, cell * 0.06);
+          }
+        }
+      }
+    });
+    const lit = (busy: boolean) =>
+      paint(() => {
+        for (let cy = 0; cy < CELLS; cy++) {
+          if (layer === 0 || layer === 2) {
+            // Offices: a floor is lit or not, with the odd dark bay.
+            if (rand() > (busy ? 0.5 : 0.28)) continue;
+            for (let cx = 0; cx < CELLS; cx++) if (rand() > 0.08) g.fillRect(...rectOf(cx, cy));
+          } else {
+            // Homes: a window here, a pair there.
+            for (let cx = 0; cx < CELLS; cx++) {
+              if (rand() > (busy ? 0.32 : 0.16)) continue;
+              const v = 150 + Math.floor(rand() * 105);
+              g.fillStyle = `rgb(${v},${v},${v})`;
+              g.fillRect(...rectOf(cx, cy));
+              if (rand() < 0.4 && cx < CELLS - 1) g.fillRect(...rectOf(++cx, cy));
+            }
+            g.fillStyle = "#fff";
+          }
+        }
+      });
+    const sparse = lit(false);
+    const busy = lit(true);
+    const base = layer * TEX * TEX * 4;
+    for (let i = 0; i < TEX * TEX; i++) {
+      data[base + i * 4] = glass[i * 4];
+      data[base + i * 4 + 1] = detail[i * 4];
+      data[base + i * 4 + 2] = sparse[i * 4];
+      data[base + i * 4 + 3] = busy[i * 4];
+    }
+  }
+  facadeArray = new THREE.DataArrayTexture(data, TEX, TEX, layers);
+  facadeArray.wrapS = facadeArray.wrapT = THREE.RepeatWrapping;
+  facadeArray.magFilter = THREE.LinearFilter;
+  facadeArray.minFilter = THREE.LinearMipmapLinearFilter;
+  facadeArray.generateMipmaps = true;
+  facadeArray.anisotropy = 4;
+  facadeArray.needsUpdate = true;
+  return facadeArray;
+}
+
+/**
+ * Plain extruded buildings, dressed by the facade texture: glass that reflects
+ * the sky, a plinth and contact shading at the base, textured roofs, and the
+ * baked night patterns as lit windows. Every value comes from a filtered
+ * texture or a slow gradient, so nothing shimmers as the plane moves.
  */
 export function createBuildingMaterial(atmo: Atmosphere) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
-  return withAtmosphere(material, atmo, "buildings-v1", (shader) => {
+  const facades = facadeTextures();
+  return withAtmosphere(material, atmo, "buildings-v2", (shader) => {
     shader.uniforms.uNight = atmo.uNight;
+    shader.uniforms.uFacade = { value: facades };
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
         `#include <common>
         attribute vec3 info;
+        attribute vec4 edge;
         varying vec2 vFacade;
         varying vec3 vInfo;
+        varying vec4 vEdge;
         varying vec3 vWN;`,
       )
       .replace(
@@ -111,21 +234,24 @@ export function createBuildingMaterial(atmo: Atmosphere) {
         `#include <begin_vertex>
         vFacade = uv;
         vInfo = info;
+        vEdge = edge;
         vWN = normalize(mat3(modelMatrix) * objectNormal);`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
         `#include <common>
+        precision highp sampler2DArray;
+        uniform sampler2DArray uFacade;
         uniform float uNight;
         varying vec2 vFacade;
         varying vec3 vInfo;
+        varying vec4 vEdge;
         varying vec3 vWN;
         float bHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float gGlass = 0.0;
         float gReflect = 0.0;
-        float gLit = 0.0;
-        float gTone = 0.0;`,
+        vec3 gGlow = vec3(0.0);`,
       )
       .replace(
         "#include <color_fragment>",
@@ -136,85 +262,61 @@ export function createBuildingMaterial(atmo: Atmosphere) {
           vec3 base = diffuseColor.rgb;
           if (vWN.y < 0.5) {
             float y = vFacade.y;
-            // Bay width and floor height per style, with a little variety per building.
-            vec2 bay = style < 0.5 ? vec2(1.6, 3.9) : style < 1.5 ? vec2(3.4, 3.1) : style < 2.5 ? vec2(2.6, 3.8) : vec2(3.0, 3.3);
+            float layer = min(style, 3.0);
+            vec2 bay = style < 0.5 ? vec2(${BAYS[0][0]}, ${BAYS[0][1]}) : style < 1.5 ? vec2(${BAYS[1][0]}, ${BAYS[1][1]}) : style < 2.5 ? vec2(${BAYS[2][0]}, ${BAYS[2][1]}) : vec2(${BAYS[3][0]}, ${BAYS[3][1]});
             bay.x *= 0.85 + seed * 0.35;
-            vec2 g = vec2(vFacade.x, y) / bay;
-            vec2 f = fract(g);
-            vec2 cell = floor(g);
-            vec2 w = max(fwidth(g), vec2(0.0001));
-            vec4 win = style < 0.5 ? vec4(0.05, 0.95, 0.14, 0.98)
-              : style < 1.5 ? vec4(0.16, 0.84, 0.28, 0.86)
-              : style < 2.5 ? vec4(0.02, 0.98, 0.36, 0.94)
-              : vec4(0.27, 0.73, 0.30, 0.80);
-            float wx = smoothstep(win.x - w.x, win.x + w.x, f.x) - smoothstep(win.y - w.x, win.y + w.x, f.x);
-            float wy = smoothstep(win.z - w.y, win.z + w.y, f.y) - smoothstep(win.w - w.y, win.w + w.y, f.y);
-            float avg = (win.y - win.x) * (win.w - win.z);
-            // Far away the grid would shimmer; it settles into its average.
-            // Glass towers light a whole floor (offices); homes light a few windows at a time.
-            bool curtain = style < 0.5 || (style > 1.5 && style < 2.5);
-            // At night lit windows need more pixels to read as windows, not a mosaic;
-            // lit office floors are bands, so only the floor height has to resolve.
-            float farNight = curtain ? smoothstep(0.12, 0.35, w.y) : smoothstep(0.05, 0.16, max(w.x, w.y));
-            float far = mix(smoothstep(0.14, 0.42, max(w.x, w.y)), farNight, uNight);
-            float m = mix(wx * wy, avg, far);
-            // Plinth: a shopfront band on offices and towers, a solid base on homes.
+            // Each building starts somewhere else in the pattern.
+            vec2 uvT = (vec2(vFacade.x, y) / bay + floor(seed * vec2(37.0, 53.0))) / ${CELLS.toFixed(1)};
+            vec4 t = texture(uFacade, vec3(uvT, layer));
             float plinth = 1.0 - smoothstep(4.0, 4.4, y);
-            m = mix(m, style == 0.0 || style == 2.0 ? 0.7 : 0.15, plinth);
-            if (style > 3.5) m = 0.0;
-            gGlass = m;
-            gReflect = (style < 0.5 ? 1.0 : style < 1.5 ? 0.12 : style < 2.5 ? 0.8 : 0.08) * (1.0 - uNight * 0.75);
-            float pane = mix(bHash(vec2(floor(cell.x / 6.0), cell.y) + seed * 91.0), 0.5, far) * 0.4 + 0.3;
-            vec3 glass = style < 0.5 || style > 1.5 && style < 2.5
-              ? mix(vec3(0.10, 0.16, 0.20), base * 0.45, 0.35) * (0.85 + 0.3 * pane)
-              : vec3(0.05, 0.06, 0.07) * (0.8 + 0.4 * pane);
-            // Spandrel bands between floors read on curtain walls.
-            vec3 frame = base * (style < 0.5 ? 0.9 : 1.0);
-            diffuseColor.rgb = mix(frame, glass, m);
-            // Floor slabs read as fine lines, so a tower shows its scale.
-            float slabLine = 1.0 - (smoothstep(0.0, w.y * 1.5, f.y) - smoothstep(1.0 - w.y * 1.5, 1.0, f.y));
-            float slab = mix(slabLine, 0.1, far);
-            diffuseColor.rgb *= 1.0 - slab * (style < 0.5 ? 0.18 : 0.28) * (1.0 - plinth);
-            // Each building a touch lighter or darker than its neighbours.
-            diffuseColor.rgb *= 0.86 + seed * 0.28;
-            // Contact shading at the street and a lighter crown at the top.
+            float glassAmt = style > 3.5 ? 0.0 : mix(t.r, style == 0.0 || style == 2.0 ? 0.7 : 0.1, plinth);
+            gGlass = glassAmt;
+            gReflect = (style < 0.5 ? 1.0 : style < 1.5 ? 0.15 : style < 2.5 ? 0.8 : 0.1) * (1.0 - uNight * 0.8);
+            vec3 glass = style < 0.5 || (style > 1.5 && style < 2.5)
+              ? mix(vec3(0.10, 0.15, 0.19), base * 0.4, 0.35)
+              : vec3(0.05, 0.055, 0.06);
+            float detail = mix(t.g, 0.85, plinth) * 1.15;
+            diffuseColor.rgb = mix(base, glass, glassAmt) * detail;
+            diffuseColor.rgb *= 0.88 + seed * 0.24;
             diffuseColor.rgb *= mix(0.42, 1.0, smoothstep(0.0, 18.0, y));
-            diffuseColor.rgb *= 1.0 + 0.12 * smoothstep(vInfo.y - 3.0, vInfo.y, y);
-            // Night: some windows on, warm or cool, a few flickering bright.
-            // Windows light in runs along a floor (a flat, an office), not one by one.
-            vec2 run = vec2(floor(cell.x / (curtain ? 40.0 : 4.0)), cell.y);
-            float on = step(bHash(run * 1.7 + seed * 17.3), curtain ? 0.3 : 0.16 + seed * 0.2);
-            float tone = curtain ? 0.9 : bHash(run + 4.1);
-            gTone = tone;
-            gLit = mix(on * wx * wy, avg * (curtain ? 0.12 : 0.18), far) * step(4.4, y) * (style > 3.5 ? 0.0 : 1.0);
-            // At night the walls go dark so the windows carry the building.
-            diffuseColor.rgb *= 1.0 - uNight * 0.7;
-            gLit *= 0.6 + tone * 0.8;
+            // A parapet band at the roofline.
+            diffuseColor.rgb *= 1.0 + 0.22 * step(vInfo.y - 1.1, y);
+            // Corners: inside corners trap shade, outside corners catch a thin bright edge.
+            float s0 = vFacade.x - vEdge.x;
+            float s1 = vEdge.y - s0;
+            float inner = max(vEdge.z * (1.0 - smoothstep(0.0, 3.0, s0)), vEdge.w * (1.0 - smoothstep(0.0, 3.0, s1)));
+            float outer = max((1.0 - vEdge.z) * (1.0 - smoothstep(0.0, 0.35, s0)), (1.0 - vEdge.w) * (1.0 - smoothstep(0.0, 0.35, s1)));
+            diffuseColor.rgb *= (1.0 - inner * 0.35) * (1.0 + outer * 0.25);
+            // Night: dark walls, and one of the two baked lighting patterns.
+            diffuseColor.rgb *= 1.0 - uNight * 0.72;
+            float lit = mix(t.b, t.a, step(0.55, seed)) * (1.0 - plinth) * (style > 3.5 ? 0.0 : 1.0);
+            bool office = style < 0.5 || (style > 1.5 && style < 2.5);
+            vec3 warm = office ? vec3(1.0, 0.8, 0.52) : mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.72, 0.42), fract(seed * 7.0));
+            // Shops glow along the street.
+            float shops = plinth * (office ? 0.9 : 0.5) * step(0.3, fract(seed * 3.0));
+            gGlow = warm * (lit * (office ? 0.6 : 1.5) + shops * 1.1);
           } else {
-            // Roofs: concrete with plant, tanks and patches.
             vec2 r = vFacade * 0.35;
             float n = bHash(floor(r)) * 0.6 + bHash(floor(r * 3.1)) * 0.4;
-            diffuseColor.rgb = base * (0.82 + 0.26 * n);
+            // Roofs keep their large plant blocks, never pixel noise.
+            diffuseColor.rgb = base * (0.86 + 0.2 * n) * (1.0 - uNight * 0.75);
           }
         }`,
       )
       .replace(
         "#include <roughnessmap_fragment>",
         `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, mix(0.35, 0.05, gReflect), gGlass);`,
+        roughnessFactor = mix(roughnessFactor, mix(0.35, 0.06, gReflect), gGlass);`,
       )
       .replace(
         "#include <metalnessmap_fragment>",
         `#include <metalnessmap_fragment>
-        metalnessFactor = mix(0.0, 0.92 * gReflect, gGlass);`,
+        metalnessFactor = 0.92 * gReflect * gGlass;`,
       )
       .replace(
         "#include <emissivemap_fragment>",
         `#include <emissivemap_fragment>
-        if (uNight > 0.01) {
-          vec3 warm = mix(vec3(1.0, 0.52, 0.18), vec3(0.34, 0.31, 0.25), step(0.8, gTone));
-          totalEmissiveRadiance += warm * gLit * 1.7 * uNight;
-        }`,
+        totalEmissiveRadiance += gGlow * uNight;`,
       );
   });
 }

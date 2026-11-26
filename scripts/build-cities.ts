@@ -772,13 +772,64 @@ function build(spec: Spec, dir: string) {
     sea: sea ? { cell: sea.cell, cols: sea.cols, rows: sea.rows, rle: encodeRle(sea.mask) } : null,
   };
 
+  // Postcards: named places worth a detour — heritage, monuments, places of
+  // worship, museums, stadiums, big parks, named towers — spread across the map.
+  const picks: { name: string; x: number; z: number; radius: number; height: number; kind: string; score: number }[] = [];
+  for (const el of raw.elements) {
+    const t = el.tags ?? {};
+    const name = (t["name:en"] ?? t.name ?? "").trim();
+    if (!name || !/^[A-Z0-9][\x20-\x7E]+$/.test(name) || name.length > 34) continue;
+    if (/^(mosque|masjid|temple|church|park|garden|stadium|mandir)$/i.test(name)) continue;
+    const pts: LatLon[] = el.geometry ?? el.members?.flatMap((m) => m.geometry ?? []) ?? [];
+    if (pts.length < 3) continue;
+    const loc = pts.map(local);
+    const xs = loc.map((q) => q[0]);
+    const zs = loc.map((q) => q[1]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+    if (Math.abs(cx) > half[0] - 300 || Math.abs(cz) > half[1] - 300) continue;
+    const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) / 2;
+    const levels = Number(t["building:levels"]) || 0;
+    const height = Number.parseFloat(t.height ?? "") || levels * 3.4 || 0;
+    const classify = (): [string, number] | null => {
+      if (t.historic && t.historic !== "yes") return ["heritage", 7];
+      if (/^(attraction|museum|viewpoint|zoo|theme_park|gallery|aquarium)$/.test(t.tourism ?? "")) return ["sight", 6];
+      if (t.amenity === "place_of_worship" || /^(temple|mosque|church|cathedral|gurudwara)$/.test(t.building ?? "")) return ["worship", 5];
+      if (t.leisure === "stadium") return ["stadium", 5];
+      if (/^(park|garden|nature_reserve)$/.test(t.leisure ?? "") && span > 160) return ["park", 3 + Math.min(3, span / 400)];
+      if (height >= 250 || (height >= 120 && (t.wikidata || t.wikipedia))) return ["tower", 3 + Math.min(3, height / 200)];
+      if (t.shop === "mall") return ["market", 3];
+      return null;
+    };
+    const found = classify();
+    if (!found) continue;
+    const kind = found[0];
+    let score = found[1];
+    if (t.wikidata || t.wikipedia) score += 3;
+    if (kind === "worship" && !(t.wikidata || t.wikipedia)) score -= 2.5;
+    picks.push({ name, x: Math.round(cx), z: Math.round(cz), radius: Math.round(Math.min(160, Math.max(30, span))), height: Math.round(Math.max(height, kind === "park" ? 0 : 25)), kind, score });
+  }
+  picks.sort((a, b) => b.score - a.score);
+  const postcards: typeof picks = [];
+  const perKind = new Map<string, number>();
+  for (const p of picks) {
+    if (postcards.length >= 32) break;
+    if ((perKind.get(p.kind) ?? 0) >= 9 || p.score < 3) continue;
+    const near = [...postcards, ...landmarks.map((l) => ({ ...l, score: 0, kind: "" }))].some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 420 || q.name === p.name);
+    if (!near) {
+      postcards.push(p);
+      perKind.set(p.kind, (perKind.get(p.kind) ?? 0) + 1);
+    }
+  }
+  index.postcards = postcards.map((p) => ({ name: p.name, x: p.x, z: p.z, radius: p.radius, height: p.height, kind: p.kind }));
+
   const indexJson = JSON.stringify(index);
   writeFileSync(join(outDir, "index.json"), indexJson);
   const indexGz = gzipSync(indexJson, { level: 9 }).length;
   console.log(
     `${spec.id}: ${(half[0] * 2 / 1000).toFixed(1)}×${(half[1] * 2 / 1000).toFixed(1)} km, ` +
     `${tileKeys.length} tiles, ${totalBld} buildings (tallest ${tallest} m), ${totalRoads} road segs, ${totalRails} rail segs, ` +
-    `${landmarks.length} landmarks, index ${(indexGz / 1024).toFixed(1)} KB gz, ` +
+    `${landmarks.length} landmarks, ${index.postcards?.length ?? 0} postcards, index ${(indexGz / 1024).toFixed(1)} KB gz, ` +
     `tiles ${(totalRaw / 1024).toFixed(0)} KB raw / ${(totalGz / 1024).toFixed(0)} KB gz (avg ${(totalGz / Math.max(1, tileKeys.length) / 1024).toFixed(1)} KB gz, max ${(maxTileGz / 1024).toFixed(1)} KB gz)`,
   );
 }
