@@ -470,7 +470,9 @@ test('published impact, expanded work and grouped career chapters on desktop and
 
 test('the plane lands in a 3D city that visitors can fly, then hand back to the conversation', async ({page}) => {
   // Real cities in a software renderer, plus a 3-second launch count, take a while in CI.
-  test.setTimeout(90000);
+  // Game time advances at most 0.05s per frame, so at a few frames a second the count
+  // alone can take 20 seconds or more of wall time.
+  test.setTimeout(180000);
   for (const width of [390, 1440]) {
     await page.setViewportSize({width, height:900});
     await page.goto('./');
@@ -498,7 +500,7 @@ test('the plane lands in a 3D city that visitors can fly, then hand back to the 
     await page.keyboard.down('ArrowLeft');
     await page.waitForTimeout(400);
     await page.keyboard.up('ArrowLeft');
-    await expect.poll(async () => Number(await page.locator('[data-hud="score"]').textContent()), {timeout: 20000}).toBeGreaterThan(0);
+    await expect.poll(async () => Number(await page.locator('[data-hud="score"]').textContent()), {timeout: 60000}).toBeGreaterThan(0);
     // Holding Space fires the booster.
     await page.keyboard.down(' ');
     await expect(sky).toHaveClass(/is-boosting/);
