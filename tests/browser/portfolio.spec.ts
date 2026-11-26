@@ -425,7 +425,9 @@ test('published impact, expanded work and grouped career chapters on desktop and
       const track = document.querySelector<HTMLElement>('[data-journey]')!;
       const pinned = document.querySelector('#experience')!.classList.contains('is-pinned');
       const top = track.getBoundingClientRect().top + scrollY;
-      window.scrollTo(0, pinned ? top + (track.offsetHeight - innerHeight) * 0.3 : el.getBoundingClientRect().top + scrollY - 100);
+      // Park in the middle of Delhi's stretch, so a small nudge never flies on to the next city.
+      const steps = document.querySelectorAll('.journey-stop').length;
+      window.scrollTo(0, pinned ? top + (track.offsetHeight - innerHeight) * (1.5 / steps) : el.getBoundingClientRect().top + scrollY - 100);
     });
     await expect(gartner).toBeVisible();
     // Roles read oldest first, the way the flight runs; territory planning came with the senior role.
