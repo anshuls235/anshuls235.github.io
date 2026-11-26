@@ -89,7 +89,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   if (!canvas) return null;
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   } catch {
     root.classList.add("is-unsupported");
     return null;
@@ -119,7 +119,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   applyQuality();
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 30000);
+  const camera = new THREE.PerspectiveCamera(62, 1, 2.0, 20000);
   const plane = paperPlane();
   scene.add(plane);
   const q = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector);
@@ -163,13 +163,14 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let sound: Sound | null = null;
   let muted = stored("sky-muted") === 1;
 
-  // Boost, combos and updrafts
+  // Boost, combos, near-miss skims and updrafts
   let boost = 0.5; // 0…1 of the booster's charge
   let boosting = false;
   let gust = 0; // seconds of updraft left
   let combo = 0;
   let ringPoints = 0;
-  const BOOST_THRUST = 230; // newtons
+  let skimCooldown = 0;
+  const BOOST_THRUST = 245; // newtons
   const multiplier = () => Math.min(5, 1 + Math.floor(combo / 3));
 
   // The course
@@ -251,8 +252,9 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   }
   function fillGates() {
     if (!city) return;
+    const difficulty = Math.min(1, ringsPassed / 18);
     while (gates.length < 3) {
-      for (const gate of nextGate(city, tail, rand)) {
+      for (const gate of nextGate(city, tail, rand, difficulty)) {
         const mesh = gateMesh(gate);
         scene.add(mesh);
         let orb: THREE.Group | null = null;
@@ -295,6 +297,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     gust = 0;
     combo = 0;
     ringPoints = 0;
+    skimCooldown = 0;
     glider.controls.thrust = 0;
     root.dataset.skyState = "flying";
     if (over) over.hidden = true;
@@ -425,6 +428,16 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     if (mode !== "play") return;
     if (boosting) boost = Math.max(0, boost - dt * 0.22);
     gust = Math.max(0, gust - dt);
+    skimCooldown = Math.max(0, skimCooldown - dt);
+    // Risk-reward near-miss: skimming within 14 m of a taller skyscraper awards points & boost!
+    if (skimCooldown <= 0 && p.y > 12 && city.roofAt(p.x, p.z, 14) > p.y + 4) {
+      skimCooldown = 2.5;
+      const pts = 75 * multiplier();
+      ringPoints += pts;
+      boost = Math.min(1, boost + 0.14);
+      sound?.pickup("boost");
+      flash(`Close shave! +${pts}`);
+    }
     clock -= dt;
     if (clock <= 0) {
       clock = 0;
@@ -468,7 +481,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     } else if (result === "missed" || strayed) {
       sound?.miss();
       combo = 0;
-      flash("Missed", "bad");
+      clock = Math.max(5, clock - 3);
+      flash("Missed  −3s", "bad");
       restartCourse();
     }
   }
@@ -630,10 +644,11 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     last = now;
     // Step quality down when frames are consistently slow.
     slowFrames = raw > 1 / 38 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
-    if (slowFrames > 45 && quality > 0) {
+    if (slowFrames > 90 && quality > 0) {
       quality--;
       slowFrames = 0;
       applyQuality();
+      resize();
     }
     acc += Math.min(raw, 0.05);
     while (acc >= STEP) {

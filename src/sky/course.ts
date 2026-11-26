@@ -49,26 +49,51 @@ function clearOver(city: City, ax: number, az: number, bx: number, bz: number) {
   return top + CLEAR;
 }
 
-export function nextGate(city: City, from: { x: number; y: number; z: number; heading: number }, rand: () => number): Gate[] {
+export function nextGate(
+  city: City,
+  from: { x: number; y: number; z: number; heading: number },
+  rand: () => number,
+  difficulty = 0,
+): Gate[] {
+  const diff = Math.max(0, Math.min(1, difficulty));
   const [hx, hz] = city.data.half;
+  const maxTurn = 0.95 + diff * 0.45; // sharper banking turns as difficulty ramps
+  const ringRadius = 18 - diff * 5.5; // tightens from 18 m down to 12.5 m
+  const timeCushion = Math.round(4 - diff * 2.5); // tighter clock margin at higher streaks
   let best: { gate: Gate; score: number } | null = null;
   for (let i = 0; i < 24; i++) {
-    const turn = (rand() - 0.5) * 2 * 1.0;
+    const turn = (rand() - 0.5) * 2 * maxTurn;
     const heading = from.heading + turn;
-    const dist = 190 + rand() * 90;
+    const dist = 185 + rand() * 85;
     const x = from.x + Math.sin(heading) * dist;
     const z = from.z - Math.cos(heading) * dist;
     if (Math.abs(x) > hx - 220 || Math.abs(z) > hz - 220) continue;
-    const y = from.y - dist / GLIDE - 4;
+    const y = from.y - dist / GLIDE - (4 + diff * 2);
     // The whole line, start to gate, must clear the roofs at the height the glide allows there.
-    if (y < 60 || y < clearOver(city, from.x, from.z, x, z)) continue;
-    // Prefer lines that pass close to tall buildings (a better view), then gentle turns.
+    if (y < 52 || y < clearOver(city, from.x, from.z, x, z)) continue;
+    // Prefer lines that thread close past tall towers, and sharper turns at higher difficulty.
     const nearby = city.roofAt(x, z, 90);
-    const score = Math.min(nearby, y - CLEAR) / Math.max(1, y) + rand() * 0.3 - Math.abs(turn) * 0.15;
-    // The clock pays for the flying a ring asks for, with a few seconds to spare.
-    if (!best || score > best.score) best = { gate: { x, y, z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "ring", radius: 18, bonus: Math.round(dist / 18) + 4 }, score };
+    const towerBonus = (Math.min(nearby, y - CLEAR) / Math.max(1, y)) * (1 + diff * 0.6);
+    const turnBias = (0.15 - diff * 0.25) * Math.abs(turn);
+    const score = towerBonus + rand() * 0.3 - turnBias;
+    if (!best || score > best.score) {
+      best = {
+        gate: {
+          x,
+          y,
+          z,
+          nx: Math.sin(heading),
+          ny: 0,
+          nz: -Math.cos(heading),
+          kind: "ring",
+          radius: ringRadius,
+          bonus: Math.max(6, Math.round(dist / (18 + diff * 2.5)) + timeCushion),
+        },
+        score,
+      };
+    }
   }
-  if (best && best.gate.y > Math.max(90, Math.min(city.tallest, 420) * 0.35)) {
+  if (best && best.gate.y > Math.max(90, Math.min(city.tallest, 420) * 0.44)) {
     // A pickup on the approach, a little off the line: worth a small detour.
     const g = best.gate;
     const t = 0.45 + rand() * 0.2;
