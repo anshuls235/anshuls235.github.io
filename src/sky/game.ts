@@ -129,6 +129,10 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let renderScale = 1;
   let paceTime = 0;
   let paceFrames = 0;
+  let grabs = 0;
+  let slowWindows = 0;
+  let fastWindows = 0;
+  let warming = false;
   let built: BuiltWorld | null = null;
   const effective = () => (mode === "play" ? quality : Math.min(quality, 1));
   let night = document.documentElement.dataset.theme === "dark";
@@ -351,7 +355,19 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     buildLabels();
     scene.environment = built.environment;
     scene.environmentIntensity = built.environmentIntensity;
-    renderer.compile(scene, camera);
+    // Shaders compile in parallel (KHR_parallel_shader_compile) instead of
+    // stopping the page while it scrolls past.
+    // It can never hold the city up: after 1.5 s the first frames compile what is left.
+    // The loop pauses meanwhile, so nothing it would dispose is still being compiled.
+    warming = true;
+    await Promise.race([
+      Promise.resolve()
+        .then(() => renderer.compileAsync(scene, camera))
+        .catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+    warming = false;
+    if (ticket !== building) return;
     resize();
   }
 
@@ -490,6 +506,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       if (current !== id) return;
       launch();
       if (mode === "attract") for (let i = 0; i < 120; i++) physics(STEP); // settle into trimmed glide right in front of the skyline
+      else void prepareFlight();
       root.classList.remove("is-loading");
       root.classList.add("is-ready");
       say(`Flying over ${next.data.name}.`);
@@ -814,8 +831,22 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     else renderer.render(scene, camera);
   }
 
+  const cpu: number[] = [];
   function loop(now: number) {
+    const began = performance.now();
+    frameBody(now);
+    if (debug) {
+      cpu.push(performance.now() - began);
+      if (cpu.length > 600) cpu.shift();
+    }
+  }
+  function frameBody(now: number) {
     frame = 0;
+    if (warming) {
+      last = 0;
+      frame = requestAnimationFrame(loop);
+      return;
+    }
     if (!visible || document.hidden || options.isStill() || !city) {
       last = 0;
       return;
@@ -829,7 +860,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     }
     last = now;
     // Step quality down when frames are consistently slow.
-    slowFrames = raw > 1 / 38 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
+    slowFrames = mode === "play" && raw > 1 / 38 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
     // A real GPU steps down to 1 at most; 0 (no ground textures, half resolution) is for software renderers.
     if (slowFrames > 90 && quality > (software ? 0 : 1) && renderScale <= 0.62) {
       quality--;
@@ -839,9 +870,23 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     }
     paceTime += raw;
     paceFrames++;
-    if (paceTime > 1.5 && !fixedRes) {
+    // Only in play: behind the page the city is capped at 30 fps on purpose,
+    // which must not read as "too slow" (that resized the canvas over and over).
+    if (mode !== "play") paceTime = paceFrames = 0;
+    if (paceTime > 2 && !fixedRes) {
+      // A resize reallocates buffers (a hitch of its own), so it happens rarely:
+      // down after two slow windows in a row, up only after ten seconds of headroom.
       const avg = paceTime / paceFrames;
-      const next = avg > 1 / 50 ? Math.max(0.6, renderScale * 0.88) : avg < 1 / 57 ? Math.min(1, renderScale * 1.06) : renderScale;
+      slowWindows = avg > 1 / 48 ? slowWindows + 1 : 0;
+      fastWindows = avg < 1 / 58 ? fastWindows + 1 : 0;
+      let next = renderScale;
+      if (slowWindows >= 2) {
+        next = Math.max(0.6, renderScale * 0.85);
+        slowWindows = 0;
+      } else if (fastWindows >= 5) {
+        next = Math.min(1, renderScale * 1.12);
+        fastWindows = 0;
+      }
       paceTime = paceFrames = 0;
       if (Math.abs(next - renderScale) > 0.01) {
         renderScale = next;
@@ -891,6 +936,11 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     renderer.shadowMap.needsUpdate = renderer.shadowMap.enabled;
     if (built) built.render(scene, camera);
     else renderer.render(scene, camera);
+    // Debug only: grab consecutive frames, read straight after drawing.
+    if (debug && grabs > 0) {
+      grabs--;
+      (window as unknown as { skyFrames: string[] }).skyFrames.push(canvas!.toDataURL("image/png"));
+    }
     frame = requestAnimationFrame(loop);
   }
   function start() {
@@ -916,8 +966,75 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   });
   seen.observe(root);
 
+  /**
+   * Before a flight: the whole ring of tiles at full detail, every shader
+   * compiled and the night glow warmed up, behind a progress bar. Then the
+   * countdown starts and nothing loads or compiles mid-flight.
+   */
+  const progressBar = q("[data-sky-progress]");
+  const progressLabel = q("[data-sky-loading-label]");
+  let preparing = 0;
+  async function prepareFlight() {
+    if (!built || !city) return;
+    const ticket = ++preparing;
+    const world = built;
+    root.classList.add("is-preparing");
+    if (progressLabel) progressLabel.textContent = `Preparing ${city.data.name}…`;
+    const show = (f: number) => progressBar?.style.setProperty("--progress", (0.1 + f * 0.75).toFixed(3));
+    show(0);
+    warming = true;
+    const start = launchPoint(city);
+    await world.prepare(start.x, start.z, show);
+    if (ticket !== preparing || world !== built) return;
+    show(1);
+    await Promise.race([
+      Promise.resolve()
+        .then(() => renderer.compileAsync(scene, camera))
+        .catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
+    ]);
+    if (ticket !== preparing || world !== built) return;
+    // Frames drawn behind the bar: the first compiles anything left and warms the
+    // glow pipeline; the rest time this GPU on this city, so flight starts at a
+    // resolution that holds 60 fps instead of discovering it by stuttering.
+    syncPlane();
+    updateCamera(true);
+    const gl = renderer.getContext();
+    const pixel = new Uint8Array(4);
+    const timeFrame = () => {
+      const t = performance.now();
+      renderer.shadowMap.needsUpdate = renderer.shadowMap.enabled;
+      world.render(scene, camera);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); // waits for the GPU
+      return performance.now() - t;
+    };
+    timeFrame();
+    if (!fixedRes && !software) {
+      renderScale = 1;
+      renderer.setPixelRatio(baseRatio);
+      resize();
+      const times = [timeFrame(), timeFrame(), timeFrame(), timeFrame(), timeFrame()].sort((a, b) => a - b);
+      const ms = times[2];
+      // Cost scales with pixels: aim for ~12 ms of GPU time per frame.
+      renderScale = Math.max(0.6, Math.min(1, Math.sqrt(12 / Math.max(ms, 1))));
+      renderer.setPixelRatio(baseRatio * renderScale);
+      resize();
+      paceTime = paceFrames = slowWindows = fastWindows = 0;
+    }
+    progressBar?.style.setProperty("--progress", "1");
+    warming = false;
+    root.classList.remove("is-preparing");
+    if (progressLabel) progressLabel.textContent = "Loading the city…";
+    launch();
+  }
+
   function setMode(next: "attract" | "play") {
     mode = next;
+    if (next !== "play" && preparing) {
+      preparing++;
+      warming = false;
+      root.classList.remove("is-preparing");
+    }
     root.dataset.skyMode = next;
     window.dispatchEvent(new CustomEvent("sky-play", { detail: next === "play" }));
     keys.clear();
@@ -930,6 +1047,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     } else sound?.wind(0);
     applyQuality();
     launch();
+    if (next === "play") void prepareFlight();
     if (next === "play") {
       say(`You have the controls over ${city?.data.name ?? "the city"}. Fly through the rings before the clock runs out. Arrow keys or WASD, or aim with the mouse. Hold Space to boost, R to relaunch, Escape to land.`);
       q("[data-sky-exit]")?.focus();
@@ -1010,7 +1128,13 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>("button") : null;
     if (!target || !root.contains(target)) return;
     if (target.dataset.city) void setCity(target.dataset.city as CityId);
-    if (target.hasAttribute("data-sky-play")) setMode("play");
+    if (target.hasAttribute("data-sky-play")) {
+      // Show the progress bar first, then do the heavy switch once it has painted.
+      root.classList.add("is-preparing");
+      progressBar?.style.setProperty("--progress", "0.04");
+      if (progressLabel && city) progressLabel.textContent = `Preparing ${city.data.name}…`;
+      requestAnimationFrame(() => setTimeout(() => setMode("play"), 0));
+    }
     if (target.hasAttribute("data-sky-exit")) setMode("attract");
     if (target.hasAttribute("data-sky-relaunch")) launch();
     if (target.hasAttribute("data-sky-sound")) toggleSound();
@@ -1055,6 +1179,14 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     Object.assign(window, {
       skyDebug: {
         landmarks: () => city?.landmarks ?? [],
+        cpu: () => {
+          const sorted = [...cpu].sort((a, b) => a - b);
+          return { p50: sorted[Math.floor(sorted.length / 2)], p95: sorted[Math.floor(sorted.length * 0.95)], max: sorted.at(-1) };
+        },
+        grab: (n: number) => {
+          (window as unknown as { skyFrames: string[] }).skyFrames = [];
+          grabs = n;
+        },
         place: (x: number, y: number, z: number, heading: number) => {
           countdown = 0;
           glider.launch(x, y, z, -heading, 22);

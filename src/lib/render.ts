@@ -267,7 +267,7 @@ function renderSky(p: Profile, base: string, social: string) {
     <canvas data-sky-canvas aria-label="A paper plane gliding over a city" role="img"></canvas>
     <div class="sky-poster" aria-hidden="true"></div>
     <div class="sky-shade" aria-hidden="true"></div>
-    <p class="sky-loading mono" aria-hidden="true">Loading the city…</p>
+    <p class="sky-loading mono" aria-hidden="true"><span data-sky-loading-label>Loading the city…</span><span class="sky-progress"><i data-sky-progress></i></span></p>
     <div class="sky-cities" role="group" aria-label="Choose a city to fly over" data-interactive hidden>${cities}</div>
     <div class="sky-speedlines" aria-hidden="true"></div>
     <div class="sky-clock" aria-hidden="true"><span class="mono">Time</span><strong data-hud="time">75</strong><span class="sky-meter" data-sky-meter><i></i></span><span class="mono sky-meter-label">Boost</span><span class="sky-bonus mono" data-sky-bonus></span></div>

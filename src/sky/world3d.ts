@@ -20,6 +20,7 @@ import { launchPoint } from "./pilot";
 import type { City, CityId, CityLandmark } from "./citydata";
 import { decodeTile, TILE_SIZE } from "./tileformat";
 import { buildTileGeometry, type BuiltTileData, type TileLod } from "./tile-geom";
+import { paintFacades, paintRipples } from "./facade-paint";
 import type { WorkerMessageIn, WorkerResponse } from "./tile-worker";
 
 // Sun, haze and water per city: a low golden sun so towers throw long shadows
@@ -469,13 +470,9 @@ function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
     c.height = rows;
     const g = c.getContext("2d")!;
     const img = g.createImageData(cols, rows);
-    for (let i = 0; i < mask.length; i++) {
-      const land = mask[i] ? 0 : 255;
-      img.data[i * 4] = land;
-      img.data[i * 4 + 1] = land;
-      img.data[i * 4 + 2] = land;
-      img.data[i * 4 + 3] = 255;
-    }
+    // One 32-bit write per cell: opaque white for land, opaque black for sea.
+    const px = new Uint32Array(img.data.buffer);
+    for (let i = 0; i < mask.length; i++) px[i] = mask[i] ? 0xff000000 : 0xffffffff;
     g.putImageData(img, 0, 0);
     alphaMap = keep(new THREE.CanvasTexture(c));
     alphaMap.minFilter = THREE.LinearFilter;
@@ -488,6 +485,7 @@ function createBaseGround(city: City, night: boolean, atmo: Atmosphere) {
         color: night ? look.groundNight : look.groundDay,
         alphaMap,
         alphaTest: alphaMap ? 0.5 : 0,
+        alphaToCoverage: !!alphaMap,
         roughness: 0.98,
         metalness: 0,
       }),
@@ -790,6 +788,8 @@ export interface BuiltWorld {
   setNight(night: boolean): void;
   setQuality(quality: number): void;
   ensureAround(x: number, z: number): Promise<void>;
+  /** Load every tile in view at full detail before flying, reporting 0…1. */
+  prepare(x: number, z: number, onProgress: (done: number) => void): Promise<void>;
   updateStream(x: number, z: number): void;
   update(time: number): void;
   render(scene: THREE.Scene, camera: THREE.Camera): void;
@@ -827,6 +827,22 @@ function getSharedWorker(): Worker | null {
     sharedWorker = null;
   }
   return sharedWorker;
+}
+
+type Painted = { facade: Uint8Array<ArrayBuffer>; ripples: Uint8Array<ArrayBuffer> };
+let facadeJob: Promise<Painted> | null = null;
+/** The facade and ripple textures' pixels, painted in the worker so the page never waits on them. */
+function facadePixels() {
+  facadeJob ??= new Promise((resolve) => {
+    const worker = getSharedWorker();
+    const local = () => ({ facade: paintFacades(), ripples: paintRipples() });
+    if (!worker) return resolve(local());
+    const id = sharedNextJobId++;
+    sharedPending.set(id, (resp) => resolve(resp.facade && resp.ripples ? { facade: resp.facade, ripples: resp.ripples } : local()));
+    const msg: WorkerMessageIn = { kind: "facade", id };
+    worker.postMessage(msg);
+  });
+  return facadeJob;
 }
 
 export async function buildWorld(
@@ -904,7 +920,7 @@ export async function buildWorld(
     const floor = new THREE.Mesh(new THREE.CircleGeometry(20000, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: ground }));
     floor.position.y = -40;
     scene.add(floor);
-    const cube = captureSky(renderer, scene, quality === 0 ? 32 : 128);
+    const cube = captureSky(renderer, scene, quality === 0 ? 32 : 64);
     const env = pmrem.fromCubemap(cube.texture).texture;
     sky?.dispose();
     skyMesh?.geometry.dispose();
@@ -913,9 +929,10 @@ export async function buildWorld(
     floor.material.dispose();
     return { cube: keep(cube), env: keep(env) };
   };
-  const dayEnv = capture(false);
-  const nightEnv = capture(true);
-  pmrem.dispose();
+  // Only the theme on screen is captured now; the other waits until it is asked for.
+  const envs: Partial<Record<"day" | "night", ReturnType<typeof capture>>> = {};
+  const envFor = (isNight: boolean) => (envs[isNight ? "night" : "day"] ??= capture(isNight));
+  envFor(night);
 
   // ---------- Lights ----------
   const sun = new THREE.DirectionalLight(0xffc68a, 6.5);
@@ -933,10 +950,11 @@ export async function buildWorld(
   group.add(hemi);
 
   // ---------- Shared materials ----------
-  const buildingMat = keep(createBuildingMaterial(atmo));
+  const painted = await facadePixels();
+  const buildingMat = keep(createBuildingMaterial(atmo, painted.facade));
   const railMat = keep(withAtmosphere(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 }), atmo, "rails"));
   const sunHdr = new THREE.Color(0xffc68a).multiplyScalar(6.5);
-  const waterMat = keep(createWaterMaterial(atmo, new THREE.Color(night ? look.waterNight : look.water), sunHdr));
+  const waterMat = keep(createWaterMaterial(atmo, new THREE.Color(night ? look.waterNight : look.water), sunHdr, painted.ripples));
 
   const tileSize = city.index.tileSize || TILE_SIZE;
   const sharedTilePlane = keep(new THREE.PlaneGeometry(tileSize + 1.5, tileSize + 1.5));
@@ -992,8 +1010,10 @@ export async function buildWorld(
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           float d = -mv.z;
           float px = uScale * (kind > 1.5 ? 2.4 : 1.8) / max(d, 1.0);
-          vFade = smoothstep(4500.0, 900.0, d) * clamp(px / 1.5, 0.35, 1.0);
-          gl_PointSize = clamp(px, 1.5, 16.0);
+          // Below 3 px a lamp keeps a 3 px footprint and dims with the light it
+          // would really cover, so distant lamps glow softly instead of twinkling.
+          vFade = smoothstep(4500.0, 900.0, d) * min(1.0, (px * px) / 9.0);
+          gl_PointSize = clamp(px, 3.0, 16.0);
           vColor = kind > 1.5 ? vec3(1.0, 0.78, 0.5) : vec3(1.0, 0.6, 0.26);
           gl_Position = projectionMatrix * mv;
         }`,
@@ -1011,7 +1031,7 @@ export async function buildWorld(
 
   let post: { composer: EffectComposer; pass: RenderPass; bloom: UnrealBloomPass; fxaa: ShaderPass } | null = null;
   const activeTiles = new Map<string, ActiveTile>();
-  const environment = { current: (night ? nightEnv : dayEnv).env };
+  const environment = { current: envFor(night).env };
 
   function applyTheme(isNight: boolean) {
     night = isNight;
@@ -1020,7 +1040,7 @@ export async function buildWorld(
     dusk.group.visible = isNight;
     sunDirection.copy(isNight ? moonDir : daySunDir);
     atmo.uSunDir.value.copy(isNight ? moonDir : daySunDir);
-    const set = isNight ? nightEnv : dayEnv;
+    const set = envFor(isNight);
     atmo.uSkyCube.value = set.cube.texture;
     environment.current = set.env;
     atmo.uSunGlow.value.set(isNight ? 0x000000 : 0xffc890);
@@ -1156,6 +1176,9 @@ export async function buildWorld(
             emissiveMap: nTex,
             emissiveIntensity: night ? 1.8 : 0,
             depthFunc: THREE.AlwaysDepth,
+            // The coastline is an alpha cut-out; with MSAA it becomes a smooth,
+            // steady edge instead of a stair-step that crawls as the plane moves.
+            alphaToCoverage: true,
           }),
           atmo,
           groundKey,
@@ -1344,16 +1367,40 @@ export async function buildWorld(
   async function ensureAround(x: number, z: number) {
     lastStreamX = x;
     lastStreamZ = z;
-    // Everything in view is solid on the first frame: the whole ring loads before play.
+    // The tile under the plane goes in at once; the ring around it streams in a
+    // tile per frame, so the page never freezes while the city appears.
+    const wanted = desiredTiles(x, z);
     direct = true;
-    await Promise.all(desiredTiles(x, z).map((w) => loadTileAtLod(w.tx, w.tz, w.lod)));
+    await Promise.all(wanted.filter((w) => w.dist < 0.01).map((w) => loadTileAtLod(w.tx, w.tz, w.lod)));
     direct = false;
+    for (const w of wanted) if (w.dist >= 0.01) void loadTileAtLod(w.tx, w.tz, w.lod);
+  }
+
+  async function prepare(x: number, z: number, onProgress: (done: number) => void) {
+    lastStreamX = x;
+    lastStreamZ = z;
+    for (const d of ready.splice(0)) install(d);
+    const wanted = desiredTiles(x, z).filter((w) => activeTiles.get(`${w.tx},${w.tz}`)?.lod !== w.lod);
+    let done = 0;
+    onProgress(wanted.length ? 0 : 1);
+    direct = true;
+    await Promise.all(
+      wanted.map((w) =>
+        loadTileAtLod(w.tx, w.tz, w.lod).then(() => {
+          done++;
+          onProgress(done / wanted.length);
+        }),
+      ),
+    );
+    direct = false;
+    for (const d of ready.splice(0)) install(d);
   }
 
   return {
     group,
     sun,
     sunDirection,
+    prepare,
     get environment() {
       return environment.current;
     },
@@ -1429,6 +1476,7 @@ export async function buildWorld(
     },
     dispose() {
       disposed = true;
+      pmrem.dispose();
       for (const d of ready.splice(0)) {
         d.groundBitmap?.close();
         d.nightBitmap?.close();
@@ -1636,6 +1684,7 @@ export function createBursts(max = 240) {
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
   let next = 0;
+  let live = false;
   const c = new THREE.Color();
   const side = new THREE.Vector3();
   const up = new THREE.Vector3();
@@ -1662,14 +1711,18 @@ export function createBursts(max = 240) {
         vel[k * 3 + 1] = (side.y * Math.cos(a) + up.y * Math.sin(a)) * sp + n.y * 8;
         vel[k * 3 + 2] = (side.z * Math.cos(a) + up.z * Math.sin(a)) * sp + n.z * 8;
         life[k] = 1;
+        live = true;
         c.setHex(hex).lerp(new THREE.Color(0xffffff), Math.random() * 0.5);
         col.set([c.r, c.g, c.b], k * 3);
       }
     },
     update(dt: number) {
+      if (!live) return;
+      live = false;
       for (let k = 0; k < max; k++) {
         if (life[k] <= 0) continue;
         life[k] = Math.max(0, life[k] - dt * 1.1);
+        live ||= life[k] > 0;
         vel[k * 3 + 1] -= 9 * dt;
         pos[k * 3] += vel[k * 3] * dt;
         pos[k * 3 + 1] += vel[k * 3 + 1] * dt;

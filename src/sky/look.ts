@@ -4,6 +4,7 @@
 // that reflects the sky with a sun glitter. All of it is shader work on a few
 // materials, so the city stays a handful of draw calls per tile.
 import * as THREE from "three";
+import { BAYS, CELLS, RIPPLE, TEX } from "./facade-paint";
 
 export interface Atmosphere {
   uSkyCube: { value: THREE.Texture | null };
@@ -87,116 +88,16 @@ export function withAtmosphere<T extends THREE.Material>(material: T, atmo: Atmo
   return material;
 }
 
-/** Bay width and floor height (metres) per facade style. */
-const BAYS: [number, number][] = [
-  [1.6, 3.9], // glass curtain wall
-  [3.4, 3.1], // residential tower
-  [2.6, 3.8], // office ribbon windows
-  [3.0, 3.3], // mid-rise
-];
-const CELLS = 8; // each texture layer holds 8 bays × 8 floors
-const TEX = 512;
-
 let facadeArray: THREE.DataArrayTexture | null = null;
 /**
- * The facades as a mipmapped texture array, one layer per style, painted once.
- * R: glass, G: detail shading (mullions, slabs, pane tint), B and A: two
- * night-time lighting patterns (sparse and busy). Being a real texture, the GPU
- * filters it: windows settle into a steady average with distance instead of
- * shimmering, by day and by night.
+ * The facades as a mipmapped texture array, one layer per style (painted by
+ * paintFacades, in the tile worker when there is one). Being a real texture,
+ * the GPU filters it: windows settle into a steady average with distance
+ * instead of shimmering, by day and by night.
  */
-export function facadeTextures() {
+export function facadeTextures(data: Uint8Array<ArrayBuffer>) {
   if (facadeArray) return facadeArray;
-  const layers = BAYS.length;
-  const data = new Uint8Array(TEX * TEX * 4 * layers);
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = TEX;
-  const g = canvas.getContext("2d", { willReadFrequently: true })!;
-  let s = 11;
-  const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const cell = TEX / CELLS;
-  for (let layer = 0; layer < layers; layer++) {
-    // Paint each channel as greyscale in turn, then pack.
-    const paint = (draw: () => void) => {
-      g.fillStyle = "#000";
-      g.fillRect(0, 0, TEX, TEX);
-      g.fillStyle = "#fff";
-      draw();
-      return g.getImageData(0, 0, TEX, TEX).data;
-    };
-    // Window rectangle within a cell: x0, x1, y0, y1 (fractions; y from the floor up).
-    const win = [
-      [0.05, 0.95, 0.16, 0.98],
-      [0.17, 0.83, 0.3, 0.86],
-      [0.02, 0.98, 0.36, 0.94],
-      [0.27, 0.73, 0.3, 0.8],
-    ][layer];
-    // Canvas rows become texture rows bottom-up (no flip), so y here runs up a floor.
-    const rectOf = (cx: number, cy: number): [number, number, number, number] => [
-      cx * cell + win[0] * cell,
-      cy * cell + win[2] * cell,
-      (win[1] - win[0]) * cell,
-      (win[3] - win[2]) * cell,
-    ];
-    const glass = paint(() => {
-      for (let cy = 0; cy < CELLS; cy++) for (let cx = 0; cx < CELLS; cx++) g.fillRect(...rectOf(cx, cy));
-    });
-    const detail = paint(() => {
-      g.fillStyle = "#d8d8d8";
-      g.fillRect(0, 0, TEX, TEX);
-      for (let cy = 0; cy < CELLS; cy++) {
-        // A floor slab line at the bottom of every floor.
-        g.fillStyle = "#8a8a8a";
-        g.fillRect(0, cy * cell, TEX, 3);
-        for (let cx = 0; cx < CELLS; cx++) {
-          const v = 150 + Math.floor(rand() * 90);
-          g.fillStyle = `rgb(${v},${v},${v})`;
-          const [x, y, w, h] = rectOf(cx, cy);
-          g.fillRect(x, y, w, h);
-          if (layer === 0 || layer === 2) {
-            // Mullions inside the glass.
-            g.fillStyle = "#6a6a6a";
-            for (const f of layer === 2 ? [0.33, 0.66] : [0.5]) g.fillRect(x + w * f - 1, y, 2, h);
-          }
-          if (layer === 1 && cx % 2 === 0) {
-            // Balcony fronts on alternate bays.
-            g.fillStyle = "#f2f2f2";
-            g.fillRect(cx * cell + cell * 0.1, cy * cell + cell * 0.26, cell * 0.8, cell * 0.06);
-          }
-        }
-      }
-    });
-    const lit = (busy: boolean) =>
-      paint(() => {
-        for (let cy = 0; cy < CELLS; cy++) {
-          if (layer === 0 || layer === 2) {
-            // Offices: a floor is lit or not, with the odd dark bay.
-            if (rand() > (busy ? 0.5 : 0.28)) continue;
-            for (let cx = 0; cx < CELLS; cx++) if (rand() > 0.08) g.fillRect(...rectOf(cx, cy));
-          } else {
-            // Homes: a window here, a pair there.
-            for (let cx = 0; cx < CELLS; cx++) {
-              if (rand() > (busy ? 0.32 : 0.16)) continue;
-              const v = 150 + Math.floor(rand() * 105);
-              g.fillStyle = `rgb(${v},${v},${v})`;
-              g.fillRect(...rectOf(cx, cy));
-              if (rand() < 0.4 && cx < CELLS - 1) g.fillRect(...rectOf(++cx, cy));
-            }
-            g.fillStyle = "#fff";
-          }
-        }
-      });
-    const sparse = lit(false);
-    const busy = lit(true);
-    const base = layer * TEX * TEX * 4;
-    for (let i = 0; i < TEX * TEX; i++) {
-      data[base + i * 4] = glass[i * 4];
-      data[base + i * 4 + 1] = detail[i * 4];
-      data[base + i * 4 + 2] = sparse[i * 4];
-      data[base + i * 4 + 3] = busy[i * 4];
-    }
-  }
-  facadeArray = new THREE.DataArrayTexture(data, TEX, TEX, layers);
+  facadeArray = new THREE.DataArrayTexture(data, TEX, TEX, BAYS.length);
   facadeArray.wrapS = facadeArray.wrapT = THREE.RepeatWrapping;
   facadeArray.magFilter = THREE.LinearFilter;
   facadeArray.minFilter = THREE.LinearMipmapLinearFilter;
@@ -212,9 +113,9 @@ export function facadeTextures() {
  * baked night patterns as lit windows. Every value comes from a filtered
  * texture or a slow gradient, so nothing shimmers as the plane moves.
  */
-export function createBuildingMaterial(atmo: Atmosphere) {
+export function createBuildingMaterial(atmo: Atmosphere, facadeData: Uint8Array<ArrayBuffer>) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
-  const facades = facadeTextures();
+  const facades = facadeTextures(facadeData);
   return withAtmosphere(material, atmo, "buildings-v2", (shader) => {
     shader.uniforms.uNight = atmo.uNight;
     shader.uniforms.uFacade = { value: facades };
@@ -322,35 +223,10 @@ export function createBuildingMaterial(atmo: Atmosphere) {
 }
 
 let normalTex: THREE.DataTexture | null = null;
-/** A tileable ripple normal map, sampled at several scales so the sea never repeats. */
-function rippleNormals() {
+/** A tileable ripple normal map (painted in the worker), sampled at several scales so the sea never repeats. */
+export function rippleNormals(data: Uint8Array<ArrayBuffer>) {
   if (normalTex) return normalTex;
-  const n = 256;
-  const h = new Float32Array(n * n);
-  let s = 7;
-  const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  for (let o = 0; o < 5; o++) {
-    const f = 2 ** (o + 1);
-    const waves = Array.from({ length: 6 }, () => [rand() * 6.283, Math.round(1 + rand() * 3), Math.round(rand() * 4) - 2]);
-    for (let y = 0; y < n; y++) {
-      for (let x = 0; x < n; x++) {
-        for (const [p, kx, ky] of waves) h[y * n + x] += Math.sin(((x * kx + y * ky) * f * 6.283) / n + p) / f ** 1.2;
-      }
-    }
-  }
-  const data = new Uint8Array(n * n * 4);
-  for (let y = 0; y < n; y++) {
-    for (let x = 0; x < n; x++) {
-      const dx = h[y * n + ((x + 1) % n)] - h[y * n + ((x + n - 1) % n)];
-      const dy = h[((y + 1) % n) * n + x] - h[((y + n - 1) % n) * n + x];
-      const i = (y * n + x) * 4;
-      data[i] = Math.max(0, Math.min(255, 128 + dx * 40));
-      data[i + 1] = Math.max(0, Math.min(255, 128 + dy * 40));
-      data[i + 2] = 255;
-      data[i + 3] = 255;
-    }
-  }
-  normalTex = new THREE.DataTexture(data, n, n);
+  normalTex = new THREE.DataTexture(data, RIPPLE, RIPPLE);
   normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
   normalTex.magFilter = THREE.LinearFilter;
   normalTex.minFilter = THREE.LinearMipmapLinearFilter;
@@ -360,11 +236,11 @@ function rippleNormals() {
 }
 
 /** Sea and lakes: sky reflection by Fresnel, a sun glitter path, and depth colour. */
-export function createWaterMaterial(atmo: Atmosphere, deep: THREE.Color, sunColor: THREE.Color) {
+export function createWaterMaterial(atmo: Atmosphere, deep: THREE.Color, sunColor: THREE.Color, ripples: Uint8Array<ArrayBuffer>) {
   return new THREE.ShaderMaterial({
     uniforms: {
       ...atmo,
-      uNormals: { value: rippleNormals() },
+      uNormals: { value: rippleNormals(ripples) },
       uDeep: { value: deep },
       uSunColor: { value: sunColor },
     },
@@ -392,7 +268,7 @@ export function createWaterMaterial(atmo: Atmosphere, deep: THREE.Color, sunColo
         // The fine chop only where it can be seen.
         if (dist < 1800.0) n += ripple(rot(p, 1.9) / 13.0 - vec2(uTime * 0.02, uTime * 0.015)) * (1.0 - dist / 1800.0);
         // Calm the ripples with distance so the horizon does not sparkle.
-        float calm = mix(0.55, 0.06, smoothstep(150.0, 4500.0, dist));
+        float calm = mix(0.42, 0.04, smoothstep(120.0, 3000.0, dist));
         n = normalize(vec3(n.x * calm, 1.0, n.y * calm));
         vec3 v = normalize(cameraPosition - vWP);
         float ndv = max(dot(n, v), 0.0);
@@ -400,7 +276,10 @@ export function createWaterMaterial(atmo: Atmosphere, deep: THREE.Color, sunColo
         vec3 r = reflect(-v, n);
         r.y = abs(r.y);
         vec3 sky = textureCube(uSkyCube, r).rgb;
-        float glint = pow(max(dot(r, uSunDir), 0.0), 900.0) * 60.0 + pow(max(dot(r, uSunDir), 0.0), 90.0) * 0.9;
+        // A broad, soft glitter path rather than needle-sharp highlights: those
+        // sparkle on and off between pixels as the ripples move.
+        float sunR = max(dot(r, uSunDir), 0.0);
+        float glint = pow(sunR, 220.0) * 6.0 * (1.0 - smoothstep(300.0, 3000.0, dist) * 0.7) + pow(sunR, 40.0) * 0.6;
         vec3 body = uDeep * (0.55 + 0.45 * ndv);
         vec3 col = mix(body, sky, clamp(fres * 1.15, 0.0, 1.0)) + uSunColor * glint * (1.0 - uNight * 0.85);
         gl_FragColor = vec4(applyAtmos(col, vWP), 1.0);

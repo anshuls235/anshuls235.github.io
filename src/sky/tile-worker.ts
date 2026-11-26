@@ -1,9 +1,11 @@
 // Web Worker: decodes binary SKY1 city tiles, paints per-tile OffscreenCanvas ground
 // & night-light textures, and builds transferable LOD geometry off the main thread.
 import { decodeTile, TILE_SIZE, type CityId, type DecodedTile } from "./tileformat";
+import { paintFacades, paintRipples } from "./facade-paint";
 import { buildTileGeometry, type BuiltTileData, type SeaMaskInfo, type TileLod } from "./tile-geom";
 
 export type WorkerMessageIn =
+  | { kind: "facade"; id: number }
   | {
       kind: "sea";
       cityId: CityId;
@@ -23,6 +25,8 @@ export type WorkerMessageIn =
 export interface WorkerResponse {
   id: number;
   data: BuiltTileData;
+  facade?: Uint8Array<ArrayBuffer>;
+  ripples?: Uint8Array<ArrayBuffer>;
   collision?: DecodedTile;
 }
 
@@ -45,6 +49,12 @@ function collectTransferables(d: BuiltTileData): Transferable[] {
 
 self.onmessage = (event: MessageEvent<WorkerMessageIn>) => {
   const msg = event.data;
+  if (msg.kind === "facade") {
+    const pixels = paintFacades();
+    const ripples = paintRipples();
+    (self as unknown as Worker).postMessage({ id: msg.id, facade: pixels, ripples }, [pixels.buffer, ripples.buffer]);
+    return;
+  }
   if (msg.kind === "sea") {
     seaByCity.set(msg.cityId, msg.sea);
     return;
