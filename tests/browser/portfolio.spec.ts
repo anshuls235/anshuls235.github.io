@@ -433,6 +433,13 @@ test('published impact, expanded work and grouped career chapters on desktop and
     // journey moves on to the next city (which rightly closes any open log).
     let settledAt = -1;
     await expect.poll(async () => { const y = await page.evaluate(() => scrollY); const still = y === settledAt; settledAt = y; return still; }, {intervals: [300]}).toBe(true);
+    // On phones the pass body scrolls on its own; bring the row up inside it, so
+    // reaching it never scrolls the page (which would fly on to the next city).
+    await gartner.locator('.role-row').last().evaluate(row => {
+      const body = row.closest<HTMLElement>('.pass-body')!;
+      const below = row.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom;
+      if (below > 0) body.scrollTop += below + 12;
+    });
     // A role's highlights are on the back of the ticket.
     await gartner.locator('.role-row').last().click();
     await expect(page.locator('.boarding-pass.is-turning')).toHaveCount(0);
