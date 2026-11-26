@@ -443,12 +443,14 @@ test('published impact, expanded work and grouped career chapters on desktop and
       if (below > 0) body.scrollTop += below + 12;
     });
     // A role's highlights are on the back of the ticket.
-    await gartner.locator('.role-row').last().click();
+    // Press it in place: a robot's scroll-into-view would move the page and fly on.
+    await gartner.locator('.role-row').last().dispatchEvent('click');
     await expect(page.locator('.boarding-pass.is-turning')).toHaveCount(0);
     const log = page.locator('.boarding-pass.show-log .pass-log.is-open');
     await expect(log).toContainText('territory planning');
     await expect(log).toBeInViewport();
-    await log.getByRole('button', {name: /Back to the pass/}).click();
+    await expect(log.getByRole('button', {name: /Back to the pass/})).toBeVisible();
+    await log.getByRole('button', {name: /Back to the pass/}).dispatchEvent('click');
     await expect(page.locator('.boarding-pass.show-log')).toHaveCount(0);
     await page.screenshot({path:`test-results/career-${width}.png`});
     await page.getByRole('button',{name:'Switch to dark theme'}).click();
