@@ -964,7 +964,8 @@ export async function buildWorld(
   // city's base, then each tile's painted map. Depth cannot tell them apart far
   // away (that is the flicker), so they are painted in order instead, each over
   // the last, before anything else is drawn.
-  waterMat.depthWrite = false;
+  // The sea writes depth (so the sky, drawn last, never paints over it) but is
+  // drawn first; the ground layers above it ignore depth and simply paint over.
   const seaPlane = new THREE.Mesh(keep(new THREE.PlaneGeometry(60000, 60000)), waterMat);
   seaPlane.rotation.x = -Math.PI / 2;
   seaPlane.renderOrder = -3;
@@ -1168,7 +1169,6 @@ export async function buildWorld(
         withAtmosphere(
           new THREE.MeshStandardMaterial({
             map: gTex,
-            alphaTest: 0.5,
             roughness: 0.95,
             metalness: 0,
             color: night ? 0x22252f : 0xffffff,
@@ -1176,9 +1176,6 @@ export async function buildWorld(
             emissiveMap: nTex,
             emissiveIntensity: night ? 1.8 : 0,
             depthFunc: THREE.AlwaysDepth,
-            // The coastline is an alpha cut-out; with MSAA it becomes a smooth,
-            // steady edge instead of a stair-step that crawls as the plane moves.
-            alphaToCoverage: true,
           }),
           atmo,
           groundKey,

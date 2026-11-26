@@ -168,7 +168,9 @@ export function createBuildingMaterial(atmo: Atmosphere, facadeData: Uint8Array<
             bay.x *= 0.85 + seed * 0.35;
             // Each building starts somewhere else in the pattern.
             vec2 uvT = (vec2(vFacade.x, y) / bay + floor(seed * vec2(37.0, 53.0))) / ${CELLS.toFixed(1)};
-            vec4 t = texture(uFacade, vec3(uvT, layer));
+            // A slight blur bias: the thinnest lines (floor slabs, lit bands) can
+            // never be finer than a pixel, so they cannot snap between pixels and crawl.
+            vec4 t = texture(uFacade, vec3(uvT, layer), 0.75);
             float plinth = 1.0 - smoothstep(4.0, 4.4, y);
             float glassAmt = style > 3.5 ? 0.0 : mix(t.r, style == 0.0 || style == 2.0 ? 0.7 : 0.1, plinth);
             gGlass = glassAmt;
@@ -190,7 +192,12 @@ export function createBuildingMaterial(atmo: Atmosphere, facadeData: Uint8Array<
             diffuseColor.rgb *= (1.0 - inner * 0.35) * (1.0 + outer * 0.25);
             // Night: dark walls, and one of the two baked lighting patterns.
             diffuseColor.rgb *= 1.0 - uNight * 0.72;
-            float lit = mix(t.b, t.a, step(0.55, seed)) * (1.0 - plinth) * (style > 3.5 ? 0.0 : 1.0);
+            // Lit windows are the brightest detail on screen, so far away they settle
+            // into their average glow sooner (a blurrier texture level) than the walls do.
+            vec4 tn = texture(uFacade, vec3(uvT, layer), 2.0);
+            float near = 1.0 - smoothstep(0.08, 0.3, length(fwidth(uvT * ${TEX.toFixed(1)})) / 8.0);
+            vec2 litPair = mix(tn.ba, t.ba, near);
+            float lit = mix(litPair.x, litPair.y, step(0.55, seed)) * (1.0 - plinth) * (style > 3.5 ? 0.0 : 1.0);
             bool office = style < 0.5 || (style > 1.5 && style < 2.5);
             vec3 warm = office ? vec3(1.0, 0.8, 0.52) : mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.72, 0.42), fract(seed * 7.0));
             // Shops glow along the street.
@@ -280,8 +287,11 @@ export function createWaterMaterial(atmo: Atmosphere, deep: THREE.Color, sunColo
         // sparkle on and off between pixels as the ripples move.
         float sunR = max(dot(r, uSunDir), 0.0);
         float glint = pow(sunR, 220.0) * 6.0 * (1.0 - smoothstep(300.0, 3000.0, dist) * 0.7) + pow(sunR, 40.0) * 0.6;
-        vec3 body = uDeep * (0.55 + 0.45 * ndv);
-        vec3 col = mix(body, sky, clamp(fres * 1.15, 0.0, 1.0)) + uSunColor * glint * (1.0 - uNight * 0.85);
+        // Water reflects the sky but is never brighter than a mirror of it, and keeps
+        // its own colour: at grazing angles real sea is a darker, bluer sky.
+        float refl = clamp(fres, 0.0, 1.0) * 0.72;
+        vec3 body = uDeep * (0.45 + 0.35 * ndv);
+        vec3 col = mix(body, sky * mix(vec3(1.0), uDeep * 2.6 + 0.35, 0.45), refl) + uSunColor * glint * (1.0 - uNight * 0.85);
         gl_FragColor = vec4(applyAtmos(col, vWP), 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

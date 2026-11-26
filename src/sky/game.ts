@@ -129,6 +129,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let renderScale = 1;
   let paceTime = 0;
   let paceFrames = 0;
+  /** Never below one render pixel per CSS pixel (unless software rendering). */
+  const applyRatio = () => renderer.setPixelRatio(software ? baseRatio * renderScale : Math.max(Math.min(1, devicePixelRatio || 1), baseRatio * renderScale));
   let grabs = 0;
   let slowWindows = 0;
   let fastWindows = 0;
@@ -138,9 +140,12 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let night = document.documentElement.dataset.theme === "dark";
   const applyQuality = () => {
     const q = effective();
-    const maxDpr = small ? 1.25 : 1.5;
+    // In play, phones get 2× (below that the city's thin lines, window bands, roads
+    // and edges, alias and crawl on their dense screens) and desktops up to 1.75×.
+    // Behind the page's text the city is softer and lighter: 1.25×.
+    const maxDpr = mode === "play" ? (small ? 2 : 1.75) : 1.25;
     baseRatio = q === 0 ? 0.5 : Math.min(devicePixelRatio || 1, maxDpr);
-    renderer.setPixelRatio(baseRatio * renderScale);
+    applyRatio();
     // Real sun shadows, building on building, when the machine can afford them.
     // At night the moon casts nothing worth the cost; that budget goes to the glow of the lights.
     renderer.shadowMap.enabled = q >= 2 && !night;
@@ -881,7 +886,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       fastWindows = avg < 1 / 58 ? fastWindows + 1 : 0;
       let next = renderScale;
       if (slowWindows >= 2) {
-        next = Math.max(0.6, renderScale * 0.85);
+        next = Math.max(0.75, renderScale * 0.85);
         slowWindows = 0;
       } else if (fastWindows >= 5) {
         next = Math.min(1, renderScale * 1.12);
@@ -890,7 +895,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       paceTime = paceFrames = 0;
       if (Math.abs(next - renderScale) > 0.01) {
         renderScale = next;
-        renderer.setPixelRatio(baseRatio * renderScale);
+        applyRatio();
         resize();
       }
     }
@@ -1011,13 +1016,13 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     timeFrame();
     if (!fixedRes && !software) {
       renderScale = 1;
-      renderer.setPixelRatio(baseRatio);
+      applyRatio();
       resize();
       const times = [timeFrame(), timeFrame(), timeFrame(), timeFrame(), timeFrame()].sort((a, b) => a - b);
       const ms = times[2];
       // Cost scales with pixels: aim for ~12 ms of GPU time per frame.
-      renderScale = Math.max(0.6, Math.min(1, Math.sqrt(12 / Math.max(ms, 1))));
-      renderer.setPixelRatio(baseRatio * renderScale);
+      renderScale = Math.max(0.75, Math.min(1, Math.sqrt(14 / Math.max(ms, 1))));
+      applyRatio();
       resize();
       paceTime = paceFrames = slowWindows = fastWindows = 0;
     }

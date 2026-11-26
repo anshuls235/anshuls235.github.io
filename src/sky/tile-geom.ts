@@ -99,6 +99,9 @@ const ROOF_LIN: Record<CityId, [number, number, number][]> = {
   delhi: ROOFS.delhi.map(hex),
 };
 
+/** Shallow-water colour painted into the ground (matches the sea shader's body colour from above). */
+const WATER_PAINT: Record<CityId, string> = { dubai: "#1d5a68", bengaluru: "#355650", delhi: "#3f5a55" };
+
 const TERRAIN_STYLE: Record<CityId, { ground: string; grainDark: string; grainLight: string; parkA: string; parkB: string; sand: string }> = {
   dubai: {
     ground: "#dec9a2",
@@ -535,9 +538,12 @@ function paintTileGroundBitmaps(
   }
 
   // Cut out inland water (rivers, canals, lagoons, reflecting pools) so 3D water shines through!
-  g.globalCompositeOperation = "destination-out";
-  for (const ring of tile.water) fillRing(ring, "#000");
-  g.globalCompositeOperation = "source-over";
+  // Water is painted into the ground, not cut out of it: a cut-out edge is a hard
+  // alpha step that crawls as the plane moves; a painted, softened edge does not.
+  const waterPaint = WATER_PAINT[cityId];
+  g.filter = `blur(${Math.max(0.6, 1.4 * scale)}px)`;
+  for (const ring of tile.water) fillRing(ring, waterPaint);
+  g.filter = "none";
   for (const ring of tile.islands) fillRing(ring, palette.ground);
 
   // Cut out coastal sea cells (Dubai Marina canal, Palm Jumeirah fronds, Arabian Gulf)
@@ -573,10 +579,18 @@ function paintTileGroundBitmaps(
       mg.putImageData(img, 0, 0);
       const wx0 = (c0 * sea.cell - sea.half[0] - minX) * scale;
       const wz0 = (r0 * sea.cell - sea.half[1] - minZ) * scale;
-      g.globalCompositeOperation = "destination-out";
-      g.imageSmoothingEnabled = true;
-      g.drawImage(mc, wx0, wz0, cw * sea.cell * scale, rh * sea.cell * scale);
-      g.globalCompositeOperation = "source-over";
+      // The 10 m sea grid, smoothed into a soft coastline: drawn into a tinted
+      // copy, blurred by about one cell, and laid over the ground.
+      const tint = new OffscreenCanvas(size, size);
+      const tg = tint.getContext("2d")!;
+      tg.imageSmoothingEnabled = true;
+      tg.filter = `blur(${Math.max(1, sea.cell * scale * 0.9)}px)`;
+      tg.drawImage(mc, wx0, wz0, cw * sea.cell * scale, rh * sea.cell * scale);
+      tg.filter = "none";
+      tg.globalCompositeOperation = "source-in";
+      tg.fillStyle = waterPaint;
+      tg.fillRect(0, 0, size, size);
+      g.drawImage(tint, 0, 0);
     }
   }
 
