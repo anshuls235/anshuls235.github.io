@@ -44,7 +44,7 @@ export function steer(glider: Glider, target: number, maxBank = 0.5) {
  * while the speed lasts, and lowers the nose itself before a stall. Let go and
  * it rolls level and settles at best-glide speed.
  */
-export function assist(glider: Glider, stick: { roll: number; pitch: number }) {
+export function assist(glider: Glider, stick: { roll: number; pitch: number }, boosting = false) {
   const t = glider.telemetry;
   glider.body.quaternion.vmult(NOSE, nose);
   glider.body.quaternion.vmult(RIGHT, right);
@@ -57,11 +57,15 @@ export function assist(glider: Glider, stick: { roll: number; pitch: number }) {
   // In a steep turn it aims slower, as pilots do to circle tightly in a thermal.
   const target = BEST_GLIDE - 4.5 * Math.min(1, Math.abs(t.bank) / 0.6);
   const glide = -0.087 + clamp(0.03 * (t.airspeed - target), -0.15, 0.12);
-  const want = Math.abs(stick.pitch) < 0.06 ? glide : stick.pitch > 0 ? stick.pitch * 0.22 : stick.pitch * 0.5; // up to +12° climb, −29° dive
+  // Under boost, hands off holds the height: the thrust becomes speed toward the
+  // ring, not a climb away from it.
+  const neutral = boosting ? 0 : glide;
+  const want = Math.abs(stick.pitch) < 0.06 ? neutral : stick.pitch > 0 ? stick.pitch * 0.22 : stick.pitch * 0.5; // up to +12° climb, −29° dive
   let pitch = 0.1 + 2.4 * (want - gamma) - 0.35 * glider.body.angularVelocity.dot(right) + turn;
   // Stall protection: below the floor, the nose comes down whatever the stick says.
   if (t.airspeed < MIN_SPEED) pitch = Math.min(pitch, -0.25 * (MIN_SPEED - t.airspeed) + turn * 0.5);
-  if (t.airspeed > 42) pitch = Math.max(pitch, 0.25);
+  // Over-speed protection: gliding, ease off above 42 m/s; boosting, only past 60.
+  if (t.airspeed > (boosting ? 60 : 42)) pitch = Math.max(pitch, 0.25);
   glider.controls.pitch = clamp(pitch, -0.8, 0.8);
 }
 

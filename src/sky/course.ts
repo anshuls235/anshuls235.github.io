@@ -23,7 +23,9 @@ export interface Gate {
   nx: number;
   ny: number;
   nz: number;
-  kind: "ring" | "climb";
+  /** ring: fly through; climb: circle up through it; lift: an updraft ring that
+   *  carries the plane up; speed: a gold ring worth more if crossed fast. */
+  kind: "ring" | "climb" | "lift" | "speed";
   radius: number;
   /** Seconds the gate adds to the clock. */
   bonus: number;
@@ -97,6 +99,12 @@ export function nextGate(
     }
   }
   if (best && best.gate.y > Math.max(90, Math.min(city.tallest, 420) * 0.44)) {
+    // Now and then a gold speed ring, a little further out: boost to it.
+    if (rand() < 0.18 + diff * 0.12) {
+      best.gate.kind = "speed";
+      best.gate.radius = Math.max(12, best.gate.radius - 2);
+      return [best.gate];
+    }
     // A pickup on the approach, a little off the line: worth a small detour.
     const g = best.gate;
     const t = 0.45 + rand() * 0.2;
@@ -111,33 +119,40 @@ export function nextGate(
     };
     return [g];
   }
-  // Running low: lead into the nearest safe thermal whose approach & circling core clear nearby roofs!
-  const ranked = [...city.thermals].sort(
-    (a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z),
-  );
-  let chosen = ranked[0];
-  for (const cand of ranked) {
-    const r = Math.hypot(cand.x - from.x, cand.z - from.z);
-    const estY = Math.max(55, from.y - r / GLIDE - 6);
-    const cAt = thermalCore(cand, estY, city.breeze);
-    if (city.roofAt(cAt.x, cAt.z, 110) < estY - 25 && clearOver(city, from.x, from.z, cAt.x, cAt.z) <= from.y + 10) {
-      chosen = cand;
-      break;
-    }
+  // Running low. A real thermal if one is close; otherwise a lift ring, always
+  // within reach, that hands the plane an updraft as it passes through.
+  const nearT = [...city.thermals]
+    .map((t) => ({ t, r: Math.hypot(t.x - from.x, t.z - from.z) }))
+    .filter(({ r }) => r < 650)
+    .sort((a, b) => a.r - b.r);
+  for (const { t, r: reach } of nearT) {
+    const baseAt = thermalCore(t, Math.max(55, from.y - reach / GLIDE), city.breeze);
+    const entry = Math.max(55, city.roofAt(baseAt.x, baseAt.z, 110) + 30, from.y - reach / GLIDE - 6);
+    if (entry > from.y - 4 || clearOver(city, from.x, from.z, baseAt.x, baseAt.z) > from.y + 10) continue;
+    const at = thermalCore(t, entry, city.breeze);
+    const heading = Math.atan2(at.x - from.x, -(at.z - from.z));
+    const top = entry + 110;
+    const above = thermalCore(t, top, city.breeze);
+    return [
+      { x: at.x, y: entry, z: at.z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "ring", radius: 22, bonus: Math.round(reach / 19) + 4 },
+      // A climb of 110 m takes about a minute at 2 m/s; the ring pays for it.
+      { x: above.x, y: top, z: above.z, nx: 0, ny: 1, nz: 0, kind: "climb", radius: 120, bonus: 60 },
+    ];
   }
-  const t = chosen;
-  const reach = Math.hypot(t.x - from.x, t.z - from.z);
-  const baseAt = thermalCore(t, Math.max(55, from.y - reach / GLIDE), city.breeze);
-  const entry = Math.max(55, city.roofAt(baseAt.x, baseAt.z, 110) + 30, from.y - reach / GLIDE - 6);
-  const at = thermalCore(t, entry, city.breeze);
-  const heading = Math.atan2(at.x - from.x, -(at.z - from.z));
-  const top = entry + 110;
-  const above = thermalCore(t, top, city.breeze);
-  return [
-    { x: at.x, y: entry, z: at.z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "ring", radius: 22, bonus: Math.round(reach / 19) + 4 },
-    // A climb of 110 m takes about a minute at 2 m/s; the ring pays for it.
-    { x: above.x, y: top, z: above.z, nx: 0, ny: 1, nz: 0, kind: "climb", radius: 120, bonus: 60 },
-  ];
+  for (let i = 0; i < 24; i++) {
+    const heading = from.heading + (rand() - 0.5) * 2 * maxTurn;
+    const dist = 170 + rand() * 60;
+    const x = from.x + Math.sin(heading) * dist;
+    const z = from.z - Math.cos(heading) * dist;
+    if (Math.abs(x) > hx - 220 || Math.abs(z) > hz - 220) continue;
+    const y = Math.max(40, from.y - dist / GLIDE - 3);
+    if (y < clearOver(city, from.x, from.z, x, z)) continue;
+    return [{ x, y, z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "lift", radius: 20, bonus: 8 }];
+  }
+  // Boxed in: straight ahead, as high as the glide allows.
+  const x = from.x + Math.sin(from.heading) * 180;
+  const z = from.z - Math.cos(from.heading) * 180;
+  return [{ x, y: Math.max(40, from.y - 24), z, nx: Math.sin(from.heading), ny: 0, nz: -Math.cos(from.heading), kind: "lift", radius: 24, bonus: 8 }];
 }
 
 /** Heading out of a gate, for laying the next one. */
@@ -156,7 +171,7 @@ export function crossing(gate: Gate, a: { x: number; y: number; z: number }, b: 
     const py = a.y + (b.y - a.y) * t - gate.y;
     const pz = a.z + (b.z - a.z) * t - gate.z;
     const off = Math.hypot(px, py, pz);
-    if (off <= gate.radius) return off <= gate.radius * 0.35 && gate.kind === "ring" ? "perfect" : "through";
+    if (off <= gate.radius) return off <= gate.radius * 0.35 && (gate.kind === "ring" || gate.kind === "speed") ? "perfect" : "through";
   }
-  return db > 60 && gate.kind === "ring" ? "missed" : null;
+  return db > 60 && gate.kind !== "climb" ? "missed" : null;
 }

@@ -138,7 +138,11 @@ export function createGlider(world: CANNON.World) {
     const { area: S, span: b, chord: c } = GLIDER;
     const aspect = (b * b) / S;
     const cl = liftCoefficient(alpha);
-    const cd = GLIDER.cd0 + (cl * cl) / (Math.PI * GLIDER.oswald * aspect) + 1.1 * Math.sin(alpha) ** 2;
+    // Ground effect: within about a span of the ground the wingtip vortices are
+    // squashed, cutting induced drag (Wieselsberger) — a cushion when skimming low.
+    const hb = Math.max(0.05, body.position.y / b);
+    const ground = hb < 1.5 ? ((16 * hb) ** 2) / (1 + (16 * hb) ** 2) : 1;
+    const cd = GLIDER.cd0 + (ground * cl * cl) / (Math.PI * GLIDER.oswald * aspect) + 1.1 * Math.sin(alpha) ** 2;
     const cy = GLIDER.cyBeta * beta;
 
     // Lift is perpendicular to the relative wind, in the plane of symmetry.
@@ -163,7 +167,9 @@ export function createGlider(world: CANNON.World) {
     const yr = w.dot(u);
     const cm = GLIDER.cm0 + GLIDER.cmAlpha * alpha + GLIDER.cmQ * ((qr * c) / (2 * V)) + GLIDER.pitchControl * controls.pitch;
     // Sliding right (β > 0) rolls the glider back left: dihedral.
-    const croll = GLIDER.clBeta * beta + GLIDER.clP * ((p * b) / (2 * V)) + GLIDER.rollControl * controls.roll;
+    // Past the stall the separated flow buffets: an uneven, shaking roll.
+    const buffet = telemetry.stalled ? Math.sin(body.position.x * 1.7 + body.position.z * 2.3) * 0.02 * Math.min(1, (Math.abs(alpha) - GLIDER.stall) / 0.1) : 0;
+    const croll = GLIDER.clBeta * beta + GLIDER.clP * ((p * b) / (2 * V)) + GLIDER.rollControl * controls.roll + buffet;
     // Positive torque about up yaws the nose left; sideslip right should yaw right.
     const cn = -GLIDER.cnBeta * beta + GLIDER.cnR * ((yr * b) / (2 * V));
     torque.set(0, 0, 0);

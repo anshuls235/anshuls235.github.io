@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { createWorld, createGlider, cityWind, type Glider } from "./glider";
 import { prepareCity, type City, type CityId, type CityIndex } from "./citydata";
-import { buildWorld, createBursts, createContrails, paperPlane, type BuiltWorld } from "./world3d";
+import { buildWorld, createBursts, createContrails, paperPlane, printPlane, type BuiltWorld } from "./world3d";
 import { autopilot, assist, launchPoint, type PilotState } from "./pilot";
 import { crossing, exitOf, nextGate, seeded, START_TIME, type Gate, type PickupKind } from "./course";
 import { createSound, type Sound } from "./sound";
@@ -23,6 +23,10 @@ export interface SkyControls {
 const STEP = 1 / 120;
 const IDS: CityId[] = ["bengaluru", "delhi", "dubai"];
 const COUNTDOWN = 3;
+/** A gold ring pays its bonus only when crossed at least this fast (boost gets you there). */
+const SPEED_RING_KMH = 110;
+/** Seconds between rings before the combo multiplier lapses. */
+const COMBO_WINDOW = 14;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 function stored(key: string, value?: number) {
@@ -55,8 +59,9 @@ const disposeGroup = (o: THREE.Object3D) =>
 /** A ring to fly through: a bright core, a soft glow around it, and a faint film across it. */
 function gateMesh(gate: Gate) {
   const climb = gate.kind === "climb";
-  const colour = climb ? 0x7cf0b8 : 0xff5a26;
-  const tube = climb ? 2.2 : 1.2;
+  // Orange: fly through. Mint: climb or lift (an updraft). Gold: a speed ring.
+  const colour = climb || gate.kind === "lift" ? 0x7cf0b8 : gate.kind === "speed" ? 0xffc83a : 0xff5a26;
+  const tube = climb ? 2.2 : gate.kind === "ring" ? 1.2 : 1.6;
   const core = new THREE.Mesh(
     new THREE.TorusGeometry(gate.radius, tube, 12, climb ? 96 : 64),
     new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0.95, toneMapped: false }),
@@ -159,6 +164,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   // A 4 m near plane: four times the depth precision of 1 m, so distant surfaces never fight.
   const camera = new THREE.PerspectiveCamera(62, 1, 4, 26000);
   const plane = paperPlane();
+  printPlane(plane, options.base, renderer.capabilities.getMaxAnisotropy());
   scene.add(plane);
   const q = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector);
   const status = q("[data-sky-status]");
@@ -212,14 +218,15 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let muted = stored("sky-muted") === 1;
 
   // Boost, combos, near-miss skims and updrafts
-  let boost = 0.5; // 0…1 of the booster's charge
+  let boost = 0.7; // 0…1 of the booster's charge (a full tank lasts ~6 s)
   let boosting = false;
   let gust = 0; // seconds of updraft left
   let combo = 0;
+  let comboTimer = 0;
   let ringPoints = 0;
   let skimCooldown = 0;
   let skimTick = 0;
-  const BOOST_THRUST = 245; // newtons
+  const BOOST_THRUST = 300; // newtons at low speed, tapering to nothing near 200 km/h
   const multiplier = () => Math.min(5, 1 + Math.floor(combo / 3));
 
   // The course
@@ -333,6 +340,17 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     glider.setWind((p, out) => {
       air(p, out);
       if (gust > 0) out.y += 7 * Math.min(1, gust);
+      if (mode === "play" && countdown <= 0) {
+        // Turbulence: smooth, layered gusts, stronger near the ground and among
+        // towers (where the air is churned), gentle up high.
+        const t = elapsed;
+        const low = 1 - Math.min(1, p.y / 220);
+        const roofs = city ? Math.min(1, city.roofAt(p.x, p.z, 40) / Math.max(20, p.y)) : 0;
+        const amp = 0.35 + 1.1 * low + 1.2 * roofs;
+        out.x += amp * (Math.sin(p.x * 0.021 + t * 0.9) + 0.5 * Math.sin(p.z * 0.047 - t * 1.7));
+        out.z += amp * (Math.sin(p.z * 0.019 + t * 1.1) + 0.5 * Math.sin(p.x * 0.043 + t * 1.9));
+        out.y += amp * 0.6 * (Math.sin((p.x + p.z) * 0.033 + t * 1.3) + 0.4 * Math.sin(p.x * 0.09 - t * 2.6));
+      }
       return out;
     });
   }
@@ -437,10 +455,11 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     flightTime = 0;
     contrails.reset();
     clock = START_TIME;
-    boost = 0.5;
+    boost = 0.7;
     boosting = false;
     gust = 0;
     combo = 0;
+    comboTimer = 0;
     ringPoints = 0;
     skimCooldown = 0;
     stamped.clear();
@@ -537,13 +556,15 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     // Smooth the stick a little so keys feel like a hand, not a switch.
     input.roll += (clamp(wantRoll, -1, 1) - input.roll) * 0.1;
     input.pitch += (clamp(wantPitch, -1, 1) - input.pitch) * 0.1;
-    if (assisted) assist(glider, input);
+    const firing = (keys.has(" ") || keys.has("Shift") || boostHeld) && boost > 0;
+    if (assisted) assist(glider, input, firing);
     else {
       glider.controls.roll = input.roll;
       glider.controls.pitch = input.pitch * 0.8;
     }
-    const firing = (keys.has(" ") || keys.has("Shift") || boostHeld) && boost > 0;
-    glider.controls.thrust = firing ? BOOST_THRUST : 0;
+    // A booster's push fades as airspeed builds (like a propeller's), so the dash
+    // tops out around 200 km/h instead of running away.
+    glider.controls.thrust = firing ? BOOST_THRUST * Math.max(0, 1 - glider.telemetry.airspeed / 58) : 0;
     if (firing && !boosting) sound?.boost(true);
     if (!firing && boosting) sound?.boost(false);
     boosting = firing;
@@ -596,8 +617,15 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     if (p.y < 0.8) return crash(city.isWater(p.x, p.z) ? "Splashed down" : "Touched down");
     if (Math.abs(p.x) > city.data.half[0] + 1500 || Math.abs(p.z) > city.data.half[1] + 1500) return crash("Flew off the map");
     if (mode !== "play") return;
-    if (boosting) boost = Math.max(0, boost - dt * 0.22);
+    if (boosting) boost = Math.max(0, boost - dt * 0.16);
     gust = Math.max(0, gust - dt);
+    if (combo > 0) {
+      comboTimer -= dt;
+      if (comboTimer <= 0) {
+        combo = 0;
+        flash("Combo lapsed", "bad");
+      }
+    }
     skimCooldown = Math.max(0, skimCooldown - dt);
     // Risk-reward near-miss (checked at 10 Hz): skimming within 14 m of a taller skyscraper awards points & boost!
     if (++skimTick >= 12) {
@@ -657,16 +685,22 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     const strayed = head.gate.kind === "climb" && Math.hypot(p.x - head.gate.x, p.z - head.gate.z) > 650;
     if (result === "through" || result === "perfect") {
       const perfect = result === "perfect";
+      const kmh = glider.telemetry.airspeed * 3.6;
+      const fast = head.gate.kind === "speed" && kmh >= SPEED_RING_KMH;
       ringsPassed++;
       combo++;
-      const extra = perfect ? 2 : 0;
+      comboTimer = COMBO_WINDOW;
+      const extra = (perfect ? 2 : 0) + (fast ? 3 : 0);
       clock += head.gate.bonus + extra;
-      ringPoints += (100 + (perfect ? 50 : 0)) * multiplier();
+      ringPoints += (100 + (perfect ? 50 : 0) + (fast ? 200 : 0)) * multiplier();
       boost = Math.min(1, boost + (perfect ? 0.3 : 0.15));
-      sound?.ring(head.gate.kind === "climb" || perfect);
-      bursts.emit(head.mesh.position, tmpN.set(head.gate.nx, head.gate.ny, head.gate.nz), head.gate.radius, perfect ? 0xffd25a : head.gate.kind === "climb" ? 0x7cf0b8 : 0xff6a30, perfect ? 140 : 90);
+      // A lift ring is a gift of height: a strong updraft for a few seconds.
+      if (head.gate.kind === "lift") gust = Math.max(gust, 4.5);
+      sound?.ring(head.gate.kind === "climb" || perfect || fast);
+      bursts.emit(head.mesh.position, tmpN.set(head.gate.nx, head.gate.ny, head.gate.nz), head.gate.radius, perfect || fast ? 0xffd25a : head.gate.kind === "climb" || head.gate.kind === "lift" ? 0x7cf0b8 : 0xff6a30, perfect || fast ? 140 : 90);
       kick = perfect ? 1 : 0.6;
-      flash(`${perfect ? "Perfect! " : ""}+${head.gate.bonus + extra}s${multiplier() > 1 ? `  ×${multiplier()}` : ""}`);
+      const label = head.gate.kind === "lift" ? "Updraft! " : head.gate.kind === "speed" ? (fast ? `Speed ${Math.round(kmh)} km/h! ` : `Too slow (${SPEED_RING_KMH}+ km/h) `) : perfect ? "Perfect! " : "";
+      flash(`${label}+${head.gate.bonus + extra}s${multiplier() > 1 ? `  ×${multiplier()}` : ""}`);
       dropGate(head);
       gates.shift();
       fillGates();

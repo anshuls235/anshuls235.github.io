@@ -1521,8 +1521,9 @@ export async function buildWorld(
  * wingtips and trailing edge. Flat shading lets every fold catch the sun.
  */
 export function paperPlane() {
-  const paper = new THREE.Color(0xfbf6ea);
-  const shade = new THREE.Color(0xeee6d4);
+  // White and a light grey: they tint the printed boarding-pass texture (set later).
+  const paper = new THREE.Color(0xffffff);
+  const shade = new THREE.Color(0xe6e2da);
   const orange = new THREE.Color(0xff4d1c);
   const positions: number[] = [];
   const colors: number[] = [];
@@ -1553,16 +1554,36 @@ export function paperPlane() {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  // The sheet seen from above: the print is laid flat across the wings, nose to tail.
+  const uvs: number[] = [];
+  for (let i = 0; i < positions.length; i += 3) uvs.push((positions[i] + 1.4) / 2.8, 1 - (positions[i + 2] + 1.95) / 2.95);
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7, flatShading: true, emissive: 0xfff4e2, emissiveIntensity: 0.22 }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.75, flatShading: true, emissive: 0xfff4e2, emissiveIntensity: 0.18 }),
   );
   mesh.castShadow = true;
   const plane = new THREE.Group();
   plane.add(mesh);
   mesh.scale.setScalar(1.45);
   return plane;
+}
+
+/** Print the boarding pass onto the paper plane once its texture arrives (~95 KB, fetched only with the game). */
+export function printPlane(plane: THREE.Object3D, base: string, anisotropy: number) {
+  new THREE.TextureLoader().load(`${base}assets/sky/plane.webp`, (tex) => {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(8, anisotropy);
+    plane.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (m && "map" in m) {
+        m.map = tex;
+        m.emissiveMap = tex;
+        m.needsUpdate = true;
+      }
+    });
+  });
 }
 
 /**

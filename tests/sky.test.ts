@@ -187,3 +187,20 @@ for (const id of ["dubai", "bengaluru", "delhi"] as CityId[]) {
     assert.ok(passed >= 6, `passed ${passed} rings (${climbs} climbs), ${clock.toFixed(0)} s left`);
   });
 }
+
+test("every ring the course lays is within reach, even low over Dubai's sparse thermals", async () => {
+  const { nextGate, seeded } = await import("../src/sky/course");
+  for (const id of ["dubai", "bengaluru", "delhi"] as CityId[]) {
+    const city = load(id);
+    const rand = seeded(42);
+    const [hx, hz] = city.data.half;
+    let worst = 0;
+    for (let i = 0; i < 300; i++) {
+      const from = { x: (rand() - 0.5) * hx * 1.6, z: (rand() - 0.5) * hz * 1.6, y: 45 + rand() * 300, heading: rand() * 6.283 };
+      if (city.roofAt(from.x, from.z, 30) > from.y - 10) continue;
+      const first = nextGate(city, from, rand, rand())[0];
+      worst = Math.max(worst, Math.hypot(first.x - from.x, first.z - from.z));
+    }
+    assert.ok(worst < 800, `${id}: farthest first ring ${worst.toFixed(0)} m`);
+  }
+});
