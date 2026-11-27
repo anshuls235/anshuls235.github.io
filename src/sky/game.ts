@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { createWorld, createGlider, cityWind, type Glider } from "./glider";
 import { prepareCity, type City, type CityId, type CityIndex } from "./citydata";
 import { buildWorld, createBursts, createContrails, paperPlane, printPlane, type BuiltWorld } from "./world3d";
-import { autopilot, assist, launchPoint, type PilotState } from "./pilot";
+import { autopilot, assist, launchPoint, launchSpots, type LaunchSpot, type PilotState } from "./pilot";
 import { crossing, exitOf, nextGate, reachable, seeded, START_TIME, type Gate, type PickupKind } from "./course";
 import { createSound, type Sound } from "./sound";
 
@@ -221,10 +221,10 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   // Boost, combos, near-miss skims and updrafts
   let boost = 0.7; // 0…1 of the booster's charge (a full tank lasts ~6 s)
   let boosting = false;
+  let lowTime = 0;
   let gust = 0; // seconds of updraft left
   let combo = 0;
   let comboTimer = 0;
-  let replanTick = 0;
   let ringPoints = 0;
   let skimCooldown = 0;
   let skimTick = 0;
@@ -232,7 +232,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const multiplier = () => Math.min(5, 1 + Math.floor(combo / 3));
 
   // The course
-  let gates: { gate: Gate; mesh: THREE.Mesh; orb: THREE.Group | null; replanned?: boolean }[] = [];
+  let gates: { gate: Gate; mesh: THREE.Mesh; orb: THREE.Group | null}[] = [];
   let tail = { x: 0, y: 0, z: 0, heading: 0 };
   let tailFrom = { x: 0, z: 0 };
   let rand = seeded(1);
@@ -444,9 +444,14 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     fillGates();
   }
 
+  /** Play flights start where prepareFlight chose; the background flight always at the classic opening. */
+  let flightStart: LaunchSpot | null = null;
+  function startSpot(c: City) {
+    return mode === "play" && flightStart ? flightStart : launchPoint(c);
+  }
   function launch() {
     if (!city) return;
-    const start = launchPoint(city);
+    const start = startSpot(city);
     // cannon's yaw turns the nose left; headings here turn right.
     glider.launch(start.x, start.y, start.z, -start.heading, 20);
     crashed = 0;
@@ -459,6 +464,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     clock = START_TIME;
     boost = 0.7;
     boosting = false;
+    lowTime = 0;
     gust = 0;
     combo = 0;
     comboTimer = 0;
@@ -528,6 +534,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       const next = await cityData(id);
       if (current !== id) return;
       city = next;
+      flightStart = null;
       buildPhysics();
       await buildScene();
       if (current !== id) return;
@@ -598,7 +605,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       // Hold on the launch line until "Fly".
       countdown -= dt;
       if (countdown <= 0) {
-        const start = launchPoint(city);
+        const start = startSpot(city);
         glider.launch(start.x, start.y, start.z, -start.heading, 20);
       }
       return;
@@ -684,7 +691,11 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       }
     }
     const result = crossing(head.gate, prev, p);
-    const strayed = head.gate.kind === "climb" && Math.hypot(p.x - head.gate.x, p.z - head.gate.z) > 650;
+    // Wandered off: a climb ring's thermal is left behind past 650 m, any other ring past 1.1 km.
+    const strayed = Math.hypot(p.x - head.gate.x, p.z - head.gate.z) > (head.gate.kind === "climb" ? 650 : 1100);
+    // Sunk below any glide that reaches the ring, and not climbing or boosting out of it, for 3 s.
+    lowTime = !boosting && gust <= 0 && glider.body.velocity.y < 0.5 && !reachable(head.gate, p) ? lowTime + dt : 0;
+    const tooLow = lowTime > 3;
     if (result === "through" || result === "perfect") {
       const perfect = result === "perfect";
       const kmh = glider.telemetry.airspeed * 3.6;
@@ -706,17 +717,13 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       dropGate(head);
       gates.shift();
       fillGates();
-    } else if (!head.replanned && ++replanTick >= 60 && ((replanTick = 0), !reachable(head.gate, p))) {
-      // Sunk below the plan: quietly re-plan from here (no penalty), so the next
-      // ring is always one the plane can actually reach. Once per ring: the rings
-      // never hop about while the pilot catches up.
-      restartCourse();
-      if (gates[0]) gates[0].replanned = true;
-    } else if (result === "missed" || strayed) {
+      lowTime = 0;
+    } else if (result === "missed" || strayed || tooLow) {
       sound?.miss();
       combo = 0;
       clock = Math.max(5, clock - 3);
-      flash("Missed  −3s", "bad");
+      flash(result === "missed" ? "Missed  −3s" : tooLow ? "Too low  −3s" : "Lost the ring  −3s", "bad");
+      lowTime = 0;
       restartCourse();
     }
   }
@@ -1036,9 +1043,19 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     const show = (f: number) => progressBar?.style.setProperty("--progress", (0.1 + f * 0.75).toFixed(3));
     show(0);
     preparingFlight = true;
-    const start = launchPoint(city);
+    // Each flight starts somewhere new: the classic opening, then a run-in to each far landmark in turn.
+    const spots = launchSpots(city);
+    const turnKey = `sky-launch-${city.data.id}`;
+    const turn = stored(turnKey);
+    stored(turnKey, turn + 1);
+    const start = { ...spots[turn % spots.length] };
+    if (progressLabel && start.name) progressLabel.textContent = `Preparing ${city.data.name}: ${start.name}…`;
     await world.prepare(start.x, start.z, show);
     if (ticket !== preparing || world !== built) return;
+    // Tiles there are loaded now: start well clear of the nearby roofs.
+    start.y = Math.max(start.y, city.roofAt(start.x, start.z, 300) + 70);
+    flightStart = start;
+    launch();
     show(1);
     await Promise.race([
       Promise.resolve()
@@ -1082,6 +1099,12 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     updateHud();
   }
 
+  /** Fly again: in play, from the next start spot (loading it behind the bar). */
+  function relaunch() {
+    launch();
+    if (mode === "play") void prepareFlight();
+  }
+
   function setMode(next: "attract" | "play") {
     mode = next;
     if (next !== "play" && preparing) {
@@ -1115,7 +1138,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       if (key === "Escape") return setMode("attract");
       if (key === "r" || (key === " " && crashed)) {
         event.preventDefault();
-        launch();
+        relaunch();
         return;
       }
       if (key === "m") return toggleSound();
@@ -1190,7 +1213,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       requestAnimationFrame(() => setTimeout(() => setMode("play"), 0));
     }
     if (target.hasAttribute("data-sky-exit")) setMode("attract");
-    if (target.hasAttribute("data-sky-relaunch")) launch();
+    if (target.hasAttribute("data-sky-relaunch")) relaunch();
     if (target.hasAttribute("data-sky-sound")) toggleSound();
     if (target.hasAttribute("data-sky-assist")) {
       assisted = !assisted;

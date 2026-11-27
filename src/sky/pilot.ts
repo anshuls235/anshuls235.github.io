@@ -118,3 +118,33 @@ export function launchPoint(city: City) {
   const core = thermalCore(thermal, y, city.breeze);
   return { x: core.x, y, z: core.z, heading: h };
 }
+
+export type LaunchSpot = { x: number; y: number; z: number; heading: number; name?: string };
+
+/**
+ * Where play flights start, in turn: the classic opening, then a run-in towards each
+ * far-apart landmark, so every flight shows a different part of the city instead of
+ * always the same corner. Heights are a floor; the game lifts them clear of the
+ * roofs once the tiles there are loaded.
+ */
+export function launchSpots(city: City): LaunchSpot[] {
+  const first = launchPoint(city);
+  const spots: LaunchSpot[] = [first];
+  const [hx, hz] = city.data.half;
+  const margin = 900;
+  const taken = [{ x: first.x, z: first.z }];
+  // Landmarks first, tallest first; then the postcard spots, to reach the rest of a big map.
+  const byHeight = [...city.landmarks].sort((a, b) => b.height - a.height);
+  for (const lm of [...byHeight, ...(city.index.postcards ?? [])]) {
+    if (spots.length >= 6) break;
+    if (taken.some((t) => Math.hypot(t.x - lm.x, t.z - lm.z) < 2500)) continue;
+    // Approach from the side of the map's middle, 700 m out, facing the landmark.
+    const len = Math.hypot(lm.x, lm.z) || 1;
+    const x = Math.max(-hx + margin, Math.min(hx - margin, lm.x - (lm.x / len) * 700));
+    const z = Math.max(-hz + margin, Math.min(hz - margin, lm.z - (lm.z / len) * 700));
+    const heading = Math.atan2(lm.x - x, -(lm.z - z));
+    spots.push({ x, y: first.y, z, heading, name: lm.name });
+    taken.push({ x: lm.x, z: lm.z });
+  }
+  return spots;
+}

@@ -5,7 +5,7 @@ import { createWorld, createGlider, cityWind, thermalCore } from "../src/sky/gli
 import { prepareCity, type City, type CityId, type CityIndex } from "../src/sky/citydata";
 import { decodeTile, encodeTile, TILE_SIZE, type TileInput } from "../src/sky/tileformat";
 import { buildTileGeometry } from "../src/sky/tile-geom";
-import { autopilot, assist, launchPoint } from "../src/sky/pilot";
+import { autopilot, assist, launchPoint, launchSpots } from "../src/sky/pilot";
 
 function load(id: CityId): City {
   const index = JSON.parse(readFileSync(`public/assets/sky/${id}/index.json`, "utf8")) as CityIndex;
@@ -29,6 +29,7 @@ function fly(id: CityId, seconds: number, pilot: "auto" | ((g: ReturnType<typeof
   g.launch(start.x, start.y, start.z, -start.heading, 20);
   const state = { leg: 0, climbing: false };
   let crashed = "";
+  let low = 0;
   for (let i = 0; i < seconds * 120 && !crashed; i++) {
     if (pilot === "auto") autopilot(g, city, state);
     else pilot(g, i / 120);
@@ -116,7 +117,7 @@ test("binary SKY1 tiles encode/decode round-trip and build all 3 LODs cleanly", 
 import { nextGate, exitOf, crossing, reachable, seeded, START_TIME, type Gate } from "../src/sky/course";
 
 /** A plain player: steer at the next ring, ask for climb or dive by height error, circle in climb rings. */
-function play(id: CityId, seconds: number) {
+function play(id: CityId, seconds: number, spot = 0) {
   const city = load(id);
   const world = createWorld();
   const g = createGlider(world);
@@ -128,7 +129,8 @@ function play(id: CityId, seconds: number) {
     if (gust > 0) out.y += 7 * Math.min(1, gust);
     return out;
   });
-  const start = launchPoint(city);
+  const start = { ...launchSpots(city)[spot] };
+  start.y = Math.max(start.y, city.roofAt(start.x, start.z, 300) + 70);
   g.launch(start.x, start.y, start.z, -start.heading, 20);
   const rand = seeded(7);
   const gates: Gate[] = [];
@@ -149,6 +151,7 @@ function play(id: CityId, seconds: number) {
   let passed = 0;
   let climbs = 0;
   let crashed = "";
+  let low = 0;
   for (let i = 0; i < seconds * 120 && !crashed && clock > 0; i++) {
     const p = g.body.position;
     const gate = gates[0];
@@ -180,8 +183,14 @@ function play(id: CityId, seconds: number) {
       clock += gates[0].bonus;
       gates.shift();
       fill();
-    } else if (result === "missed" || (i % 120 === 0 && !reachable(gates[0], b))) {
-      // As in the game: missed, or sunk below the plan, a fresh course from here.
+    } else if (
+      result === "missed" ||
+      Math.hypot(b.x - gates[0].x, b.z - gates[0].z) > (gates[0].kind === "climb" ? 650 : 1100) ||
+      (low = gust <= 0 && g.body.velocity.y < 0.5 && !reachable(gates[0], b) ? low + 1 / 120 : 0) > 3
+    ) {
+      low = 0;
+      // As in the game: missed or wandered off, a fresh course from here (rings never move otherwise).
+      clock = Math.max(5, clock - 3);
       gates.length = 0;
       tail = { x: b.x, y: b.y, z: b.z, heading: Math.atan2(g.body.velocity.x, -g.body.velocity.z) };
       prev = { x: b.x, z: b.z };
@@ -192,6 +201,15 @@ function play(id: CityId, seconds: number) {
 }
 
 for (const id of ["dubai", "bengaluru", "delhi"] as CityId[]) {
+  test(`flights over ${id} start in different parts of the city, each one playable`, () => {
+    const spots = launchSpots(load(id));
+    assert.ok(spots.length >= 2, `${id}: only ${spots.length} start spot`);
+    for (let k = 1; k < spots.length; k++) {
+      const { passed, crashed, clock } = play(id, 60, k);
+      assert.equal(crashed, "", `${spots[k].name}: ${crashed}`);
+      assert.ok(passed >= 3 && clock > 0, `${spots[k].name}: passed ${passed} rings, ${clock.toFixed(0)} s left`);
+    }
+  });
   test(`the ring course over ${id} is playable with the assist: three minutes, no buildings hit, the clock holds`, () => {
     const { passed, crashed, clock, climbs } = play(id, 180);
     assert.equal(crashed, "", crashed);
