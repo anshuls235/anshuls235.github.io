@@ -307,7 +307,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       g.fillText(text, 52, 37);
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthWrite: false, transparent: true, toneMapped: false }));
+      // Drawn over everything: a tag sliced by a tower in front of it looks broken.
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
       sprite.center.set(0.5, 0);
       sprite.scale.set((0.032 * w) / 52, 0.032, 1);
       sprite.position.set(lm.x, Math.min(Math.max(lm.height, 20), 600) + 30, lm.z);
@@ -984,6 +985,15 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
         .sort((a, b) => a.sprite.position.distanceToSquared(plane.position) - b.sprite.position.distanceToSquared(plane.position))
         .slice(0, 5);
       for (const l of labels) l.sprite.visible = near.includes(l);
+      // Float each shown tag just above the roofs around its place (tiles stream in, so re-check).
+      if (city) {
+        for (const l of near) {
+          const spot = spots.find((p) => p.name === l.name);
+          if (!spot) continue;
+          const top = Math.max(spot.height, 20, city.roofAt(spot.x, spot.z, spot.radius + 60));
+          l.sprite.position.y = Math.min(top, 600) + 30;
+        }
+      }
     }
     updateHud();
     updatePointer();
@@ -1043,12 +1053,14 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     const show = (f: number) => progressBar?.style.setProperty("--progress", (0.1 + f * 0.75).toFixed(3));
     show(0);
     preparingFlight = true;
-    // Each flight starts somewhere new: the classic opening, then a run-in to each far landmark in turn.
-    const spots = launchSpots(city);
-    const turnKey = `sky-launch-${city.data.id}`;
-    const turn = stored(turnKey);
-    stored(turnKey, turn + 1);
-    const start = { ...spots[turn % spots.length] };
+    // Each flight starts somewhere random in the city, never where the last one did.
+    const starts = launchSpots(city);
+    const lastKey = `sky-launch-${city.data.id}`;
+    const last = stored(lastKey) - 1;
+    let pick = Math.floor(Math.random() * starts.length);
+    if (pick === last && starts.length > 1) pick = (pick + 1 + Math.floor(Math.random() * (starts.length - 1))) % starts.length;
+    stored(lastKey, pick + 1);
+    const start = { ...starts[pick] };
     if (progressLabel && start.name) progressLabel.textContent = `Preparing ${city.data.name}: ${start.name}…`;
     await world.prepare(start.x, start.z, show);
     if (ticket !== preparing || world !== built) return;
