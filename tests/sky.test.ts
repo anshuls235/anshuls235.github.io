@@ -29,7 +29,6 @@ function fly(id: CityId, seconds: number, pilot: "auto" | ((g: ReturnType<typeof
   g.launch(start.x, start.y, start.z, -start.heading, 20);
   const state = { leg: 0, climbing: false };
   let crashed = "";
-  let low = 0;
   for (let i = 0; i < seconds * 120 && !crashed; i++) {
     if (pilot === "auto") autopilot(g, city, state);
     else pilot(g, i / 120);
