@@ -145,7 +145,7 @@ export function nextGate(
   for (const { t, r: reach } of nearT) {
     const baseAt = thermalCore(t, Math.max(55, from.y - reach / GLIDE), city.breeze);
     const entry = Math.max(55, city.roofAt(baseAt.x, baseAt.z, 110) + 30, from.y - reach / GLIDE - 6);
-    if (entry > from.y - 4 || clearOver(city, from.x, from.z, baseAt.x, baseAt.z) > from.y + 10) continue;
+    if (entry > from.y - reach / GLIDE + 8 || clearOver(city, from.x, from.z, baseAt.x, baseAt.z) > from.y + 10) continue;
     const at = thermalCore(t, entry, city.breeze);
     const heading = Math.atan2(at.x - from.x, -(at.z - from.z));
     const top = entry + 110;
@@ -163,7 +163,8 @@ export function nextGate(
     const x = from.x + Math.sin(heading) * dist;
     const z = from.z - Math.cos(heading) * dist;
     if (Math.abs(x) > hx - 400 || Math.abs(z) > hz - 400) continue;
-    const y = Math.max(50, from.y - dist / GLIDE - 3);
+    // Never above what the plane can glide to (else it is unreachable from the start).
+    const y = Math.max(Math.min(50, from.y - dist / 12 - 2), from.y - dist / GLIDE - 3, 15);
     if (y < clearOver(city, from.x, from.z, x, z)) continue;
     // Low among towers is no place to be: lift rings lead out to open ground.
     const crowd = city.roofAt(x, z, 140) - y;
@@ -181,7 +182,8 @@ export function nextGate(
       const x = from.x + Math.sin(heading) * dist;
       const z = from.z - Math.cos(heading) * dist;
       if (Math.abs(x) > hx - 400 || Math.abs(z) > hz - 400) continue;
-      const y = Math.max(50, from.y - dist / GLIDE - 3);
+      // Never above what the plane can glide to (else it is unreachable from the start).
+    const y = Math.max(Math.min(50, from.y - dist / 12 - 2), from.y - dist / GLIDE - 3, 15);
       const margin = y - clearOver(city, from.x, from.z, x, z) + Math.cos(h - heading) * 5 - Math.abs(wrapAngle(heading - from.heading)) * 8;
       if (margin > pick.margin) pick = { margin, x, y, z, heading };
     }
@@ -200,7 +202,7 @@ const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 export function reachable(gate: Gate, p: { x: number; y: number; z: number }) {
   if (gate.kind === "climb") return true;
   const dist = Math.hypot(gate.x - p.x, gate.z - p.z);
-  return p.y - dist / 12 >= gate.y - gate.radius * 0.6;
+  return p.y - dist / GLIDE >= gate.y - gate.radius * 0.6;
 }
 
 /** Heading out of a gate, for laying the next one. */

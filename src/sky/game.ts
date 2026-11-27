@@ -232,7 +232,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const multiplier = () => Math.min(5, 1 + Math.floor(combo / 3));
 
   // The course
-  let gates: { gate: Gate; mesh: THREE.Mesh; orb: THREE.Group | null }[] = [];
+  let gates: { gate: Gate; mesh: THREE.Mesh; orb: THREE.Group | null; replanned?: boolean }[] = [];
   let tail = { x: 0, y: 0, z: 0, heading: 0 };
   let tailFrom = { x: 0, z: 0 };
   let rand = seeded(1);
@@ -706,10 +706,12 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       dropGate(head);
       gates.shift();
       fillGates();
-    } else if (++replanTick >= 60 && ((replanTick = 0), !reachable(head.gate, p))) {
+    } else if (!head.replanned && ++replanTick >= 60 && ((replanTick = 0), !reachable(head.gate, p))) {
       // Sunk below the plan: quietly re-plan from here (no penalty), so the next
-      // ring is always one the plane can actually reach.
+      // ring is always one the plane can actually reach. Once per ring: the rings
+      // never hop about while the pilot catches up.
       restartCourse();
+      if (gates[0]) gates[0].replanned = true;
     } else if (result === "missed" || strayed) {
       sound?.miss();
       combo = 0;

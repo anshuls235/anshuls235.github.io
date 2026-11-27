@@ -212,6 +212,8 @@ test("every ring the course lays is within reach, even low over Dubai's sparse t
       if (city.roofAt(from.x, from.z, 30) > from.y - 10) continue;
       const first = nextGate(city, from, rand, rand())[0];
       worst = Math.max(worst, Math.hypot(first.x - from.x, first.z - from.z));
+      // A fresh plan is always reachable from where it was made, so re-planning never loops.
+      assert.ok(reachable(first, from), `${id}: ${first.kind} ring at ${first.y.toFixed(0)} m unreachable from ${from.y.toFixed(0)} m`);
     }
     assert.ok(worst < 800, `${id}: farthest first ring ${worst.toFixed(0)} m`);
   }
@@ -239,7 +241,8 @@ test("following the rings keeps a pilot over the built city and never leads off 
           prev = { x: g.x, z: g.z };
         }
       }
-      assert.ok(over / total > 0.9, `${id} seed ${seed}: only ${over}/${total} rings over the city`);
+      // Delhi has big parks and the Yamuna inside the city: rings over them are fine.
+      assert.ok(over / total > 0.8, `${id} seed ${seed}: only ${over}/${total} rings over the city`);
     }
   }
 });
