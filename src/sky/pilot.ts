@@ -60,12 +60,17 @@ export function assist(glider: Glider, stick: { roll: number; pitch: number }, b
   // Under boost, hands off holds the height: the thrust becomes speed toward the
   // ring, not a climb away from it.
   const neutral = boosting ? 0 : glide;
-  const want = Math.abs(stick.pitch) < 0.06 ? neutral : stick.pitch > 0 ? stick.pitch * 0.22 : stick.pitch * 0.5; // up to +12° climb, −29° dive
-  let pitch = 0.1 + 2.4 * (want - gamma) - 0.35 * glider.body.angularVelocity.dot(right) + turn;
+  const diving = stick.pitch < -0.06 && !boosting;
+  const want = Math.abs(stick.pitch) < 0.06 ? neutral : stick.pitch > 0 ? stick.pitch * 0.22 : stick.pitch * 0.62; // up to +12° climb, −36° dive
+  // Pushing down opens the airbrakes as speed builds, so a dive stays a dive
+  // (≈ 120–140 km/h) instead of the over-speed guard pulling the nose back up.
+  glider.controls.brake = diving ? clamp((t.airspeed - 30) / 8, 0, 1) : 0;
+  // A push answers quicker than a pull: diving for a low ring should feel immediate.
+  let pitch = 0.1 + (diving ? 3.4 : 2.4) * (want - gamma) - 0.35 * glider.body.angularVelocity.dot(right) + turn;
   // Stall protection: below the floor, the nose comes down whatever the stick says.
   if (t.airspeed < MIN_SPEED) pitch = Math.min(pitch, -0.25 * (MIN_SPEED - t.airspeed) + turn * 0.5);
-  // Over-speed protection: gliding, ease off above 42 m/s; boosting, only past 60.
-  if (t.airspeed > (boosting ? 60 : 42)) pitch = Math.max(pitch, 0.25);
+  // Over-speed protection: gliding, ease off above 42 m/s; diving with brakes, past 46; boosting, past 60.
+  if (t.airspeed > (boosting ? 60 : diving ? 46 : 42)) pitch = Math.max(pitch, 0.25);
   glider.controls.pitch = clamp(pitch, -0.8, 0.8);
 }
 

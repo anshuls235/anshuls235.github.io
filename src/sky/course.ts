@@ -46,9 +46,21 @@ function clearOver(city: City, ax: number, az: number, bx: number, bz: number) {
   let top = 0;
   for (let s = 0; s <= length; s += 18) {
     const t = length ? s / length : 0;
-    top = Math.max(top, city.roofAt(ax + (bx - ax) * t, az + (bz - az) * t, 30));
+    top = Math.max(top, city.roofAt(ax + (bx - ax) * t, az + (bz - az) * t, 48));
   }
   return top + CLEAR;
+}
+
+/** Over the built city: a mapped tile with buildings close by (not open sea or desert). */
+function overCity(city: City, x: number, z: number) {
+  const size = city.index.tileSize;
+  return city.tileSet.has(`${Math.floor(x / size)},${Math.floor(z / size)}`) && city.roofAt(x, z, 350) > 0;
+}
+/** The heart of the city, where its landmarks are: the course heads home from the edges. */
+function home(city: City) {
+  const l = city.landmarks;
+  if (!l.length) return { x: 0, z: 0 };
+  return { x: l.reduce((s, p) => s + p.x, 0) / l.length, z: l.reduce((s, p) => s + p.z, 0) / l.length };
 }
 
 export function nextGate(
@@ -61,6 +73,9 @@ export function nextGate(
 ): Gate[] {
   const diff = Math.max(0, Math.min(1, difficulty));
   const [hx, hz] = city.data.half;
+  const centre = home(city);
+  const lost = !overCity(city, from.x, from.z);
+  const towardHome = (heading: number) => Math.cos(Math.atan2(centre.x - from.x, -(centre.z - from.z)) - heading);
   const maxTurn = 0.95 + diff * 0.45; // sharper banking turns as difficulty ramps
   const ringRadius = 18 - diff * 5.5; // tightens from 18 m down to 12.5 m
   const timeCushion = Math.round(4 - diff * 2.5); // tighter clock margin at higher streaks
@@ -71,7 +86,7 @@ export function nextGate(
     const dist = 185 + rand() * 85;
     const x = from.x + Math.sin(heading) * dist;
     const z = from.z - Math.cos(heading) * dist;
-    if (Math.abs(x) > hx - 220 || Math.abs(z) > hz - 220) continue;
+    if (Math.abs(x) > hx - 400 || Math.abs(z) > hz - 400) continue;
     const y = from.y - dist / GLIDE - (4 + diff * 2);
     // The whole line, start to gate, must clear the roofs at the height the glide allows there.
     if (y < 52 || y < clearOver(city, from.x, from.z, x, z)) continue;
@@ -80,7 +95,9 @@ export function nextGate(
     const towerBonus = (Math.min(nearby, y - CLEAR) / Math.max(1, y)) * (1 + diff * 0.6);
     const turnBias = (0.15 - diff * 0.25) * Math.abs(turn);
     const toward = lure ? Math.cos(Math.atan2(lure.x - from.x, -(lure.z - from.z)) - heading) : 0;
-    const score = towerBonus + rand() * 0.3 - turnBias + Math.max(0, toward) * 0.45;
+    // Rings stay over the built city; off it, the course turns for home.
+    const cityScore = (overCity(city, x, z) ? 0 : -3) + (lost ? towardHome(heading) * 1.5 : 0);
+    const score = towerBonus + rand() * 0.3 - turnBias + Math.max(0, toward) * 0.45 + cityScore;
     if (!best || score > best.score) {
       best = {
         gate: {
@@ -139,20 +156,51 @@ export function nextGate(
       { x: above.x, y: top, z: above.z, nx: 0, ny: 1, nz: 0, kind: "climb", radius: 120, bonus: 60 },
     ];
   }
+  let lift: { gate: Gate; score: number } | null = null;
   for (let i = 0; i < 24; i++) {
     const heading = from.heading + (rand() - 0.5) * 2 * maxTurn;
-    const dist = 170 + rand() * 60;
+    const dist = 130 + rand() * 50;
     const x = from.x + Math.sin(heading) * dist;
     const z = from.z - Math.cos(heading) * dist;
-    if (Math.abs(x) > hx - 220 || Math.abs(z) > hz - 220) continue;
-    const y = Math.max(40, from.y - dist / GLIDE - 3);
+    if (Math.abs(x) > hx - 400 || Math.abs(z) > hz - 400) continue;
+    const y = Math.max(50, from.y - dist / GLIDE - 3);
     if (y < clearOver(city, from.x, from.z, x, z)) continue;
-    return [{ x, y, z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "lift", radius: 20, bonus: 8 }];
+    // Low among towers is no place to be: lift rings lead out to open ground.
+    const crowd = city.roofAt(x, z, 140) - y;
+    const score = (overCity(city, x, z) ? 1 : 0) + (lost ? towardHome(heading) : 0) - Math.max(0, crowd) / 40 + rand() * 0.2;
+    if (!lift || score > lift.score) lift = { gate: { x, y, z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "lift", radius: 20, bonus: 8 }, score };
   }
-  // Boxed in: straight ahead, as high as the glide allows.
-  const x = from.x + Math.sin(from.heading) * 180;
-  const z = from.z - Math.cos(from.heading) * 180;
-  return [{ x, y: Math.max(40, from.y - 24), z, nx: Math.sin(from.heading), ny: 0, nz: -Math.cos(from.heading), kind: "lift", radius: 24, bonus: 8 }];
+  if (lift) return [lift.gate];
+  // Boxed in: of sixteen short hops, the one with the most room above the roofs,
+  // leaning toward the city's heart.
+  const h = Math.atan2(centre.x - from.x, -(centre.z - from.z));
+  let pick = { margin: -Infinity, x: 0, y: 0, z: 0, heading: from.heading };
+  for (let k = 0; k < 16; k++) {
+    const heading = from.heading + ((k - 7.5) / 8) * Math.PI;
+    for (const dist of [140, 190]) {
+      const x = from.x + Math.sin(heading) * dist;
+      const z = from.z - Math.cos(heading) * dist;
+      if (Math.abs(x) > hx - 400 || Math.abs(z) > hz - 400) continue;
+      const y = Math.max(50, from.y - dist / GLIDE - 3);
+      const margin = y - clearOver(city, from.x, from.z, x, z) + Math.cos(h - heading) * 5 - Math.abs(wrapAngle(heading - from.heading)) * 8;
+      if (margin > pick.margin) pick = { margin, x, y, z, heading };
+    }
+  }
+  return [{ x: pick.x, y: pick.y, z: pick.z, nx: Math.sin(pick.heading), ny: 0, nz: -Math.cos(pick.heading), kind: "lift", radius: 24, bonus: 8 }];
+}
+
+const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Whether the plane can still glide into this gate from where it actually is.
+ * Rings are planned from the previous ring's height; a pilot who has sunk below
+ * that plan gets a fresh course from their real position instead of a ring
+ * they cannot reach (or a tower in the way).
+ */
+export function reachable(gate: Gate, p: { x: number; y: number; z: number }) {
+  if (gate.kind === "climb") return true;
+  const dist = Math.hypot(gate.x - p.x, gate.z - p.z);
+  return p.y - dist / 12 >= gate.y - gate.radius * 0.6;
 }
 
 /** Heading out of a gate, for laying the next one. */

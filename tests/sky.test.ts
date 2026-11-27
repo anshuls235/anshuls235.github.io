@@ -113,14 +113,21 @@ test("binary SKY1 tiles encode/decode round-trip and build all 3 LODs cleanly", 
   assert.ok(lod2.buildings.pos.length < lod0.buildings.pos.length, "far tiles are lighter than near ones");
 });
 
-import { nextGate, exitOf, crossing, seeded, START_TIME, type Gate } from "../src/sky/course";
+import { nextGate, exitOf, crossing, reachable, seeded, START_TIME, type Gate } from "../src/sky/course";
 
 /** A plain player: steer at the next ring, ask for climb or dive by height error, circle in climb rings. */
 function play(id: CityId, seconds: number) {
   const city = load(id);
   const world = createWorld();
   const g = createGlider(world);
-  g.setWind(cityWind(city.breeze, city.thermals, city.obstacles));
+  // As in the game: a lift ring hands the plane an updraft for a few seconds.
+  let gust = 0;
+  const air = cityWind(city.breeze, city.thermals, city.obstacles);
+  g.setWind((p, out) => {
+    air(p, out);
+    if (gust > 0) out.y += 7 * Math.min(1, gust);
+    return out;
+  });
   const start = launchPoint(city);
   g.launch(start.x, start.y, start.z, -start.heading, 20);
   const rand = seeded(7);
@@ -161,18 +168,23 @@ function play(id: CityId, seconds: number) {
     const a = { x: p.x, y: p.y, z: p.z };
     world.step(1 / 120);
     clock -= 1 / 120;
+    gust = Math.max(0, gust - 1 / 120);
     const b = { x: g.body.position.x, y: g.body.position.y, z: g.body.position.z };
-    if (city.hits(b.x, b.y, b.z)) crashed = `building at ${b.x.toFixed(0)},${b.y.toFixed(0)},${b.z.toFixed(0)}`;
-    else if (b.y < 0.6) crashed = "ground";
+    if (city.hits(b.x, b.y, b.z)) crashed = `building at ${b.x.toFixed(0)},${b.y.toFixed(0)},${b.z.toFixed(0)} heading for a ${gates[0].kind} ring at ${gates[0].x.toFixed(0)},${gates[0].y.toFixed(0)},${gates[0].z.toFixed(0)} after ${passed}`;
+    else if (b.y < 0.6) crashed = `ground at ${b.x.toFixed(0)},${b.z.toFixed(0)} heading for a ${gates[0].kind} ring at ${gates[0].x.toFixed(0)},${gates[0].y.toFixed(0)},${gates[0].z.toFixed(0)} after ${passed}, ${(i / 120).toFixed(0)} s`;
     const result = crossing(gates[0], a, b);
     if (result === "through" || result === "perfect") {
       passed++;
       if (gates[0].kind === "climb") climbs++;
+      if (gates[0].kind === "lift") gust = 6;
       clock += gates[0].bonus;
       gates.shift();
       fill();
-    } else if (result === "missed") {
-      gates.shift();
+    } else if (result === "missed" || (i % 120 === 0 && !reachable(gates[0], b))) {
+      // As in the game: missed, or sunk below the plan, a fresh course from here.
+      gates.length = 0;
+      tail = { x: b.x, y: b.y, z: b.z, heading: Math.atan2(g.body.velocity.x, -g.body.velocity.z) };
+      prev = { x: b.x, z: b.z };
       fill();
     }
   }
@@ -202,5 +214,32 @@ test("every ring the course lays is within reach, even low over Dubai's sparse t
       worst = Math.max(worst, Math.hypot(first.x - from.x, first.z - from.z));
     }
     assert.ok(worst < 800, `${id}: farthest first ring ${worst.toFixed(0)} m`);
+  }
+});
+
+test("following the rings keeps a pilot over the built city and never leads off the map", async () => {
+  const { nextGate, exitOf, seeded } = await import("../src/sky/course");
+  for (const id of ["dubai", "bengaluru", "delhi"] as CityId[]) {
+    const city = load(id);
+    const [hx, hz] = city.data.half;
+    const size = city.index.tileSize;
+    for (const seed of [1, 7, 99]) {
+      const rand = seeded(seed);
+      const start = launchPoint(city);
+      let from = { x: start.x, y: start.y, z: start.z, heading: start.heading };
+      let prev = { x: start.x, z: start.z };
+      let over = 0;
+      let total = 0;
+      for (let i = 0; i < 150; i++) {
+        for (const g of nextGate(city, from, rand, Math.min(1, i / 18))) {
+          total++;
+          assert.ok(Math.abs(g.x) < hx - 300 && Math.abs(g.z) < hz - 300, `${id}: ring ${i} at ${g.x.toFixed(0)},${g.z.toFixed(0)} is at the edge`);
+          if (city.tileSet.has(`${Math.floor(g.x / size)},${Math.floor(g.z / size)}`) && city.roofAt(g.x, g.z, 350) > 0) over++;
+          from = exitOf(g, prev);
+          prev = { x: g.x, z: g.z };
+        }
+      }
+      assert.ok(over / total > 0.9, `${id} seed ${seed}: only ${over}/${total} rings over the city`);
+    }
   }
 });

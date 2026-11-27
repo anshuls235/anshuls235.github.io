@@ -7,7 +7,7 @@ import { createWorld, createGlider, cityWind, type Glider } from "./glider";
 import { prepareCity, type City, type CityId, type CityIndex } from "./citydata";
 import { buildWorld, createBursts, createContrails, paperPlane, printPlane, type BuiltWorld } from "./world3d";
 import { autopilot, assist, launchPoint, type PilotState } from "./pilot";
-import { crossing, exitOf, nextGate, seeded, START_TIME, type Gate, type PickupKind } from "./course";
+import { crossing, exitOf, nextGate, reachable, seeded, START_TIME, type Gate, type PickupKind } from "./course";
 import { createSound, type Sound } from "./sound";
 
 export interface SkyOptions {
@@ -223,6 +223,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let gust = 0; // seconds of updraft left
   let combo = 0;
   let comboTimer = 0;
+  let replanTick = 0;
   let ringPoints = 0;
   let skimCooldown = 0;
   let skimTick = 0;
@@ -694,8 +695,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       clock += head.gate.bonus + extra;
       ringPoints += (100 + (perfect ? 50 : 0) + (fast ? 200 : 0)) * multiplier();
       boost = Math.min(1, boost + (perfect ? 0.3 : 0.15));
-      // A lift ring is a gift of height: a strong updraft for a few seconds.
-      if (head.gate.kind === "lift") gust = Math.max(gust, 4.5);
+      // A lift ring is a gift of height: a strong updraft for six seconds (~40 m).
+      if (head.gate.kind === "lift") gust = Math.max(gust, 6);
       sound?.ring(head.gate.kind === "climb" || perfect || fast);
       bursts.emit(head.mesh.position, tmpN.set(head.gate.nx, head.gate.ny, head.gate.nz), head.gate.radius, perfect || fast ? 0xffd25a : head.gate.kind === "climb" || head.gate.kind === "lift" ? 0x7cf0b8 : 0xff6a30, perfect || fast ? 140 : 90);
       kick = perfect ? 1 : 0.6;
@@ -704,6 +705,10 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       dropGate(head);
       gates.shift();
       fillGates();
+    } else if (++replanTick >= 60 && ((replanTick = 0), !reachable(head.gate, p))) {
+      // Sunk below the plan: quietly re-plan from here (no penalty), so the next
+      // ring is always one the plane can actually reach.
+      restartCourse();
     } else if (result === "missed" || strayed) {
       sound?.miss();
       combo = 0;

@@ -44,6 +44,8 @@ export interface Controls {
   roll: number;
   /** Booster thrust along the nose, newtons (0 when idle). */
   thrust: number;
+  /** Airbrakes (spoilers), 0 closed … 1 fully open: extra drag for steep, slow descents. */
+  brake: number;
 }
 
 export type WindField = (p: CANNON.Vec3, out: CANNON.Vec3) => CANNON.Vec3;
@@ -97,7 +99,7 @@ export function createGlider(world: CANNON.World) {
   body.updateMassProperties();
   world.addBody(body);
 
-  const controls: Controls = { pitch: 0, roll: 0, thrust: 0 };
+  const controls: Controls = { pitch: 0, roll: 0, thrust: 0, brake: 0 };
   const telemetry: Telemetry = { airspeed: 0, groundSpeed: 0, altitude: 0, vario: 0, alpha: 0, bank: 0, stalled: false, lift: 0, airVy: 0 };
   let wind: WindField = (_p, out) => out.set(0, 0, 0);
 
@@ -142,7 +144,7 @@ export function createGlider(world: CANNON.World) {
     // squashed, cutting induced drag (Wieselsberger) — a cushion when skimming low.
     const hb = Math.max(0.05, body.position.y / b);
     const ground = hb < 1.5 ? ((16 * hb) ** 2) / (1 + (16 * hb) ** 2) : 1;
-    const cd = GLIDER.cd0 + (ground * cl * cl) / (Math.PI * GLIDER.oswald * aspect) + 1.1 * Math.sin(alpha) ** 2;
+    const cd = GLIDER.cd0 + 0.09 * controls.brake + (ground * cl * cl) / (Math.PI * GLIDER.oswald * aspect) + 1.1 * Math.sin(alpha) ** 2;
     const cy = GLIDER.cyBeta * beta;
 
     // Lift is perpendicular to the relative wind, in the plane of symmetry.
@@ -197,6 +199,7 @@ export function createGlider(world: CANNON.World) {
     controls.pitch = 0;
     controls.roll = 0;
     controls.thrust = 0;
+    controls.brake = 0;
   }
 
   return {
