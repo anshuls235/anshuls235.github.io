@@ -139,7 +139,8 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   let grabs = 0;
   let slowWindows = 0;
   let fastWindows = 0;
-  let warming = false;
+  let compiling = false; // a new city's shaders are compiling
+  let preparingFlight = false; // a flight is loading behind the progress bar
   let built: BuiltWorld | null = null;
   const effective = () => (mode === "play" ? quality : Math.min(quality, 1));
   let night = document.documentElement.dataset.theme === "dark";
@@ -384,14 +385,14 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
     // stopping the page while it scrolls past.
     // It can never hold the city up: after 1.5 s the first frames compile what is left.
     // The loop pauses meanwhile, so nothing it would dispose is still being compiled.
-    warming = true;
+    compiling = true;
     await Promise.race([
       Promise.resolve()
         .then(() => renderer.compileAsync(scene, camera))
         .catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, 1500)),
     ]);
-    warming = false;
+    compiling = false;
     if (ticket !== building) return;
     resize();
   }
@@ -887,7 +888,7 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   }
   function frameBody(now: number) {
     frame = 0;
-    if (warming) {
+    if (compiling || preparingFlight) {
       last = 0;
       frame = requestAnimationFrame(loop);
       return;
@@ -1019,14 +1020,20 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
   const progressLabel = q("[data-sky-loading-label]");
   let preparing = 0;
   async function prepareFlight() {
-    if (!built || !city) return;
+    if (!built || !city) {
+      // No city yet: its own load will start the flight; never leave the bar up.
+      root.classList.remove("is-preparing");
+      return;
+    }
     const ticket = ++preparing;
     const world = built;
     root.classList.add("is-preparing");
+    // The HUD shows this flight from the start, not the background flight's numbers.
+    updateHud();
     if (progressLabel) progressLabel.textContent = `Preparing ${city.data.name}…`;
     const show = (f: number) => progressBar?.style.setProperty("--progress", (0.1 + f * 0.75).toFixed(3));
     show(0);
-    warming = true;
+    preparingFlight = true;
     const start = launchPoint(city);
     await world.prepare(start.x, start.z, show);
     if (ticket !== preparing || world !== built) return;
@@ -1066,17 +1073,18 @@ export function initSky(root: HTMLElement, options: SkyOptions): SkyControls | n
       paceTime = paceFrames = slowWindows = fastWindows = 0;
     }
     progressBar?.style.setProperty("--progress", "1");
-    warming = false;
+    preparingFlight = false;
     root.classList.remove("is-preparing");
     if (progressLabel) progressLabel.textContent = "Loading the city…";
     launch();
+    updateHud();
   }
 
   function setMode(next: "attract" | "play") {
     mode = next;
     if (next !== "play" && preparing) {
       preparing++;
-      warming = false;
+      preparingFlight = false;
       root.classList.remove("is-preparing");
     }
     root.dataset.skyMode = next;

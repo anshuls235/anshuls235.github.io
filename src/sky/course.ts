@@ -167,7 +167,7 @@ export function nextGate(
     if (y < clearOver(city, from.x, from.z, x, z)) continue;
     // Low among towers is no place to be: lift rings lead out to open ground.
     const crowd = city.roofAt(x, z, 140) - y;
-    const score = (overCity(city, x, z) ? 1 : 0) + (lost ? towardHome(heading) : 0) - Math.max(0, crowd) / 40 + rand() * 0.2;
+    const score = (overCity(city, x, z) ? 1 : 0) + (lost ? towardHome(heading) : 0) - Math.max(0, crowd + 30) / 8 + rand() * 0.2;
     if (!lift || score > lift.score) lift = { gate: { x, y, z, nx: Math.sin(heading), ny: 0, nz: -Math.cos(heading), kind: "lift", radius: 20, bonus: 8 }, score };
   }
   if (lift) return [lift.gate];
@@ -206,7 +206,9 @@ export function reachable(gate: Gate, p: { x: number; y: number; z: number }) {
 /** Heading out of a gate, for laying the next one. */
 export function exitOf(gate: Gate, previous: { x: number; z: number }) {
   const heading = gate.kind === "climb" ? Math.atan2(gate.x - previous.x, -(gate.z - previous.z)) : Math.atan2(gate.nx, -gate.nz);
-  return { x: gate.x, y: gate.y, z: gate.z, heading };
+  // A lift ring's updraft carries the plane up ~40 m; plan the next ring from there
+  // (conservatively), or a chain of lift rings would step down into the towers.
+  return { x: gate.x, y: gate.y + (gate.kind === "lift" ? 30 : 0), z: gate.z, heading };
 }
 
 /** Whether the step from a to b passed through the gate (dead centre counts as perfect), or left it behind. */
